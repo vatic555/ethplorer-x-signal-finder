@@ -1,0 +1,24 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ethplorer-x-signal-finder"
+version = "0.1.0"
+description = "AI-assisted X intelligence pipeline foundation for Ethplorer"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "Proprietary" }
+authors = [
+  { name = "Ethplorer" },
+]
+dependencies = []
+
+[project.scripts]
+x-signal-finder = "x_signal_finder.cli:main"
+
+[tool.setuptools]
+package-dir = { "" = "src" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
