@@ -37,8 +37,12 @@ dist/
 *.sqlite3-journal
 
 # Runtime and analytical exports
+data/runtime/
+data/raw/
 data/exports/*
 !data/exports/.gitkeep
+*.dump
+*.sql.gz
 
 # IDE and editor files
 .idea/

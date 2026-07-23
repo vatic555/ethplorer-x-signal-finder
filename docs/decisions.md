@@ -44,6 +44,8 @@ Status: Accepted
 
 A managed PostgreSQL service such as Supabase is the intended operational source of truth. The provider and schema are not selected or implemented in this bootstrap.
 
+Superseded by the 2026-07-23 decision below.
+
 ## 2026-07-22 - Git excludes raw operational X content
 
 Status: Accepted
@@ -61,3 +63,13 @@ Python 3.11 or newer is the main runtime. Platform-specific scripts may be optio
 Status: Accepted
 
 Every draft requires human review, and a human must publish it. Automatic publication requires an explicit future specification and architecture decision change.
+
+## 2026-07-23 - Supabase selected as the initial managed PostgreSQL provider
+
+Status: Accepted
+
+Supabase is the initial managed PostgreSQL provider for the MVP. The application connects with a protected standard PostgreSQL connection string from `DATABASE_URL` through `psycopg`. It does not depend on the Supabase Python SDK, anon keys, authenticated roles, service-role keys, or provider-specific UUID extensions. The storage layer remains compatible with other standard PostgreSQL providers.
+
+PostgreSQL is the operational source of truth. GitHub remains separate from operational data and must not contain raw X content, runtime databases, dumps, or operational exports. Database secrets exist only in local or deployment environment configuration.
+
+Schema changes use explicit, deterministic, checksum-tracked migrations. Normal pipeline execution never creates or migrates the database automatically. Operational tables use Row Level Security without anonymous or authenticated public policies.

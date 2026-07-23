@@ -1,89 +1,114 @@
 # Ethplorer X Signal Finder
 
-Ethplorer X Signal Finder is the foundation for an AI-assisted X intelligence pipeline. It is intended to find rare discussions with a real information gap that Ethplorer can close naturally and credibly using documented products, data, analytics, infrastructure, expertise, or business development capabilities.
+Ethplorer X Signal Finder is an AI-assisted X intelligence pipeline foundation. It is intended to find rare discussions with a real information gap that Ethplorer can close naturally and credibly using documented products, data, analytics, infrastructure, expertise, or business development capabilities.
 
 It is not a generic crypto-news aggregator, an automatic publishing bot, or a mechanism for forcing Ethplorer into unrelated conversations.
 
 ## Current Status
 
-The repository is bootstrapped with the canonical specification, decision log, terminology structure, knowledge-base placeholders, initial prompt templates, and a minimal Python CLI. X collection, durable database storage, LLM integration, Telegram, and publication are not implemented. The CLI makes no external API calls and needs no credentials.
+The durable PostgreSQL storage foundation is implemented. PostgreSQL is the operational source of truth, with Supabase selected as the initial managed provider. Application code uses the standard PostgreSQL protocol through `psycopg` and does not use the Supabase Python SDK.
+
+X collection, LLM integration, Telegram, and publication are not implemented. All publication remains a mandatory human action.
 
 ## Repository Structure
 
 ```text
 .
-├── AGENTS.md                  # Instructions for coding agents
-├── docs/                      # Canonical specification and decisions
-├── knowledge/                 # Terminology, sources, and asset catalog
-├── prompts/                   # Initial processing-stage prompt templates
-├── src/x_signal_finder/       # Cross-platform Python package and CLI
-├── migrations/                # Future database migrations
-├── scripts/                   # Future optional helper scripts
-├── tests/                     # Future automated tests
-└── data/
-    ├── exports/               # Ignored analytical exports
-    └── fixtures/              # Safe future test fixtures
+|-- AGENTS.md
+|-- docs/                      # Canonical specification and decisions
+|-- knowledge/                 # Terminology, sources, and asset catalog
+|-- migrations/                # Reviewable PostgreSQL migrations
+|-- prompts/                   # Processing-stage prompt templates
+|-- src/x_signal_finder/       # Cross-platform package, CLI, and storage code
+|-- tests/                     # Unit and optional PostgreSQL integration tests
+`-- data/
+    `-- exports/               # Ignored analytical exports
 ```
 
-## Setup on macOS or Linux
+Git does not store runtime databases, database dumps, raw X content, or operational exports.
+
+## Setup
 
 Python 3.11 or newer is required.
+
+macOS or Linux:
 
 ```sh
 python3 -m venv .venv
 source .venv/bin/activate
-python -m pip install --editable .
+python -m pip install --editable ".[dev]"
 ```
 
-## Setup on Windows
-
-Using PowerShell with Python 3.11 or newer:
+Windows PowerShell:
 
 ```powershell
 py -3.11 -m venv .venv
-.venv\Scripts\Activate.ps1
-python -m pip install --editable .
+.venv\Scripts\python.exe -m pip install --editable ".[dev]"
 ```
 
-If PowerShell execution policy prevents activation, the virtual-environment interpreter can be used directly:
+## Database Configuration
 
-```powershell
-.venv\Scripts\python.exe -m pip install --editable .
+Copy `.env.example` to `.env` for local development and set:
+
+```dotenv
+DATABASE_URL=postgresql://...
 ```
 
-## Run the CLI
+`.env` is local and ignored by Git. Never commit the database password or paste it into documentation, issues, or chat. Real environment variables override `.env`.
 
-After installation:
+For Supabase:
+
+1. Create a Supabase project and choose its database password.
+2. Open the project's connection dialog and copy a PostgreSQL connection string appropriate for the execution environment.
+3. Replace the password placeholder locally and save the full value only as `DATABASE_URL` in `.env`.
+4. Run the explicit migration and validation commands below.
+
+The MVP uses a protected PostgreSQL connection. It does not use anon keys, authenticated roles, service-role keys, or public API policies. RLS is enabled on operational tables with no anonymous or authenticated public policies.
+
+## CLI
+
+General commands:
 
 ```sh
 python -m x_signal_finder --help
 python -m x_signal_finder status
 ```
 
-The installed console entry point is equivalent:
+Database commands:
 
 ```sh
-x-signal-finder --help
-x-signal-finder status
+python -m x_signal_finder db doctor
+python -m x_signal_finder db migrate
+python -m x_signal_finder db status
+python -m x_signal_finder db smoke-test
 ```
 
-No `.env` file or credentials are required for these commands.
+`db doctor` and `db status` are read-only. `db migrate` is the only command that applies schema migrations. Migrations never run automatically during normal pipeline execution. `db smoke-test` creates clearly synthetic records inside one transaction, rolls it back, and verifies that no synthetic rows remain.
+
+All database commands return a non-zero exit code on failure and redact PostgreSQL connection strings from output.
+
+## Tests
+
+Default tests require no credentials and make no external API calls:
+
+```sh
+python -m pytest
+```
+
+Optional PostgreSQL integration tests use only `TEST_DATABASE_URL` and never fall back to `DATABASE_URL`:
+
+```sh
+python -m pytest -m integration
+```
 
 ## Current Limitations
 
 - No X API collection or pagination
-- No operational database or Supabase integration
-- No LLM calls
+- No LLM calls or prompt execution
 - No context enrichment from external sources
 - No Telegram delivery
 - No automatic image generation
 - No GitHub Actions
 - No automatic publication
 
-All publication remains a mandatory human action.
-
-## Next Implementation Milestone
-
-Design and implement durable storage and X collection with safe pagination and checkpoints.
-
-Before changing architecture or product behavior, read [`docs/project-spec.md`](docs/project-spec.md). Never commit secrets, runtime databases, raw operational X content, or private or licensed exports.
+Before changing architecture or product behavior, read `docs/project-spec.md`.

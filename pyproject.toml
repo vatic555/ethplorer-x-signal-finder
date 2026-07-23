@@ -12,7 +12,15 @@ license = { text = "Proprietary" }
 authors = [
   { name = "Ethplorer" },
 ]
-dependencies = []
+dependencies = [
+  "psycopg[binary]>=3.2,<4",
+  "python-dotenv>=1.0,<2",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8,<9",
+]
 
 [project.scripts]
 x-signal-finder = "x_signal_finder.cli:main"
@@ -22,3 +30,8 @@ package-dir = { "" = "src" }
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.pytest.ini_options]
+markers = [
+  "integration: requires an explicitly configured PostgreSQL test database",
+]

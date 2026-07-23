@@ -20,7 +20,7 @@ The intended MVP automates collection and filtering, including collection, durab
 
 Execution is initially started manually once or twice per day. Humans review Opportunities, edit drafts, record feedback, and publish on X. Human publication is mandatory.
 
-This bootstrap stage creates the repository foundation, documentation, prompts, and a minimal local CLI only. It does not implement collection, database access, model calls, Telegram, publication, or other external integrations.
+The current implementation includes the repository foundation, documentation, prompts, a local CLI, and durable PostgreSQL storage. It does not implement collection, model calls, Telegram, publication, or other external integrations.
 
 ## 4. Inputs
 
@@ -151,7 +151,13 @@ No Visual Brief should be produced when text is sufficient, when reliable data i
 
 ## 13. Storage and Auditability
 
-The intended operational source of truth is a managed PostgreSQL database such as Supabase. Database integration is not implemented in this bootstrap task. Likely entities include `runs`, `posts`, `signals`, `opportunities`, `usage_events`, and `sync_state`; their final schema remains an open design decision.
+PostgreSQL is the operational source of truth. Supabase is the initial managed PostgreSQL provider, but application code uses standard PostgreSQL interfaces through `psycopg` and does not depend on the Supabase Python SDK. The connection string is read from `DATABASE_URL`; local `.env` configuration is optional, and real environment variables take precedence.
+
+The implemented schema includes `schema_migrations`, `runs`, `posts`, `signals`, `signal_posts`, `opportunities`, `human_reviews`, `usage_events`, and `sync_state`. Application-generated UUIDs avoid provider-specific UUID extensions. Repository operations use parameterized SQL and caller-owned explicit transactions.
+
+Schema migrations are deterministic, reviewable, safe to run repeatedly, and tracked by version and SHA-256 checksum. A changed or missing applied migration causes a clear failure. Migrations run only through an explicit database CLI command and never during normal pipeline execution.
+
+All operational tables have Row Level Security enabled with no anonymous or authenticated public policies. The MVP application uses a protected PostgreSQL connection and does not use anon keys, authenticated roles, service-role keys, or public Supabase API access.
 
 Git must not be used as the operational store for raw X content. Runtime databases, raw runtime data, and private or licensed exports must not be committed. CSV and XLSX files are analytical exports, not the operational source of truth.
 
@@ -171,7 +177,7 @@ Platform-specific scripts may be optional conveniences but must never be the onl
 
 Future external-service activity must produce structured usage events linked to a run and processing stage. Records should capture the provider, operation or model, request count, measured input and output units where available, reported or estimated cost, currency, timestamp, and relevant entity IDs.
 
-Reported usage, estimated usage, and unknown cost must remain distinguishable. This bootstrap stage performs no external calls and incurs no API usage.
+Reported usage, estimated usage, and unknown cost must remain distinguishable. The current storage stage performs no external service calls and incurs no API usage.
 
 ## 16. Human Review and Feedback
 
@@ -225,7 +231,6 @@ The following features are explicitly deferred:
 - Which X API access tier and endpoints can satisfy source access, pagination, retention, and compliance requirements?
 - What exact boundary defines a complete collection when an API window ends before the stored checkpoint?
 - What checkpoint and transaction design guarantees that partial collection never advances state?
-- What managed PostgreSQL provider and schema best satisfy durability, audit, privacy, and cost needs?
 - What retention, deletion, and content-display policies are required by the applicable X terms?
 - How should event-cluster identity and later cluster merging be represented?
 - Which structured schemas and confidence rules should each prompt stage use?
