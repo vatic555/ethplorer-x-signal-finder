@@ -2,6 +2,11 @@
 
 - Read `docs/project-spec.md` before making architectural or product changes.
 - Treat `docs/project-spec.md` as the canonical product and technical specification.
+- Read `docs/roadmap.md` before implementation work and follow its canonical stage order.
+- Preserve the roadmap's MVP boundary: Stages 0 through 7 are MVP, and Stage 8 is post-MVP.
+- Update `docs/roadmap.md` and `README.md` whenever the current stage or stage status changes.
+- Never mark a roadmap stage Completed until its task-specific validation passes.
+- Record an accepted decision in `docs/decisions.md` before reordering or bypassing roadmap stages.
 - Do not invent Ethplorer capabilities. Use only capabilities documented in the knowledge base.
 - Clearly distinguish verified facts, model inference, and unresolved uncertainty.
 - Reject weak Opportunities instead of producing generic drafts.

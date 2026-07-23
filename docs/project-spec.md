@@ -2,6 +2,10 @@
 
 Status: Canonical specification for the current MVP direction
 
+## Specification and Roadmap
+
+This document defines required product and technical behavior. `docs/roadmap.md` defines implementation sequence and progress. Stages 0 through 7 constitute the MVP, and Stage 8 is post-MVP. Roadmap status cannot redefine product requirements.
+
 ## 1. Product Goal
 
 Ethplorer X Signal Finder is an AI-assisted intelligence pipeline that analyzes selected X sources and identifies rare, high-value discussions where Ethplorer can contribute natural, specific, and credible value through documented products, data, analytics, infrastructure, expertise, or business development opportunities.
