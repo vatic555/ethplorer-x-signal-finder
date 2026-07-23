@@ -6,16 +6,17 @@ It is not a generic crypto-news aggregator, an automatic publishing bot, or a me
 
 ## Current Status
 
-The local durable PostgreSQL storage implementation is ready, while real Supabase migration and validation remain pending. PostgreSQL is the operational source of truth, with Supabase selected as the initial managed provider. Application code uses the standard PostgreSQL protocol through `psycopg` and does not use the Supabase Python SDK.
+The durable PostgreSQL storage foundation is implemented and validated against the real Supabase database. PostgreSQL is the operational source of truth, with Supabase selected as the initial managed provider. Application code uses the standard PostgreSQL protocol through `psycopg` and does not use the Supabase Python SDK.
 
 X collection, LLM integration, Telegram, and publication are not implemented. All publication remains a mandatory human action.
 
 ## Implementation Status
 
 - Stage 0 - Repository Bootstrap - Completed
-- Stage 1 - Durable Storage Foundation - In Progress
-- Current task - Task 002 - Durable Storage Foundation
-- Remaining milestone - real Supabase migration and validation
+- Stage 1 - Durable Storage Foundation - Completed
+- Stage 2 - X API Access Spike - Planned
+- Current task - None
+- Next task - Task 003 - X API Access Spike
 
 See the canonical [implementation roadmap](docs/roadmap.md), [product and technical specification](docs/project-spec.md), and [architecture decision log](docs/decisions.md).
 

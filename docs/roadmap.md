@@ -5,11 +5,12 @@ Status: Canonical implementation sequence and progress record
 ## Current Position
 
 - Stage 0 - Repository Bootstrap - Completed
-- Stage 1 - Durable Storage Foundation - In Progress
-- Current task - Task 002 - Durable Storage Foundation
+- Stage 1 - Durable Storage Foundation - Completed
+- Stage 2 - X API Access Spike - Planned
+- Current task - None
+- Next task - Task 003 - X API Access Spike
 - Local PostgreSQL implementation is ready
-- Real Supabase connection is available
-- Supabase migration and full database validation are still pending
+- Real Supabase migration and database validation are complete
 
 Stage 1 must not be marked Completed until the real Supabase database has been created, migrations have been applied, and database validation has passed.
 
@@ -50,7 +51,7 @@ Post-MVP work may cover:
 | Stage | Name | Status | Task | MVP |
 |---|---|---|---|---|
 | 0 | Repository Bootstrap | Completed | Task 001 | Yes |
-| 1 | Durable Storage Foundation | In Progress | Task 002 | Yes |
+| 1 | Durable Storage Foundation | Completed | Task 002 | Yes |
 | 2 | X API Access Spike | Planned | Task 003 | Yes |
 | 3 | X Collection Pipeline | Planned | Task 004 | Yes |
 | 4 | Minimum Knowledge Base | Planned | Task 005 | Yes |
@@ -77,16 +78,18 @@ Established the repository foundation:
 ### Tasks
 
 - Task 001 - Repository Bootstrap - Completed
-- Task 001A - Canonical Implementation Roadmap - In Progress
+- Task 001A - Canonical Implementation Roadmap - Completed
 
 ### Completion Record
 
 - Final commit: `f9b5abf9abe28f3891c0c1cf1376f9a1b87e8353`
 - Commit message: `chore: bootstrap Ethplorer X Signal Finder`
+- Roadmap task commit: `671a7cbd1f4990e78e41d4717dada5bde28abf59`
+- Roadmap validation summary: canonical roadmap created; linked documents aligned; documentation consistency checks passed.
 
 ## Stage 1 - Durable Storage Foundation
 
-Status: In Progress
+Status: Completed
 
 Create the cloud PostgreSQL foundation:
 
@@ -104,18 +107,19 @@ Current state:
 - local schema and implementation are ready;
 - default tests pass;
 - real Supabase connection is available;
-- Supabase migration and full database validation remain pending.
+- migration 1 is applied with no pending migrations;
+- database structure, RLS, rollback behavior, and connectivity are validated.
 
 ### Tasks
 
-- Task 002 - Durable Storage Foundation - In Progress
+- Task 002 - Durable Storage Foundation - Completed
 
 ### Completion Record
 
-- Completion date:
-- Final commit:
-- Validation summary:
-- Remaining limitations:
+- Completion date: 2026-07-23
+- Final commit: `dda7e417550a8f5a05c88f2277443e07c577fcc0`
+- Validation summary: Supabase PostgreSQL 17.6; migration 1 applied; `db doctor` healthy; `db smoke-test` passed with all synthetic changes rolled back; 12 default tests passed with 1 optional integration test skipped; explicit Supabase integration test passed; repeat migration reported no pending work.
+- Remaining limitations: No known Task 002 limitations. X collection and later pipeline stages remain unimplemented.
 
 ## Stage 2 - X API Access Spike
 
