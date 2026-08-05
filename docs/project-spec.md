@@ -24,7 +24,7 @@ The intended MVP automates collection and filtering, including collection, durab
 
 Execution is initially started manually once or twice per day. Humans review Opportunities, edit drafts, record feedback, and publish on X. Human publication is mandatory.
 
-The current implementation includes the repository foundation, documentation, prompts, a local CLI, durable PostgreSQL storage, and an isolated read-only X API access-spike probe with one-shot OAuth 2.0 PKCE diagnostics. The probe is not a collector, does not persist API responses or checkpoints, and never writes to PostgreSQL. Live X validation remains pending credentials and manual account authorization. Collection, model calls, Telegram, and publication are not implemented.
+The current implementation includes the repository foundation, documentation, prompts, a local CLI, durable PostgreSQL storage, and an isolated read-only X API access-spike probe with one-shot OAuth 2.0 PKCE diagnostics. Live validation confirmed OAuth authorization and refresh, home-timeline pagination and in-memory checkpoint detection, and access to the direct `@Ethplorer` mentions endpoint. The Stage 2 decision is `constrained-go` because the API exposes bounded history, partial errors require conservative handling, actual billing remains observable only through the Developer Console, and the empty live mentions result did not exercise pagination. The probe is not a collector, does not persist API responses or checkpoints, and never writes to PostgreSQL. Collection, model calls, Telegram, and publication are not implemented.
 
 ## 4. Inputs
 

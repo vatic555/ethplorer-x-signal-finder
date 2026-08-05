@@ -37,7 +37,7 @@ from x_signal_finder.x_api.probe import run_probe
 
 STATUS_MESSAGE = (
     "Durable PostgreSQL storage foundation is implemented. "
-    "The X API access spike is in progress. "
+    "The X API access spike is complete with a constrained-go decision. "
     "X collection and LLM integration are not implemented."
 )
 

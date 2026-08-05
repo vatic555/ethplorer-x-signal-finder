@@ -14,7 +14,9 @@ def test_project_status_does_not_require_database(capsys) -> None:
     result = main(["status"])
 
     assert result == 0
-    assert "PostgreSQL storage foundation is implemented" in capsys.readouterr().out
+    output = capsys.readouterr().out
+    assert "PostgreSQL storage foundation is implemented" in output
+    assert "access spike is complete with a constrained-go decision" in output
 
 
 def test_x_api_subcommands_parse() -> None:

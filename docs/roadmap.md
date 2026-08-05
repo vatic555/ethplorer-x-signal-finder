@@ -6,13 +6,13 @@ Status: Canonical implementation sequence and progress record
 
 - Stage 0 - Repository Bootstrap - Completed
 - Stage 1 - Durable Storage Foundation - Completed
-- Stage 2 - X API Access Spike - In Progress
-- Current task - Task 003 - X API Access Spike
-- Next task - Complete Task 003 validation before starting Task 004
+- Stage 2 - X API Access Spike - Completed
+- Current task - Task 003 - X API Access Spike - Completed
+- Next task - Task 004 - X Collection Pipeline - Planned
 - Local PostgreSQL implementation is ready
 - Real Supabase migration and database validation are complete
-- Task 003 documentation review and diagnostic probe are implemented
-- Stage 2 blocker - X credentials and manual Aleksandr OAuth authorization are not yet available for live endpoint and pagination validation
+- Task 003 documentation review, diagnostic probe, live OAuth, endpoint, pagination, refresh, and checkpoint validation are complete
+- Stage 2 decision - `constrained-go`; Stage 3 remains Planned and has not started
 
 Stage 1 must not be marked Completed until the real Supabase database has been created, migrations have been applied, and database validation has passed.
 
@@ -54,7 +54,7 @@ Post-MVP work may cover:
 |---|---|---|---|---|
 | 0 | Repository Bootstrap | Completed | Task 001 | Yes |
 | 1 | Durable Storage Foundation | Completed | Task 002 | Yes |
-| 2 | X API Access Spike | In Progress | Task 003 | Yes |
+| 2 | X API Access Spike | Completed | Task 003 | Yes |
 | 3 | X Collection Pipeline | Planned | Task 004 | Yes |
 | 4 | Minimum Knowledge Base | Planned | Task 005 | Yes |
 | 5 | Relevance Filtering and Signal Clustering | Planned | Task 006 | Yes |
@@ -125,7 +125,7 @@ Current state:
 
 ## Stage 2 - X API Access Spike
 
-Status: In Progress
+Status: Completed
 
 Verify the real technical and commercial limits of X before building the collector:
 
@@ -143,23 +143,26 @@ Verify the real technical and commercial limits of X before building the collect
 
 Current state:
 
-- official X documentation review is complete as of 2026-08-04;
+- official X documentation review is complete as of 2026-08-05;
 - isolated read-only probe, OAuth 2.0 PKCE helper, synthetic fixtures, and mocked tests are implemented;
-- documentation-only findings support technical feasibility with limited history windows;
-- no live X endpoint has been called because credentials and manual account authorization are absent;
-- decision remains `blocked pending credentials`;
-- Stage 3 must not start until live authentication, endpoint, pagination, checkpoint, and billing validation passes.
+- live OAuth 2.0 PKCE authorization and refresh succeeded;
+- live home-timeline requests returned HTTP 200, exercised multiple pages, showed no duplicate IDs, repeated page one consistently, and reached an in-memory checkpoint;
+- the direct `@Ethplorer` mentions request returned HTTP 200 under Aleksandr user context, demonstrating that separate Ethplorer authorization is not required to call the endpoint in this configuration;
+- the mentions response contained no Posts, so mentions pagination could not be observed live;
+- decision is `constrained-go` because of bounded history windows, possible partial errors, unobserved mentions pagination, Developer Console billing dependence, and unresolved operational compliance details;
+- Stage 3 remains Planned and has not started.
 
 ### Tasks
 
-- Task 003 - X API Access Spike - In Progress
+- Task 003 - X API Access Spike - Completed
 
 ### Completion Record
 
-- Completion date:
-- Final commit:
-- Validation summary: Documentation review and default synthetic tests pass; live validation is pending and the stage is not complete.
-- Remaining limitations: Blocked pending X app credentials and manual Aleksandr OAuth authorization. Home, mentions, refresh, pagination, history sufficiency, actual rate-limit headers, and billing are not live-validated.
+- Completion date: 2026-08-05
+- Final implementation commit: `d21fb2cd99cab8fa6b37fa465501e90db03ca751`
+- Decision: `constrained-go`
+- Validation summary: OAuth 2.0 PKCE authorization and refresh succeeded; home and mentions endpoints returned HTTP 200; home pagination, page-repeat consistency, duplicate detection, returned fields, actual rate-limit headers, and in-memory checkpoint reachability were validated; the default test suite passed without external calls; tokens, responses, and Post text were not persisted.
+- Remaining limitations: Home is bounded to the documented 3,200-Post or seven-day window, and mentions to 800 Posts. The live mentions result was empty, so its pagination was not exercised. Home responses can contain partial object errors even with HTTP 200. Exact charged usage remains a Developer Console observation. Stage 3 must implement independent safe checkpoints, complete pagination, partial-error failure handling, possible-window-truncation warnings, usage accounting, and an approved retention and deletion process.
 
 ## Stage 3 - X Collection Pipeline
 

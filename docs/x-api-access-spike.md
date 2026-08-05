@@ -1,23 +1,25 @@
 # X API Access Spike
 
-Investigation date: 2026-08-04
+Documentation investigation: 2026-08-04, rechecked 2026-08-05
+
+Live validation: 2026-08-05
 
 ## 1. Executive conclusion
 
-Decision: `blocked pending credentials`
+Decision: `constrained-go`
 
-Official documentation indicates that both MVP sources are technically available through X API v2:
+Official documentation and live read-only validation confirm that both MVP sources are technically available through X API v2:
 
 - the reverse chronological home timeline through `GET /2/users/{id}/timelines/reverse_chronological`, using user context for the same authenticated user;
 - `@Ethplorer` mentions through `GET /2/users/{id}/mentions`, using app-only or user-context authentication for a visible account.
 
-The documented request limits are sufficient for one or two manually started runs per day. However, no X credentials or completed owner authorization were available on the investigation date. Authentication, endpoint responses, pagination, refresh behavior, history sufficiency, checkpoint behavior, and billing have therefore not been validated live. Stage 2 remains In Progress and Stage 3 must not start.
+OAuth 2.0 PKCE authorization and refresh succeeded. The home endpoint returned HTTP 200 across multiple pages, repeated page one consistently, returned no duplicate Post IDs, and reached a synthetic in-memory checkpoint. The direct `@Ethplorer` mentions endpoint returned HTTP 200 under Aleksandr user context, but its current result was empty and therefore could not exercise mentions pagination.
 
-The documentation-only evidence suggests a possible future `constrained-go`, primarily because the home timeline is limited to the most recent 3,200 Posts or seven days and the mentions timeline to 800 Posts. That is not the final spike decision.
+The result is constrained because the home timeline is limited to the most recent 3,200 Posts or seven days, the mentions timeline to 800 Posts, an HTTP 200 response can contain partial object errors, live mentions pagination remains unobserved, exact charged usage is available only through the Developer Console, and retention and deletion obligations require Stage 3 controls. Stage 2 is complete. Stage 3 remains Planned and must begin only as Task 004.
 
 ## 2. Investigation date and sources
 
-All sources below are official X documentation and were checked on 2026-08-04.
+All sources below are official X documentation. They were checked on 2026-08-04 and the central timeline, OAuth, pricing, and policy sources were rechecked on 2026-08-05.
 
 | Official source | What it supports |
 |---|---|
@@ -47,8 +49,8 @@ Prices and access conditions can change. The Developer Console remains authorita
 
 | Source | Endpoint | Authentication | Required scopes | Pagination | History window | Rate limit | Pricing | Live tested |
 |---|---|---|---|---|---|---|---|---|
-| Aleksandr home | `GET /2/users/{id}/timelines/reverse_chronological` | OAuth 2.0 Authorization Code with PKCE or OAuth 1.0a user context; `{id}` must equal authenticated user | `tweet.read`, `users.read`; `offline.access` for refresh token | `pagination_token` from `meta.next_token`; 1-100 per page | Most recent 3,200 Posts or seven days | 180 requests per user per 15 minutes; no app-only limit because app-only is unsupported | Public resource price is $0.005 per Post read; home is not listed as an Owned Read | No - credentials absent |
-| `@Ethplorer` mentions | `GET /2/users/{id}/mentions` | OAuth 2.0 app-only bearer token, OAuth 2.0 PKCE user context, or OAuth 1.0a user context for visible content | App-only has no user scopes; PKCE uses `tweet.read`, `users.read` | `pagination_token`; 5-100 per page | Most recent 800 mentions | 450 requests per app or 300 per user per 15 minutes | $0.005 per Post read normally; $0.001 only when the documented Owned Read ownership and authenticated-ID conditions are met | No - credentials absent |
+| Aleksandr home | `GET /2/users/{id}/timelines/reverse_chronological` | OAuth 2.0 Authorization Code with PKCE or OAuth 1.0a user context; `{id}` must equal authenticated user | `tweet.read`, `users.read`; `offline.access` for refresh token | `pagination_token` from `meta.next_token`; 1-100 per page | Most recent 3,200 Posts or seven days | 180 requests per user per 15 minutes; no app-only limit because app-only is unsupported | Public resource price is $0.005 per Post read; home is not listed as an Owned Read | Yes - HTTP 200, multi-page pagination and checkpoint reached |
+| `@Ethplorer` mentions | `GET /2/users/{id}/mentions` | OAuth 2.0 app-only bearer token, OAuth 2.0 PKCE user context, or OAuth 1.0a user context for visible content | App-only has no user scopes; PKCE uses `tweet.read`, `users.read` | `pagination_token`; 5-100 per page | Most recent 800 mentions | 450 requests per app or 300 per user per 15 minutes | $0.005 per Post read normally; $0.001 only when the documented Owned Read ownership and authenticated-ID conditions are met | Yes - HTTP 200 with an empty result; pagination not observed |
 | Mentions fallback | `GET /2/tweets/search/recent?query=@Ethplorer` | App-only or supported user context | `tweet.read`, `users.read` for PKCE | `next_token`; up to 100 per page | Last seven days | Current app-specific limit must be verified in the Developer Console before adoption | $0.005 per Post read under current public pricing | No - direct endpoint must be tested first |
 
 The recent-search fallback is not equivalent to the mentions timeline. It has a seven-day time boundary, query semantics rather than a user timeline contract, separate rate limits and billing behavior, and potential differences around protected, unavailable, edited, indexed, or delayed content. `@Ethplorer` is the official mention operator; `to:Ethplorer` matches replies only and is not a complete substitute.
@@ -91,11 +93,11 @@ The helper never prints or persists access tokens, refresh tokens, response bodi
 
 The home endpoint path ID must be the authenticated Aleksandr user ID. An Ethplorer token cannot retrieve Aleksandr's personalized home feed, and an Aleksandr token cannot retrieve a different user's home feed.
 
-The direct mentions endpoint supports app-only authentication, so a separate `@Ethplorer` OAuth authorization is not documented as mandatory for public mentions. A separate Ethplorer authorization can still affect visibility, account-owned pricing, and access to protected content. These differences require live validation with the actual app and account configuration.
+The direct mentions endpoint supports app-only authentication, so a separate `@Ethplorer` OAuth authorization is not documented as mandatory for public mentions. Live user-context validation under Aleksandr authorization returned HTTP 200 for the configured Ethplorer user ID, confirming that the endpoint can be called in this configuration. The empty response does not prove content completeness or visibility. A separate Ethplorer authorization can still affect visibility, Owned Read pricing, and access to protected content; those differences were not validated.
 
-### Current blocker
+### Live authentication result
 
-No `X_CLIENT_ID`, `X_ACCESS_TOKEN`, `X_REFRESH_TOKEN`, `X_BEARER_TOKEN`, `X_HOME_USER_ID`, or `X_ETHPLORER_USER_ID` was available on 2026-08-04. No authorization URL was opened and no X endpoint was called.
+On 2026-08-05, the native/public-client OAuth 2.0 Authorization Code flow with S256 PKCE completed through the configured localhost callback. Code exchange and one refresh succeeded. Tokens remained in memory only, were not printed, and were discarded when each probe exited. The callback server stopped after each one-shot authorization.
 
 ## 5. Home timeline findings
 
@@ -109,7 +111,7 @@ No `X_CLIENT_ID`, `X_ACCESS_TOKEN`, `X_REFRESH_TOKEN`, `X_BEARER_TOKEN`, `X_HOME
 - Available window: most recent 3,200 Posts or seven days according to the current timeline documentation.
 - Rate limit: 180 user-context requests per 15 minutes.
 - Expected request feasibility: a full exposed window needs at most 32 pages at 100 Posts per page, below the request limit. This does not guarantee that the API window contains every Post since the previous run.
-- Live result: not tested because owner authorization and credentials are absent.
+- Live result: HTTP 200 on every request. A two-page run returned 196 unique Post IDs, exposed another page token, found no duplicates, and reproduced page one consistently. A separate three-page checkpoint run returned 296 unique Post IDs and reached the selected synthetic checkpoint with no duplicates. The API exposed the documented metadata and a 180-request user-context rate limit. At least one HTTP 200 response included partial object errors, confirming that Stage 3 must inspect body-level errors before treating a page as complete.
 
 ## 6. Ethplorer mentions findings
 
@@ -124,7 +126,7 @@ No `X_CLIENT_ID`, `X_ACCESS_TOKEN`, `X_REFRESH_TOKEN`, `X_BEARER_TOKEN`, `X_HOME
 - Deduplication: Post ID is the stable application key. Repeated resources are also normally deduplicated for billing within one UTC day, but X describes billing deduplication as a soft guarantee.
 - Checkpoint feasibility: all pages newer than a stored Post ID can be requested, but the API does not document a positive signal that an older checkpoint fell outside the 800-Post window.
 - Fallback: recent search with `query=@Ethplorer` is official but limited to seven days and must be independently evaluated for completeness, latency, access, cost, and indexing behavior.
-- Live result: neither the direct endpoint nor search fallback was tested because credentials are absent.
+- Live result: the direct endpoint returned HTTP 200 under Aleksandr OAuth user context with the configured Ethplorer user ID. The response contained zero Posts and no next-page token, so endpoint access is proven but mentions pagination, duplicate behavior, checkpoint reachability, and visibility differences could not be observed. The response exposed a 300-request user-context rate limit. The search fallback was not called because the direct endpoint was available.
 
 ## 7. Returned fields
 
@@ -140,6 +142,10 @@ By default X returns `id`, `text`, and `edit_history_tweet_ids`. The probe reque
 `referenced_tweets` distinguishes `replied_to`, `quoted`, and `retweeted` relationships. `conversation_id` identifies the conversation root. Links and mentions are available through `entities`; media references are available through `attachments` and expansions. Response `meta` can contain `result_count`, `newest_id`, `oldest_id`, `next_token`, and `previous_token`. A 200 response may include partial `errors`; 401, 403, 404, 429, and 5xx responses require distinct handling.
 
 Timeline responses do not provide a complete deletion feed. Missing, deleted, protected, suspended, or withheld resources can surface as absence, partial errors, lookup errors, or compliance events depending on endpoint and access.
+
+### Live field observation
+
+The home probe observed the requested identifiers, timestamps, conversation and reference fields, language, entities, public metrics, attachments, and text field presence without printing or persisting values. It also observed the additional default `edit_history_tweet_ids` field and an `article` field on at least one returned object. Metadata included `result_count`, `newest_id`, `oldest_id`, `next_token`, and `previous_token`. The empty mentions response provided no Post field sample. These observations confirm response-shape availability only; they do not approve retaining every field in Stage 3.
 
 ### Mapping to the current `posts` table
 
@@ -182,7 +188,9 @@ The scenarios assume 30 days, one or two manual runs per day, maximum-page pagin
 | Expected MVP | 500 | 25 | 15,750 | $78.75 | $75.75 |
 | High | 2,000 | 100 | 63,000 | $315.00 | $303.00 |
 
-These are arithmetic scenarios, not observed usage. Actual volume, app ownership, credit availability, endpoint-specific Developer Console prices, daily deduplication behavior, and whether expanded resources create additional charges must be validated live. Configure a low spending cap for the spike.
+These are arithmetic scenarios, not observed production usage. Production volume, app ownership, credit availability, endpoint-specific Developer Console prices, daily deduplication behavior, and whether expanded resources create additional charges must be measured during Stage 3. Configure a low spending limit before operational collection.
+
+The live probes returned overlapping home resources during repeated and checkpoint runs. The probe intentionally did not persist billable-resource details, and the API response did not report the charged amount. Therefore actual charged usage remains unknown in this report and must be read from the Developer Console. This does not change the official $0.005 public Post-read scenario model or the requirement for Stage 3 usage accounting.
 
 ## 9. Storage and compliance
 
@@ -254,6 +262,10 @@ The API does not document a flag that says an older saved checkpoint was lost be
 
 The diagnostic probe performs these classifications only in memory and never writes `sync_state`.
 
+### Live checkpoint experiment
+
+The first home run supplied a safe Post ID for an in-memory follow-up. A separate three-page run reported `checkpoint_reached`, returned HTTP 200 for all pages, and detected no duplicate IDs. The endpoint still exposed a next-page token at the diagnostic page boundary. The response also contained partial object errors, so reaching a checkpoint alone is insufficient for safe advancement; Stage 3 must require a clean, fully processed page sequence.
+
 ## 11. Risks
 
 - API access changes can invalidate endpoint or account assumptions.
@@ -265,7 +277,7 @@ The diagnostic probe performs these classifications only in memory and never wri
 - Ethplorer app ownership or separate authorization can change price and content visibility.
 - Retention, update, deletion, and redistribution duties require an operational compliance process.
 - A self-serve app may lack proactive deletion events available through Enterprise compliance streams.
-- Tokens can expire or be revoked; refresh behavior and rotation must be validated.
+- Tokens can expire or be revoked. One refresh succeeded live, but operational rotation, revocation, and recovery still require Stage 3 handling.
 - Endpoint response fields and pagination tokens can change or be deprecated.
 - The two sources can fail independently and must never share checkpoint advancement.
 - Recent search can miss or delay content and is not automatically equivalent to direct mentions.
@@ -273,16 +285,17 @@ The diagnostic probe performs these classifications only in memory and never wri
 
 ## 12. Final recommendation
 
-Do not start Stage 3 yet. Keep Stage 2 In Progress with `blocked pending credentials`.
+Stage 2 is complete with `constrained-go`. Stage 3 may proceed only as the separate planned Task 004 and must preserve the constraints below.
 
-To unblock the final decision:
+Required Stage 3 constraints:
 
-1. Configure an approved X app with the disclosed MVP use case and a small spending cap.
-2. Complete OAuth 2.0 PKCE as Aleksandr and validate access-token refresh.
-3. Run live home and mentions probes for at least two pages when data volume permits.
-4. Repeat page one, verify reverse chronological IDs and duplicates, and run the synthetic checkpoint experiment.
-5. Confirm the direct mentions endpoint with app-only or user-context auth and determine whether separate Ethplorer authorization is needed for visibility or Owned Read pricing.
-6. Record actual rate-limit headers, Developer Console charges, returned fields, partial errors, and endpoint access restrictions without storing Post content in Git.
-7. Resolve whether the app approval and X terms permit the planned AI-assisted inference and third-party model handling.
+1. Keep independent transactions and checkpoints for home and mentions.
+2. Follow every page token to a safe stopping condition and never advance a checkpoint after a partial error, incomplete loop, or failed durable commit.
+3. Emit missed-collection and possible-window-truncation warnings for the documented 3,200/seven-day home and 800-mention limits.
+4. Treat mentions pagination and checkpoint behavior as unverified until a non-empty multi-page result is available; do not substitute recent search without a new evidence-backed decision.
+5. Persist refresh tokens only through an approved secret mechanism and implement rotation, revocation, and recovery handling.
+6. Record actual usage and cost per source and reconcile it with the Developer Console.
+7. Implement an approved retention, revalidation, removal, and deletion process before operational X Content is stored.
+8. Resolve whether the approved app use case and selected model-provider terms permit full planned AI-assisted processing before sending X Content to a third party.
 
-If live validation succeeds, Stage 3 must account for independent source transactions, maximum-page pagination, window-cap warnings, no checkpoint advancement on partial failure, refresh-token handling, cost accounting, and X Content revalidation and deletion. Stage 3 remains Planned and is not implemented by this spike.
+Separate Ethplorer authorization is not required to receive a successful direct-mentions response in the tested configuration, but the empty result does not establish content completeness and does not test protected-content visibility or Owned Read pricing. The current result does not justify separate authorization. Stage 3 remains Planned and is not implemented by this spike.

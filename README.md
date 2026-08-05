@@ -8,7 +8,7 @@ It is not a generic crypto-news aggregator, an automatic publishing bot, or a me
 
 The durable PostgreSQL storage foundation is implemented and validated against the real Supabase database. PostgreSQL is the operational source of truth, with Supabase selected as the initial managed provider. Application code uses the standard PostgreSQL protocol through `psycopg` and does not use the Supabase Python SDK.
 
-Stage 2 includes an isolated read-only X API probe, a one-shot OAuth 2.0 PKCE helper, and synthetic tests. Official documentation review is complete, but live authentication, endpoints, pagination, checkpoint behavior, and billing remain blocked pending X credentials and manual Aleksandr authorization. This is not an X collector.
+Stage 2 is complete with a `constrained-go` decision. The isolated read-only X API probe validated OAuth 2.0 PKCE authorization and refresh, live home-timeline access and pagination, an in-memory checkpoint, and live access to the direct `@Ethplorer` mentions endpoint. The mentions response contained no Posts, so mentions pagination could not be observed live. The documented history windows, partial-error behavior, pricing uncertainty, and compliance obligations remain constraints for Stage 3. This is not an X collector.
 
 X collection, LLM integration, Telegram, and publication are not implemented. All publication remains a mandatory human action.
 
@@ -18,9 +18,9 @@ The repository remains public during the MVP. Public visibility does not change 
 
 - Stage 0 - Repository Bootstrap - Completed
 - Stage 1 - Durable Storage Foundation - Completed
-- Stage 2 - X API Access Spike - In Progress
-- Current task - Task 003 - X API Access Spike
-- Next task - Complete Task 003 validation before starting Task 004
+- Stage 2 - X API Access Spike - Completed
+- Current task - Task 003 - X API Access Spike - Completed
+- Next task - Task 004 - X Collection Pipeline - Planned
 
 See the canonical [implementation roadmap](docs/roadmap.md), [product and technical specification](docs/project-spec.md), and [architecture decision log](docs/decisions.md).
 
@@ -130,8 +130,8 @@ python -m pytest -m integration
 
 ## Current Limitations
 
-- No production X collection pipeline
-- No completed live X API access validation yet
+- No production X collection pipeline or persisted X checkpoints
+- Mentions pagination was not observed live because the validated response was empty
 - No LLM calls or prompt execution
 - No context enrichment from external sources
 - No Telegram delivery
