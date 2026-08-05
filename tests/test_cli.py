@@ -17,6 +17,7 @@ def test_project_status_does_not_require_database(capsys) -> None:
     output = capsys.readouterr().out
     assert "PostgreSQL storage foundation is implemented" in output
     assert "access spike is complete with a constrained-go decision" in output
+    assert "Task 004A X collector is complete" in output
 
 
 def test_x_api_subcommands_parse() -> None:
@@ -26,6 +27,24 @@ def test_x_api_subcommands_parse() -> None:
     assert args.command == "x-api"
     assert args.x_api_command == "probe"
     assert args.source == "home"
+
+    oauth_setup = parser.parse_args(["x-api", "oauth-setup"])
+    assert oauth_setup.x_api_command == "oauth-setup"
+
+
+def test_collect_defaults_are_bounded() -> None:
+    args = build_parser().parse_args(["collect", "--source", "home"])
+
+    assert args.command == "collect"
+    assert args.max_pages == 1
+    assert args.max_results == 20
+
+
+def test_collect_rejects_invalid_shared_page_size_before_external_calls(capsys) -> None:
+    result = main(["collect", "--source", "both", "--max-results", "1"])
+
+    assert result == 2
+    assert "max_results for mentions" in capsys.readouterr().err
 
 
 def test_x_api_probe_without_credentials_fails_before_network(

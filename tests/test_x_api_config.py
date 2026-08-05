@@ -5,6 +5,7 @@ import pytest
 from x_signal_finder.x_api.config import (
     XApiConfigurationError,
     load_x_api_config,
+    persist_refresh_token,
 )
 
 
@@ -42,3 +43,17 @@ def test_user_ids_must_be_numeric(tmp_path: Path) -> None:
 
     with pytest.raises(XApiConfigurationError, match="digits"):
         config.user_id_for("home")
+
+
+def test_refresh_token_is_persisted_only_to_existing_local_env(tmp_path: Path) -> None:
+    dotenv_path = tmp_path / ".env"
+    dotenv_path.write_text(
+        "X_CLIENT_ID=synthetic-client\nX_REFRESH_TOKEN=\n",
+        encoding="utf-8",
+    )
+
+    persist_refresh_token("synthetic-rotated-token", dotenv_path=dotenv_path)
+
+    config = load_x_api_config(environ={}, dotenv_path=dotenv_path)
+    assert config.client_id == "synthetic-client"
+    assert config.refresh_token == "synthetic-rotated-token"

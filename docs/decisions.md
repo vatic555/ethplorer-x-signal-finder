@@ -99,3 +99,13 @@ Status: Accepted
 Live OAuth 2.0 PKCE authorization and refresh succeeded. The reverse chronological home endpoint returned multiple HTTP 200 pages, repeated page one consistently, exposed rate-limit metadata, and reached an in-memory checkpoint without duplicate Post IDs. The direct `@Ethplorer` mentions endpoint also returned HTTP 200 under Aleksandr user context, so separate Ethplorer authorization is not required to call the endpoint in the tested configuration. Its empty result did not exercise mentions pagination or establish content completeness, access to protected content, or Owned Read pricing.
 
 Stage 3 may proceed only as the separate planned Task 004 and must treat the Stage 2 result as `constrained-go`. The collector must use independent source checkpoints, paginate to a safe stopping condition, refuse checkpoint advancement on partial errors or incomplete pagination, warn about possible history-window truncation, track usage and cost, and support X Content revalidation and deletion obligations. Stage 2 does not approve automatic publication, scheduling, schema changes, or any other deferred capability.
+
+## 2026-08-06 - Task 004A bounded collector baseline
+
+Status: Accepted
+
+Task 004A validates the shortest operational path from X API through the Python CLI to the existing PostgreSQL schema. It adds no migration and no dependency. The command is manually invoked, defaults to one page and 20 Posts per source, excludes simple home reposts in both the API request and application mapping, and uses `post_id` upserts for deduplication. Home and mentions maintain independent `sync_state` rows.
+
+Only the OAuth refresh token is stored in the ignored local `.env`. Access tokens remain in memory. A successful refresh-token rotation is persisted before collection begins so a later API or database failure does not lose the usable refresh credential.
+
+The first bounded run establishes a current baseline even when older history is available and records `initial_history_not_backfilled`. This is an explicit Task 004A viability tradeoff, not a claim of historical completeness. After a checkpoint exists, incomplete pagination, response-level partial errors, missing pagination metadata, or duplicate Post IDs prevent checkpoint advancement. Full historical recovery, automatic retention and deletion handling, and the rest of Stage 3 hardening remain deferred.

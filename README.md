@@ -8,9 +8,9 @@ It is not a generic crypto-news aggregator, an automatic publishing bot, or a me
 
 The durable PostgreSQL storage foundation is implemented and validated against the real Supabase database. PostgreSQL is the operational source of truth, with Supabase selected as the initial managed provider. Application code uses the standard PostgreSQL protocol through `psycopg` and does not use the Supabase Python SDK.
 
-Stage 2 is complete with a `constrained-go` decision. The isolated read-only X API probe validated OAuth 2.0 PKCE authorization and refresh, live home-timeline access and pagination, an in-memory checkpoint, and live access to the direct `@Ethplorer` mentions endpoint. The mentions response contained no Posts, so mentions pagination could not be observed live. The documented history windows, partial-error behavior, pricing uncertainty, and compliance obligations remain constraints for Stage 3. This is not an X collector.
+Stage 2 is complete with a `constrained-go` decision. Stage 3 is In Progress, and Task 004A is complete. Its bounded manually started collector uses OAuth refresh, fetches home or `@Ethplorer` mentions, excludes simple reposts from home, and upserts Posts plus independent source checkpoints into PostgreSQL. Live validation saved real home Posts in Supabase, retained original Posts, replies, and quote Posts, created no duplicate `post_id` rows on a repeated run, and completed an empty mentions run successfully. Task 004A is deliberately not the full production collector: defaults are one page and 20 Posts, initial history is not backfilled automatically, and incomplete incremental pagination or partial errors do not advance a checkpoint.
 
-X collection, LLM integration, Telegram, and publication are not implemented. All publication remains a mandatory human action.
+LLM integration, Telegram, and publication are not implemented. All publication remains a mandatory human action.
 
 The repository remains public during the MVP. Public visibility does not change the existing prohibition on committing credentials, local `.env` files, raw operational X content, runtime database data or dumps, private or licensed exports, or confidential internal documents.
 
@@ -19,8 +19,9 @@ The repository remains public during the MVP. Public visibility does not change 
 - Stage 0 - Repository Bootstrap - Completed
 - Stage 1 - Durable Storage Foundation - Completed
 - Stage 2 - X API Access Spike - Completed
-- Current task - Task 003 - X API Access Spike - Completed
-- Next task - Task 004 - X Collection Pipeline - Planned
+- Stage 3 - X Collection Pipeline - In Progress
+- Current task - Task 004A - Minimal X Collector to PostgreSQL - Completed
+- Next task - Await the next explicit Stage 3 task specification
 
 See the canonical [implementation roadmap](docs/roadmap.md), [product and technical specification](docs/project-spec.md), and [architecture decision log](docs/decisions.md).
 
@@ -99,6 +100,16 @@ python -m x_signal_finder x-api oauth-probe --source both --max-pages 2
 
 These commands must be invoked explicitly. They do not write to PostgreSQL or disk and never print Post text, raw API responses, or credentials. The OAuth command uses one temporary localhost callback, validates PKCE and refresh in memory, and stops the callback server before exiting.
 
+Task 004A collector setup and bounded runs:
+
+```sh
+python -m x_signal_finder x-api oauth-setup
+python -m x_signal_finder collect --source home --max-pages 1 --max-results 20
+python -m x_signal_finder collect --source mentions --max-pages 1 --max-results 20
+```
+
+`oauth-setup` stores only the refresh token in the ignored local `.env`. Every collector run refreshes the access token in memory and safely replaces a rotated refresh token in `.env`. Collector output contains counts, checkpoints, IDs, estimated X cost, and warnings only. It never prints Post text, raw JSON, or credentials. See [the Task 004A collector guide](docs/x-collector.md) for checkpoint behavior and Supabase inspection.
+
 Database commands:
 
 ```sh
@@ -130,7 +141,8 @@ python -m pytest -m integration
 
 ## Current Limitations
 
-- No production X collection pipeline or persisted X checkpoints
+- Task 004A is a bounded viability collector, not the complete Stage 3 pipeline
+- No automatic historical backfill or production missed-window recovery
 - Mentions pagination was not observed live because the validated response was empty
 - No LLM calls or prompt execution
 - No context enrichment from external sources

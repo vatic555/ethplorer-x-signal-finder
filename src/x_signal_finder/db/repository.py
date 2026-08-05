@@ -61,6 +61,7 @@ class StorageRepository:
         signals_count: int = 0,
         opportunities_count: int = 0,
         warning_count: int = 0,
+        error_summary: str | None = None,
     ) -> None:
         status = "completed_with_warnings" if completed_with_warnings else "completed"
         self._connection.execute(
@@ -68,7 +69,8 @@ class StorageRepository:
             UPDATE runs
             SET finished_at = %s, status = %s, fetched_posts_count = %s,
                 new_posts_count = %s, rejected_posts_count = %s,
-                signals_count = %s, opportunities_count = %s, warning_count = %s
+                signals_count = %s, opportunities_count = %s, warning_count = %s,
+                error_summary = %s
             WHERE run_id = %s
             """,
             (
@@ -80,6 +82,7 @@ class StorageRepository:
                 signals_count,
                 opportunities_count,
                 warning_count,
+                error_summary,
                 run_id,
             ),
         )
@@ -164,6 +167,20 @@ class StorageRepository:
         if parameters:
             with self._connection.cursor() as cursor:
                 cursor.executemany(statement, parameters)
+
+    def get_existing_post_ids(self, post_ids: Iterable[str]) -> frozenset[str]:
+        values = sorted(set(post_ids))
+        if not values:
+            return frozenset()
+        rows = self._connection.execute(
+            """
+            SELECT post_id
+            FROM posts
+            WHERE post_id = ANY(%s)
+            """,
+            (values,),
+        ).fetchall()
+        return frozenset(str(row[0]) for row in rows)
 
     def get_sync_state(self, source_key: str) -> dict[str, Any] | None:
         row = self._connection.execute(

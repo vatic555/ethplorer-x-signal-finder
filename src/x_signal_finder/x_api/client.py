@@ -64,6 +64,33 @@ class XApiPage:
     meta_present: bool
 
 
+@dataclass(frozen=True, repr=False)
+class XApiContentPage:
+    """Validated collector page whose representation never exposes X Content."""
+
+    status: int
+    posts: tuple[dict[str, Any], ...]
+    users_by_id: Mapping[str, Mapping[str, Any]]
+    next_token: str | None
+    newest_id: str | None
+    oldest_id: str | None
+    rate_limits: Mapping[str, str]
+    partial_error_count: int
+    elapsed_seconds: float
+    meta_present: bool
+
+    def __repr__(self) -> str:
+        return (
+            "XApiContentPage(status="
+            f"{self.status}, post_count={len(self.posts)}, "
+            f"user_count={len(self.users_by_id)}, "
+            f"next_token_present={bool(self.next_token)}, "
+            f"partial_error_count={self.partial_error_count})"
+        )
+
+    __str__ = __repr__
+
+
 class XApiRequestError(RuntimeError):
     """Safe X API failure without response bodies or credentials."""
 
@@ -144,8 +171,11 @@ def _error_category(status: int, payload: object) -> str:
     return "api_error"
 
 
-def parse_page(response: HttpResponse, *, endpoint: str, elapsed: float) -> XApiPage:
-    """Parse a response into a safe diagnostic page or a redacted failure."""
+def _decode_payload(
+    response: HttpResponse,
+    *,
+    endpoint: str,
+) -> tuple[dict[str, Any], dict[str, str]]:
     rate_limits = parse_rate_limit_headers(response.headers)
     try:
         payload: Any = json.loads(response.body.decode("utf-8")) if response.body else {}
@@ -171,6 +201,12 @@ def parse_page(response: HttpResponse, *, endpoint: str, elapsed: float) -> XApi
             endpoint=endpoint,
             rate_limits=rate_limits,
         )
+    return payload, rate_limits
+
+
+def parse_page(response: HttpResponse, *, endpoint: str, elapsed: float) -> XApiPage:
+    """Parse a response into a safe diagnostic page or a redacted failure."""
+    payload, rate_limits = _decode_payload(response, endpoint=endpoint)
 
     data = payload.get("data", [])
     meta_present = "meta" in payload
@@ -222,8 +258,88 @@ def parse_page(response: HttpResponse, *, endpoint: str, elapsed: float) -> XApi
     )
 
 
+def parse_content_page(
+    response: HttpResponse,
+    *,
+    endpoint: str,
+    elapsed: float,
+) -> XApiContentPage:
+    """Parse a collector page without exposing response content in diagnostics."""
+    payload, rate_limits = _decode_payload(response, endpoint=endpoint)
+    data = payload.get("data", [])
+    meta_present = "meta" in payload
+    meta = payload.get("meta", {})
+    includes = payload.get("includes", {})
+    errors = payload.get("errors", [])
+    if (
+        not isinstance(data, list)
+        or not isinstance(meta, dict)
+        or not isinstance(includes, dict)
+    ):
+        raise XApiRequestError(
+            status=response.status,
+            category="unexpected_response_shape",
+            endpoint=endpoint,
+            rate_limits=rate_limits,
+        )
+
+    posts: list[dict[str, Any]] = []
+    for post in data:
+        if not isinstance(post, dict) or not isinstance(post.get("id"), str):
+            raise XApiRequestError(
+                status=response.status,
+                category="unexpected_response_shape",
+                endpoint=endpoint,
+                rate_limits=rate_limits,
+            )
+        posts.append(dict(post))
+
+    users = includes.get("users", [])
+    if not isinstance(users, list):
+        raise XApiRequestError(
+            status=response.status,
+            category="unexpected_response_shape",
+            endpoint=endpoint,
+            rate_limits=rate_limits,
+        )
+    users_by_id: dict[str, Mapping[str, Any]] = {}
+    for user in users:
+        if not isinstance(user, dict) or not isinstance(user.get("id"), str):
+            raise XApiRequestError(
+                status=response.status,
+                category="unexpected_response_shape",
+                endpoint=endpoint,
+                rate_limits=rate_limits,
+            )
+        users_by_id[user["id"]] = dict(user)
+
+    next_token = meta.get("next_token")
+    if next_token is not None and not isinstance(next_token, str):
+        raise XApiRequestError(
+            status=response.status,
+            category="unexpected_response_shape",
+            endpoint=endpoint,
+            rate_limits=rate_limits,
+        )
+    post_ids = tuple(str(post["id"]) for post in posts)
+    newest_id = meta.get("newest_id") or (post_ids[0] if post_ids else None)
+    oldest_id = meta.get("oldest_id") or (post_ids[-1] if post_ids else None)
+    return XApiContentPage(
+        status=response.status,
+        posts=tuple(posts),
+        users_by_id=users_by_id,
+        next_token=next_token,
+        newest_id=str(newest_id) if newest_id is not None else None,
+        oldest_id=str(oldest_id) if oldest_id is not None else None,
+        rate_limits=rate_limits,
+        partial_error_count=len(errors) if isinstance(errors, list) else 0,
+        elapsed_seconds=elapsed,
+        meta_present=meta_present,
+    )
+
+
 class XApiClient:
-    """Read-only client whose public results omit all post content."""
+    """Read-only X client with explicit diagnostic and collector result paths."""
 
     def __init__(
         self,
@@ -241,6 +357,22 @@ class XApiClient:
         self._transport = transport or _default_transport
 
     def get_page(self, endpoint: str, params: Mapping[str, object]) -> XApiPage:
+        response, elapsed = self._get(endpoint, params)
+        return parse_page(response, endpoint=endpoint, elapsed=elapsed)
+
+    def get_content_page(
+        self,
+        endpoint: str,
+        params: Mapping[str, object],
+    ) -> XApiContentPage:
+        response, elapsed = self._get(endpoint, params)
+        return parse_content_page(response, endpoint=endpoint, elapsed=elapsed)
+
+    def _get(
+        self,
+        endpoint: str,
+        params: Mapping[str, object],
+    ) -> tuple[HttpResponse, float]:
         query = urlencode(
             [(key, str(value)) for key, value in params.items() if value is not None]
         )
@@ -253,9 +385,9 @@ class XApiClient:
             {
                 "Authorization": f"Bearer {self._token}",
                 "Accept": "application/json",
-                "User-Agent": "ethplorer-x-signal-finder-access-spike/0.1",
+                "User-Agent": "ethplorer-x-signal-finder/0.1",
             },
             self._timeout,
         )
         elapsed = time.monotonic() - started
-        return parse_page(response, endpoint=endpoint, elapsed=elapsed)
+        return response, elapsed

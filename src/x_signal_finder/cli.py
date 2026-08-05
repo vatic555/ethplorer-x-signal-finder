@@ -12,6 +12,13 @@ from uuid import uuid4
 import psycopg
 
 from x_signal_finder import __version__
+from x_signal_finder.collector import (
+    CollectionError,
+    fetch_source,
+    record_failed_source_attempt,
+    save_source_collection,
+    source_key_for,
+)
 from x_signal_finder.config import (
     ConfigurationError,
     load_database_config,
@@ -30,15 +37,21 @@ from x_signal_finder.x_api.client import XApiClient, XApiRequestError
 from x_signal_finder.x_api.config import (
     XApiConfigurationError,
     load_x_api_config,
+    persist_refresh_token,
 )
-from x_signal_finder.x_api.oauth import OAuthFlowError, authorize_with_local_callback
+from x_signal_finder.x_api.oauth import (
+    OAuthFlowError,
+    authorize_with_local_callback,
+    refresh_access_token,
+)
 from x_signal_finder.x_api.probe import run_probe
 
 
 STATUS_MESSAGE = (
     "Durable PostgreSQL storage foundation is implemented. "
     "The X API access spike is complete with a constrained-go decision. "
-    "X collection and LLM integration are not implemented."
+    "The bounded Task 004A X collector is complete and Stage 3 remains in progress. "
+    "LLM integration is not implemented."
 )
 
 
@@ -111,6 +124,21 @@ def build_parser() -> argparse.ArgumentParser:
     oauth_probe.add_argument("--max-results", type=int, default=100)
     oauth_probe.add_argument("--checkpoint-id")
     oauth_probe.add_argument("--repeat-first-page", action="store_true")
+    x_api_subparsers.add_parser(
+        "oauth-setup",
+        help="Authorize once and store only the refresh token in local .env.",
+    )
+    collect = subparsers.add_parser(
+        "collect",
+        help="Run the bounded Task 004A X collector and persist to PostgreSQL.",
+    )
+    collect.add_argument(
+        "--source",
+        choices=("home", "mentions", "both"),
+        default="both",
+    )
+    collect.add_argument("--max-pages", type=int, default=1)
+    collect.add_argument("--max-results", type=int, default=20)
     return parser
 
 
@@ -368,12 +396,223 @@ def _run_oauth_probe(args: argparse.Namespace) -> int:
     return 0
 
 
+def _run_oauth_setup() -> int:
+    config = load_x_api_config()
+    config.require_oauth_setup()
+    tokens = authorize_with_local_callback(
+        client_id=config.client_id,
+        redirect_uri=config.redirect_uri,
+    )
+    persist_refresh_token(tokens.refresh_token)
+    print("OAuth setup: succeeded; refresh token stored in local .env")
+    print("Access token: held in memory only and discarded")
+    return 0
+
+
 def _run_x_api_command(args: argparse.Namespace) -> int:
     if args.x_api_command == "probe":
         return _run_x_api_probe(args)
     if args.x_api_command == "oauth-probe":
         return _run_oauth_probe(args)
+    if args.x_api_command == "oauth-setup":
+        return _run_oauth_setup()
     raise ValueError(f"Unknown X API command: {args.x_api_command}")
+
+
+def _failed_source_diagnostic(
+    *,
+    source: str,
+    error_category: str,
+    details: dict[str, object] | None = None,
+) -> dict[str, object]:
+    diagnostic: dict[str, object] = {
+        "source": source,
+        "source_key": source_key_for(source),
+        "error_category": error_category,
+    }
+    diagnostic.update(details or {})
+    return diagnostic
+
+
+def _run_collect(args: argparse.Namespace) -> int:
+    if args.max_pages < 1:
+        raise ValueError("max_pages must be at least 1")
+    if args.source in {"mentions", "both"} and args.max_results < 5:
+        raise ValueError("max_results for mentions must be between 5 and 100")
+    if not 1 <= args.max_results <= 100:
+        raise ValueError("max_results must be between 1 and 100")
+
+    database_config = load_database_config()
+    x_config = load_x_api_config()
+    x_config.require_collector_setup()
+    refreshed = refresh_access_token(
+        client_id=x_config.client_id,
+        refresh_token=x_config.refresh_token,
+    )
+    persist_refresh_token(refreshed.refresh_token)
+
+    run_id = uuid4()
+    started_at = datetime.now(timezone.utc)
+    requested_sources = (
+        ("home", "mentions") if args.source == "both" else (args.source,)
+    )
+    user_ids = {
+        source: x_config.user_id_for(source) for source in requested_sources
+    }
+    summaries = []
+    failures: list[dict[str, object]] = []
+
+    with connect_database(database_config) as connection:
+        repository = StorageRepository(connection)
+        with connection.transaction():
+            repository.create_run(
+                run_id=run_id,
+                started_at=started_at,
+                trigger_type="manual_x_collection",
+                application_version=__version__,
+                metadata={
+                    "source": args.source,
+                    "max_pages": args.max_pages,
+                    "max_results": args.max_results,
+                    "task": "004A",
+                },
+            )
+
+        for source in requested_sources:
+            source_key = source_key_for(source)
+            with connection.transaction():
+                previous_state = repository.get_sync_state(source_key)
+            checkpoint_before = (
+                str(previous_state["checkpoint_value"])
+                if previous_state and previous_state.get("checkpoint_value") is not None
+                else None
+            )
+            collected_at = datetime.now(timezone.utc)
+            try:
+                fetched = fetch_source(
+                    client=XApiClient(
+                        token=refreshed.access_token,
+                        base_url=x_config.base_url,
+                    ),
+                    source=source,
+                    user_id=user_ids[source],
+                    run_id=run_id,
+                    collected_at=collected_at,
+                    checkpoint_before=checkpoint_before,
+                    max_pages=args.max_pages,
+                    max_results=args.max_results,
+                )
+            except XApiRequestError as error:
+                failure = _failed_source_diagnostic(
+                    source=source,
+                    error_category=error.category,
+                    details={
+                        "http_result": error.status,
+                        "rate_limits": error.rate_limits,
+                    },
+                )
+                with connection.transaction():
+                    record_failed_source_attempt(
+                        repository=repository,
+                        source=source,
+                        previous_state=previous_state,
+                        attempted_at=collected_at,
+                        warning_code=error.category,
+                    )
+                failures.append(failure)
+                continue
+            except CollectionError:
+                failure = _failed_source_diagnostic(
+                    source=source,
+                    error_category="unexpected_post_shape",
+                )
+                with connection.transaction():
+                    record_failed_source_attempt(
+                        repository=repository,
+                        source=source,
+                        previous_state=previous_state,
+                        attempted_at=collected_at,
+                        warning_code="unexpected_post_shape",
+                    )
+                failures.append(failure)
+                continue
+
+            try:
+                with connection.transaction():
+                    summary = save_source_collection(
+                        repository=repository,
+                        fetched=fetched,
+                        previous_state=previous_state,
+                        run_id=run_id,
+                        usage_event_id=uuid4(),
+                        collected_at=collected_at,
+                        max_pages=args.max_pages,
+                        max_results=args.max_results,
+                    )
+            except Exception:
+                with connection.transaction():
+                    record_failed_source_attempt(
+                        repository=repository,
+                        source=source,
+                        previous_state=previous_state,
+                        attempted_at=collected_at,
+                        warning_code="database_write_failed",
+                    )
+                failures.append(
+                    _failed_source_diagnostic(
+                        source=source,
+                        error_category="database_write_failed",
+                    )
+                )
+                continue
+            summaries.append(summary)
+
+        warning_count = sum(len(summary.warnings) for summary in summaries) + len(
+            failures
+        )
+        fetched_count = sum(summary.fetched_posts for summary in summaries)
+        new_count = sum(summary.new_posts for summary in summaries)
+        rejected_count = sum(summary.reposts_excluded for summary in summaries)
+        finished_at = datetime.now(timezone.utc)
+        if failures and not summaries:
+            run_status = "failed"
+            with connection.transaction():
+                repository.fail_run(
+                    run_id=run_id,
+                    finished_at=finished_at,
+                    error_summary=f"{len(failures)} source collection(s) failed",
+                    warning_count=warning_count,
+                )
+        else:
+            completed_with_warnings = bool(failures) or bool(warning_count)
+            run_status = (
+                "completed_with_warnings" if completed_with_warnings else "completed"
+            )
+            with connection.transaction():
+                repository.complete_run(
+                    run_id=run_id,
+                    finished_at=finished_at,
+                    completed_with_warnings=completed_with_warnings,
+                    fetched_posts_count=fetched_count,
+                    new_posts_count=new_count,
+                    rejected_posts_count=rejected_count,
+                    warning_count=warning_count,
+                    error_summary=(
+                        f"{len(failures)} source collection(s) failed"
+                        if failures
+                        else None
+                    ),
+                )
+
+    report = {
+        "run_id": str(run_id),
+        "status": run_status,
+        "sources": [summary.safe_diagnostic() for summary in summaries],
+        "errors": failures,
+    }
+    print(json.dumps(report, indent=2, sort_keys=True))
+    blocking_warning = any(summary.has_blocking_warning for summary in summaries)
+    return 1 if failures or blocking_warning else 0
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -428,6 +667,27 @@ def main(argv: Sequence[str] | None = None) -> int:
         except (XApiConfigurationError, OAuthFlowError, ValueError) as error:
             print(f"X API probe failed: {error}", file=sys.stderr)
             return 2
+    if args.command == "collect":
+        try:
+            return _run_collect(args)
+        except (ConfigurationError, XApiConfigurationError, OAuthFlowError, ValueError) as error:
+            safe_error = redact_secrets(str(error))
+            print(f"Collection failed: {safe_error}", file=sys.stderr)
+            return 2
+        except psycopg.OperationalError:
+            print(
+                "Collection failed: PostgreSQL connection unavailable. "
+                "Check DATABASE_URL, network access, and SSL settings.",
+                file=sys.stderr,
+            )
+            return 1
+        except Exception as error:
+            safe_error = redact_secrets(error)
+            print(
+                f"Collection failed: {type(error).__name__}: {safe_error}",
+                file=sys.stderr,
+            )
+            return 1
 
     parser.print_help()
     return 0

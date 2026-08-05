@@ -8,7 +8,7 @@ import os
 from pathlib import Path
 import re
 
-from dotenv import dotenv_values
+from dotenv import dotenv_values, set_key
 
 
 X_API_BASE_URL = "https://api.x.com/2"
@@ -77,6 +77,14 @@ class XApiConfig:
                 "X_CLIENT_ID is required for OAuth 2.0 PKCE authorization."
             )
 
+    def require_collector_setup(self) -> None:
+        self.require_oauth_setup()
+        if not self.refresh_token:
+            raise XApiConfigurationError(
+                "X_REFRESH_TOKEN is required. Run `python -m x_signal_finder "
+                "x-api oauth-setup` once."
+            )
+
 
 def load_x_api_config(
     *,
@@ -102,3 +110,26 @@ def load_x_api_config(
         home_user_id=value("X_HOME_USER_ID"),
         ethplorer_user_id=value("X_ETHPLORER_USER_ID"),
     )
+
+
+def persist_refresh_token(
+    refresh_token: str,
+    *,
+    dotenv_path: str | Path = ".env",
+) -> None:
+    """Persist only the refresh token in an existing local dotenv file."""
+    if not refresh_token:
+        raise XApiConfigurationError("A non-empty X refresh token is required.")
+    path = Path(dotenv_path)
+    if not path.is_file():
+        raise XApiConfigurationError(
+            "Local .env does not exist. Create it from .env.example first."
+        )
+    success, _, _ = set_key(
+        str(path),
+        "X_REFRESH_TOKEN",
+        refresh_token,
+        quote_mode="always",
+    )
+    if not success:
+        raise XApiConfigurationError("Could not update X_REFRESH_TOKEN in local .env.")

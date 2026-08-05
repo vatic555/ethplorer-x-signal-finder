@@ -7,12 +7,14 @@ Status: Canonical implementation sequence and progress record
 - Stage 0 - Repository Bootstrap - Completed
 - Stage 1 - Durable Storage Foundation - Completed
 - Stage 2 - X API Access Spike - Completed
-- Current task - Task 003 - X API Access Spike - Completed
-- Next task - Task 004 - X Collection Pipeline - Planned
+- Stage 3 - X Collection Pipeline - In Progress
+- Current task - Task 004A - Minimal X Collector to PostgreSQL - Completed
+- Next task - Await the next explicit Stage 3 task specification
 - Local PostgreSQL implementation is ready
 - Real Supabase migration and database validation are complete
 - Task 003 documentation review, diagnostic probe, live OAuth, endpoint, pagination, refresh, and checkpoint validation are complete
-- Stage 2 decision - `constrained-go`; Stage 3 remains Planned and has not started
+- Stage 2 decision - `constrained-go`; Stage 3 has started with the bounded Task 004A collector
+- Task 004A implementation, synthetic validation, and bounded live X-to-Supabase validation are complete
 
 Stage 1 must not be marked Completed until the real Supabase database has been created, migrations have been applied, and database validation has passed.
 
@@ -55,7 +57,7 @@ Post-MVP work may cover:
 | 0 | Repository Bootstrap | Completed | Task 001 | Yes |
 | 1 | Durable Storage Foundation | Completed | Task 002 | Yes |
 | 2 | X API Access Spike | Completed | Task 003 | Yes |
-| 3 | X Collection Pipeline | Planned | Task 004 | Yes |
+| 3 | X Collection Pipeline | In Progress | Task 004A | Yes |
 | 4 | Minimum Knowledge Base | Planned | Task 005 | Yes |
 | 5 | Relevance Filtering and Signal Clustering | Planned | Task 006 | Yes |
 | 6 | Opportunity Gate and Context Enrichment | Planned | Task 007 | Yes |
@@ -150,7 +152,7 @@ Current state:
 - the direct `@Ethplorer` mentions request returned HTTP 200 under Aleksandr user context, demonstrating that separate Ethplorer authorization is not required to call the endpoint in this configuration;
 - the mentions response contained no Posts, so mentions pagination could not be observed live;
 - decision is `constrained-go` because of bounded history windows, possible partial errors, unobserved mentions pagination, Developer Console billing dependence, and unresolved operational compliance details;
-- Stage 3 remains Planned and has not started.
+- Stage 3 subsequently started with Task 004A and remains In Progress.
 
 ### Tasks
 
@@ -166,7 +168,7 @@ Current state:
 
 ## Stage 3 - X Collection Pipeline
 
-Status: Planned
+Status: In Progress
 
 Build reliable automatic collection while keeping execution manually initiated:
 
@@ -182,9 +184,33 @@ Build reliable automatic collection while keeping execution manually initiated:
 - collection usage and cost accounting;
 - macOS and Windows support.
 
+Current state:
+
+- Task 004A implements a manually invoked `collect` command with one-page and 20-Post safe defaults;
+- OAuth access tokens are refreshed in memory, and only the rotated refresh token is stored in ignored local `.env`;
+- home and mentions use independent `sync_state` keys;
+- Post mapping, simple-repost exclusion, upsert deduplication, safe checkpoint updates, minimal usage estimates, and secret-safe summaries are implemented without a schema migration;
+- an intentionally bounded first run establishes a current baseline and records that older history was not backfilled;
+- incomplete incremental pagination, partial response errors, or duplicate IDs prevent checkpoint advancement;
+- required bounded live home, repeated-home, and mentions runs against X and Supabase passed;
+- full Stage 3 pagination, retry hardening, missed-window recovery, and compliance automation are not part of Task 004A.
+
 ### Tasks
 
-- Task 004 - X Collection Pipeline - Planned
+- Task 004A - Minimal X Collector to PostgreSQL - Completed
+- Further Stage 3 hardening - Planned; task not yet assigned
+
+### Task 004A Validation Record
+
+- Completion date: 2026-08-06
+- Live runs: home baseline, repeated incremental home, and mentions
+- Live result: 21 Posts fetched across two home requests, 4 simple reposts excluded, and 17 unique home rows saved; stored types were 13 original Posts, 2 replies, and 2 quote Posts; the mentions request succeeded with zero Posts.
+- Deduplication: 17 total Post rows and 17 distinct `post_id` values after the repeated home run; duplicate groups were zero.
+- Checkpoints: `x_home_timeline` stored and reused a non-empty checkpoint; `x_ethplorer_mentions` recorded a successful empty collection with no checkpoint value.
+- Usage estimate: 2 home requests and 1 mentions request; 21 public Post reads; $0.105 estimated X Post-read cost before Developer Console reconciliation.
+- Database validation: PostgreSQL 17.6; migration 1 current; no pending migrations; required tables present; RLS enabled; no new migration created.
+- Tests: 42 passed and 3 optional integration tests skipped before live validation.
+- Remaining limitations: bounded initial baseline, no historical backfill, no full Stage 3 recovery workflow, no automated X Content revalidation or deletion, and one stored `source_key` value per Post row.
 
 ### Completion Record
 

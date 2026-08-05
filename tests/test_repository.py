@@ -14,6 +14,9 @@ class RecordingConnection:
         self.parameters = parameters
         return self
 
+    def fetchall(self):
+        return [("known-post",)]
+
 
 def test_create_run_uses_bound_parameters() -> None:
     connection = RecordingConnection()
@@ -30,3 +33,14 @@ def test_create_run_uses_bound_parameters() -> None:
     assert sensitive_trigger not in connection.query
     assert "%s" in connection.query
     assert sensitive_trigger in connection.parameters
+
+
+def test_existing_post_lookup_uses_bound_array() -> None:
+    connection = RecordingConnection()
+    repository = StorageRepository(connection)  # type: ignore[arg-type]
+
+    existing = repository.get_existing_post_ids(["known-post", "new-post"])
+
+    assert existing == frozenset({"known-post"})
+    assert "known-post" not in connection.query
+    assert connection.parameters == (["known-post", "new-post"],)

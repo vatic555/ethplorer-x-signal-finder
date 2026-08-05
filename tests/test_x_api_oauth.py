@@ -64,3 +64,21 @@ def test_code_exchange_and_refresh_do_not_expose_tokens() -> None:
     assert second.access_token == "second-secret"
     assert "first-secret" not in repr(first)
     assert "refresh-secret" not in repr(first)
+
+
+def test_refresh_keeps_current_token_when_rotation_is_omitted() -> None:
+    def transport(url, body, headers, timeout):
+        return HttpResponse(
+            200,
+            {},
+            b'{"access_token":"new-access","scope":"tweet.read offline.access"}',
+        )
+
+    tokens = refresh_access_token(
+        client_id="synthetic-client",
+        refresh_token="current-refresh",
+        transport=transport,
+    )
+
+    assert tokens.access_token == "new-access"
+    assert tokens.refresh_token == "current-refresh"

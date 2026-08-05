@@ -164,7 +164,14 @@ def refresh_access_token(
         {"Content-Type": "application/x-www-form-urlencoded"},
         20.0,
     )
-    return _parse_tokens(response)
+    refreshed = _parse_tokens(response)
+    if refreshed.refresh_token:
+        return refreshed
+    return OAuthTokens(
+        access_token=refreshed.access_token,
+        refresh_token=refresh_token,
+        scope=refreshed.scope,
+    )
 
 
 def authorize_with_local_callback(

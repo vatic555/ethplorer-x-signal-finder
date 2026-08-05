@@ -6,7 +6,7 @@ Run the default cross-platform test suite with:
 python -m pytest
 ```
 
-Default tests require no credentials and make no external API calls. They cover configuration precedence and redaction, migration ordering and checksums, CLI parsing, parameterized repository SQL, X response parsing, pagination metadata, checkpoint outcomes, OAuth PKCE helpers, and safe error classification.
+Default tests require no credentials and make no external API calls. They cover configuration precedence and redaction, migration ordering and checksums, CLI parsing, parameterized repository SQL, X response parsing, pagination metadata, checkpoint outcomes, OAuth PKCE helpers, collector mapping, simple-repost exclusion, source keys, deduplication counts, safe checkpoint updates, refresh-token persistence, and secret-safe output.
 
 Tests marked `integration` are optional. They require `TEST_DATABASE_URL`, never use `DATABASE_URL` automatically, and are skipped when the explicit test connection is absent:
 
