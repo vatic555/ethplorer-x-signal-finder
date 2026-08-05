@@ -34,4 +34,5 @@ where = ["src"]
 [tool.pytest.ini_options]
 markers = [
   "integration: requires an explicitly configured PostgreSQL test database",
+  "x_api_live: requires explicit opt-in and X API credentials",
 ]

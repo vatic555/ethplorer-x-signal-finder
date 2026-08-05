@@ -8,15 +8,19 @@ It is not a generic crypto-news aggregator, an automatic publishing bot, or a me
 
 The durable PostgreSQL storage foundation is implemented and validated against the real Supabase database. PostgreSQL is the operational source of truth, with Supabase selected as the initial managed provider. Application code uses the standard PostgreSQL protocol through `psycopg` and does not use the Supabase Python SDK.
 
+Stage 2 includes an isolated read-only X API probe, a one-shot OAuth 2.0 PKCE helper, and synthetic tests. Official documentation review is complete, but live authentication, endpoints, pagination, checkpoint behavior, and billing remain blocked pending X credentials and manual Aleksandr authorization. This is not an X collector.
+
 X collection, LLM integration, Telegram, and publication are not implemented. All publication remains a mandatory human action.
+
+The repository remains public during the MVP. Public visibility does not change the existing prohibition on committing credentials, local `.env` files, raw operational X content, runtime database data or dumps, private or licensed exports, or confidential internal documents.
 
 ## Implementation Status
 
 - Stage 0 - Repository Bootstrap - Completed
 - Stage 1 - Durable Storage Foundation - Completed
-- Stage 2 - X API Access Spike - Planned
-- Current task - None
-- Next task - Task 003 - X API Access Spike
+- Stage 2 - X API Access Spike - In Progress
+- Current task - Task 003 - X API Access Spike
+- Next task - Complete Task 003 validation before starting Task 004
 
 See the canonical [implementation roadmap](docs/roadmap.md), [product and technical specification](docs/project-spec.md), and [architecture decision log](docs/decisions.md).
 
@@ -84,6 +88,17 @@ python -m x_signal_finder --help
 python -m x_signal_finder status
 ```
 
+X API access-spike diagnostics:
+
+```sh
+python -m x_signal_finder x-api --help
+python -m x_signal_finder x-api probe home --user-id USER_ID --max-pages 2
+python -m x_signal_finder x-api probe mentions --user-id USER_ID --max-pages 2
+python -m x_signal_finder x-api oauth-probe --source both --max-pages 2
+```
+
+These commands must be invoked explicitly. They do not write to PostgreSQL or disk and never print Post text, raw API responses, or credentials. The OAuth command uses one temporary localhost callback, validates PKCE and refresh in memory, and stops the callback server before exiting.
+
 Database commands:
 
 ```sh
@@ -94,6 +109,8 @@ python -m x_signal_finder db smoke-test
 ```
 
 `db doctor` and `db status` are read-only. `db migrate` is the only command that applies schema migrations. Migrations never run automatically during normal pipeline execution. `db smoke-test` creates clearly synthetic records inside one transaction, rolls it back, and verifies that no synthetic rows remain.
+
+X API spike commands and one-time OAuth setup are documented in [the X API access spike report](docs/x-api-access-spike.md). Probe commands are diagnostic only, never write to PostgreSQL, and never persist API responses.
 
 All database commands return a non-zero exit code on failure and redact PostgreSQL connection strings from output.
 
@@ -113,7 +130,8 @@ python -m pytest -m integration
 
 ## Current Limitations
 
-- No X API collection or pagination
+- No production X collection pipeline
+- No completed live X API access validation yet
 - No LLM calls or prompt execution
 - No context enrichment from external sources
 - No Telegram delivery

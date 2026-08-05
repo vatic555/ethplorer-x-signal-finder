@@ -24,7 +24,7 @@ The intended MVP automates collection and filtering, including collection, durab
 
 Execution is initially started manually once or twice per day. Humans review Opportunities, edit drafts, record feedback, and publish on X. Human publication is mandatory.
 
-The current implementation includes the repository foundation, documentation, prompts, a local CLI, and durable PostgreSQL storage. It does not implement collection, model calls, Telegram, publication, or other external integrations.
+The current implementation includes the repository foundation, documentation, prompts, a local CLI, durable PostgreSQL storage, and an isolated read-only X API access-spike probe with one-shot OAuth 2.0 PKCE diagnostics. The probe is not a collector, does not persist API responses or checkpoints, and never writes to PostgreSQL. Live X validation remains pending credentials and manual account authorization. Collection, model calls, Telegram, and publication are not implemented.
 
 ## 4. Inputs
 
@@ -181,7 +181,7 @@ Platform-specific scripts may be optional conveniences but must never be the onl
 
 Future external-service activity must produce structured usage events linked to a run and processing stage. Records should capture the provider, operation or model, request count, measured input and output units where available, reported or estimated cost, currency, timestamp, and relevant entity IDs.
 
-Reported usage, estimated usage, and unknown cost must remain distinguishable. The current storage stage performs no external service calls and incurs no API usage.
+Reported usage, estimated usage, and unknown cost must remain distinguishable. Default commands and tests perform no external service calls. The explicit X API access-spike commands can incur pay-per-use X charges during authorized live validation, but they do not persist operational usage records because they are diagnostics rather than pipeline runs.
 
 ## 16. Human Review and Feedback
 

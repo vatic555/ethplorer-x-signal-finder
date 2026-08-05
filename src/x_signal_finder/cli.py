@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 from collections.abc import Sequence
 from datetime import datetime, timezone
+import json
 import sys
 from uuid import uuid4
 
@@ -25,10 +26,18 @@ from x_signal_finder.db.migrations import (
     discover_migrations,
 )
 from x_signal_finder.db.repository import StorageRepository
+from x_signal_finder.x_api.client import XApiClient, XApiRequestError
+from x_signal_finder.x_api.config import (
+    XApiConfigurationError,
+    load_x_api_config,
+)
+from x_signal_finder.x_api.oauth import OAuthFlowError, authorize_with_local_callback
+from x_signal_finder.x_api.probe import run_probe
 
 
 STATUS_MESSAGE = (
     "Durable PostgreSQL storage foundation is implemented. "
+    "The X API access spike is in progress. "
     "X collection and LLM integration are not implemented."
 )
 
@@ -65,6 +74,43 @@ def build_parser() -> argparse.ArgumentParser:
         "smoke-test",
         help="Exercise repository operations and roll back all synthetic data.",
     )
+    x_api = subparsers.add_parser(
+        "x-api",
+        help="Run isolated, read-only X API access-spike diagnostics.",
+    )
+    x_api_subparsers = x_api.add_subparsers(dest="x_api_command")
+    probe = x_api_subparsers.add_parser(
+        "probe",
+        help="Probe one timeline endpoint using an environment-provided token.",
+    )
+    probe.add_argument("source", choices=("home", "mentions"))
+    probe.add_argument("--user-id")
+    probe.add_argument("--max-pages", type=int, default=2)
+    probe.add_argument("--max-results", type=int, default=100)
+    probe.add_argument("--checkpoint-id")
+    probe.add_argument(
+        "--repeat-first-page",
+        action="store_true",
+        help="Repeat page one to compare IDs; this consumes an extra request.",
+    )
+    oauth_probe = x_api_subparsers.add_parser(
+        "oauth-probe",
+        help=(
+            "Run one-time OAuth 2.0 PKCE authorization, validate refresh, and "
+            "probe without persisting tokens or responses."
+        ),
+    )
+    oauth_probe.add_argument(
+        "--source",
+        choices=("home", "mentions", "both"),
+        default="home",
+    )
+    oauth_probe.add_argument("--home-user-id")
+    oauth_probe.add_argument("--ethplorer-user-id")
+    oauth_probe.add_argument("--max-pages", type=int, default=2)
+    oauth_probe.add_argument("--max-results", type=int, default=100)
+    oauth_probe.add_argument("--checkpoint-id")
+    oauth_probe.add_argument("--repeat-first-page", action="store_true")
     return parser
 
 
@@ -272,6 +318,64 @@ def _run_db_command(command: str) -> int:
     raise ValueError(f"Unknown database command: {command}")
 
 
+def _print_probe(summary) -> None:
+    print(json.dumps(summary.safe_diagnostic(), indent=2, sort_keys=True))
+
+
+def _run_x_api_probe(args: argparse.Namespace) -> int:
+    config = load_x_api_config()
+    user_id = config.user_id_for(args.source, args.user_id)
+    client = XApiClient(token=config.token_for(args.source), base_url=config.base_url)
+    summary = run_probe(
+        client=client,
+        source=args.source,
+        user_id=user_id,
+        max_pages=args.max_pages,
+        max_results=args.max_results,
+        checkpoint_id=args.checkpoint_id,
+        repeat_first_page=args.repeat_first_page,
+    )
+    _print_probe(summary)
+    return 0
+
+
+def _run_oauth_probe(args: argparse.Namespace) -> int:
+    config = load_x_api_config()
+    config.require_oauth_setup()
+    tokens = authorize_with_local_callback(
+        client_id=config.client_id,
+        redirect_uri=config.redirect_uri,
+    )
+    print("OAuth 2.0 PKCE authorization and refresh: succeeded")
+
+    sources = ("home", "mentions") if args.source == "both" else (args.source,)
+    for source in sources:
+        explicit_id = (
+            args.home_user_id if source == "home" else args.ethplorer_user_id
+        )
+        user_id = config.user_id_for(source, explicit_id)
+        summary = run_probe(
+            client=XApiClient(token=tokens.access_token, base_url=config.base_url),
+            source=source,
+            user_id=user_id,
+            max_pages=args.max_pages,
+            max_results=args.max_results,
+            checkpoint_id=args.checkpoint_id,
+            repeat_first_page=args.repeat_first_page,
+        )
+        _print_probe(summary)
+    print("OAuth tokens and API responses were not persisted.")
+    return 0
+
+
+def _run_x_api_command(args: argparse.Namespace) -> int:
+    if args.x_api_command == "probe":
+        return _run_x_api_probe(args)
+    if args.x_api_command == "oauth-probe":
+        return _run_oauth_probe(args)
+    raise ValueError(f"Unknown X API command: {args.x_api_command}")
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     """Run the command-line interface and return a process exit code."""
     parser = build_parser()
@@ -309,6 +413,21 @@ def main(argv: Sequence[str] | None = None) -> int:
                 file=sys.stderr,
             )
             return 1
+    if args.command == "x-api":
+        if args.x_api_command is None:
+            parser.parse_args(["x-api", "--help"])
+            return 0
+        try:
+            return _run_x_api_command(args)
+        except XApiRequestError as error:
+            print(
+                json.dumps(error.safe_diagnostic(), indent=2, sort_keys=True),
+                file=sys.stderr,
+            )
+            return 1
+        except (XApiConfigurationError, OAuthFlowError, ValueError) as error:
+            print(f"X API probe failed: {error}", file=sys.stderr)
+            return 2
 
     parser.print_help()
     return 0

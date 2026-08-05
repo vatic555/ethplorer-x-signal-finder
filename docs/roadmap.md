@@ -6,11 +6,13 @@ Status: Canonical implementation sequence and progress record
 
 - Stage 0 - Repository Bootstrap - Completed
 - Stage 1 - Durable Storage Foundation - Completed
-- Stage 2 - X API Access Spike - Planned
-- Current task - None
-- Next task - Task 003 - X API Access Spike
+- Stage 2 - X API Access Spike - In Progress
+- Current task - Task 003 - X API Access Spike
+- Next task - Complete Task 003 validation before starting Task 004
 - Local PostgreSQL implementation is ready
 - Real Supabase migration and database validation are complete
+- Task 003 documentation review and diagnostic probe are implemented
+- Stage 2 blocker - X credentials and manual Aleksandr OAuth authorization are not yet available for live endpoint and pagination validation
 
 Stage 1 must not be marked Completed until the real Supabase database has been created, migrations have been applied, and database validation has passed.
 
@@ -52,7 +54,7 @@ Post-MVP work may cover:
 |---|---|---|---|---|
 | 0 | Repository Bootstrap | Completed | Task 001 | Yes |
 | 1 | Durable Storage Foundation | Completed | Task 002 | Yes |
-| 2 | X API Access Spike | Planned | Task 003 | Yes |
+| 2 | X API Access Spike | In Progress | Task 003 | Yes |
 | 3 | X Collection Pipeline | Planned | Task 004 | Yes |
 | 4 | Minimum Knowledge Base | Planned | Task 005 | Yes |
 | 5 | Relevance Filtering and Signal Clustering | Planned | Task 006 | Yes |
@@ -123,7 +125,7 @@ Current state:
 
 ## Stage 2 - X API Access Spike
 
-Status: Planned
+Status: In Progress
 
 Verify the real technical and commercial limits of X before building the collector:
 
@@ -139,16 +141,25 @@ Verify the real technical and commercial limits of X before building the collect
 - expected cost;
 - go, constrained-go, or no-go decision.
 
+Current state:
+
+- official X documentation review is complete as of 2026-08-04;
+- isolated read-only probe, OAuth 2.0 PKCE helper, synthetic fixtures, and mocked tests are implemented;
+- documentation-only findings support technical feasibility with limited history windows;
+- no live X endpoint has been called because credentials and manual account authorization are absent;
+- decision remains `blocked pending credentials`;
+- Stage 3 must not start until live authentication, endpoint, pagination, checkpoint, and billing validation passes.
+
 ### Tasks
 
-- Task 003 - X API Access Spike - Planned
+- Task 003 - X API Access Spike - In Progress
 
 ### Completion Record
 
 - Completion date:
 - Final commit:
-- Validation summary:
-- Remaining limitations:
+- Validation summary: Documentation review and default synthetic tests pass; live validation is pending and the stage is not complete.
+- Remaining limitations: Blocked pending X app credentials and manual Aleksandr OAuth authorization. Home, mentions, refresh, pagination, history sufficiency, actual rate-limit headers, and billing are not live-validated.
 
 ## Stage 3 - X Collection Pipeline
 

@@ -4,9 +4,11 @@ This log records meaningful architectural and product decisions. New entries mus
 
 ## 2026-07-22 - Private repository during MVP
 
-Status: Accepted
+Status: Superseded
 
 The repository begins private because the MVP may include implementation details related to private data sources and licensed content. Repository privacy does not permit secrets or runtime data to be committed.
+
+Superseded by the 2026-08-04 public-repository decision below.
 
 ## 2026-07-22 - Markdown specification in Git is canonical
 
@@ -81,3 +83,11 @@ Status: Accepted
 `docs/roadmap.md` is the canonical implementation sequence and progress record. `docs/project-spec.md` remains the canonical product and technical requirements specification.
 
 Stages 0 through 7 constitute the MVP. Stage 8 is post-MVP. Reordering or bypassing a stage requires an explicit accepted decision. A stage is completed only after its task-specific validation passes.
+
+## 2026-08-04 - Public repository during MVP
+
+Status: Accepted
+
+The repository remains public during the MVP. Public visibility does not authorize committing credentials, `.env` files, raw operational X content, runtime database data, database dumps, private or licensed exports, or confidential internal documents.
+
+Public documentation and synthetic fixtures must remain safe for unrestricted distribution. Operational data continues to live in PostgreSQL, and secrets continue to exist only in ignored local or deployment environment configuration.
