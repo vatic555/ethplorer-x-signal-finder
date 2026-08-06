@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+import inspect
 from uuid import UUID
 
 from x_signal_finder.db.repository import StorageRepository
@@ -44,3 +45,31 @@ def test_existing_post_lookup_uses_bound_array() -> None:
     assert existing == frozenset({"known-post"})
     assert "known-post" not in connection.query
     assert connection.parameters == (["known-post", "new-post"],)
+
+
+def test_post_upsert_preserves_first_seen_and_workflow_fields() -> None:
+    source = inspect.getsource(StorageRepository.upsert_posts)
+    conflict_update = source.split("ON CONFLICT (post_id) DO UPDATE SET", 1)[1]
+
+    assert "first_seen_run_id =" not in conflict_update
+    assert "first_collected_at =" not in conflict_update
+    assert "processing_status =" not in conflict_update
+    assert "rejection_stage =" not in conflict_update
+    assert "rejection_reason =" not in conflict_update
+    assert "availability_status =" not in conflict_update
+    assert "content_deleted_at =" not in conflict_update
+    for field in (
+        "author_id",
+        "author_username",
+        "created_at",
+        "conversation_id",
+        "referenced_post_id",
+        "post_type",
+        "source_key",
+        "text",
+        "raw_json",
+        "last_seen_run_id",
+        "last_collected_at",
+        "last_verified_at",
+    ):
+        assert f"{field} = EXCLUDED.{field}" in conflict_update

@@ -71,6 +71,8 @@ class XApiContentPage:
     status: int
     posts: tuple[dict[str, Any], ...]
     users_by_id: Mapping[str, Mapping[str, Any]]
+    expanded_posts_by_id: Mapping[str, Mapping[str, Any]]
+    media_by_key: Mapping[str, Mapping[str, Any]]
     next_token: str | None
     newest_id: str | None
     oldest_id: str | None
@@ -84,6 +86,8 @@ class XApiContentPage:
             "XApiContentPage(status="
             f"{self.status}, post_count={len(self.posts)}, "
             f"user_count={len(self.users_by_id)}, "
+            f"expanded_post_count={len(self.expanded_posts_by_id)}, "
+            f"media_count={len(self.media_by_key)}, "
             f"next_token_present={bool(self.next_token)}, "
             f"partial_error_count={self.partial_error_count})"
         )
@@ -313,6 +317,46 @@ def parse_content_page(
             )
         users_by_id[user["id"]] = dict(user)
 
+    expanded_posts = includes.get("tweets", [])
+    if not isinstance(expanded_posts, list):
+        raise XApiRequestError(
+            status=response.status,
+            category="unexpected_response_shape",
+            endpoint=endpoint,
+            rate_limits=rate_limits,
+        )
+    expanded_posts_by_id: dict[str, Mapping[str, Any]] = {}
+    for post in expanded_posts:
+        if not isinstance(post, dict) or not isinstance(post.get("id"), str):
+            raise XApiRequestError(
+                status=response.status,
+                category="unexpected_response_shape",
+                endpoint=endpoint,
+                rate_limits=rate_limits,
+            )
+        expanded_posts_by_id[post["id"]] = dict(post)
+
+    media = includes.get("media", [])
+    if not isinstance(media, list):
+        raise XApiRequestError(
+            status=response.status,
+            category="unexpected_response_shape",
+            endpoint=endpoint,
+            rate_limits=rate_limits,
+        )
+    media_by_key: dict[str, Mapping[str, Any]] = {}
+    for media_object in media:
+        if not isinstance(media_object, dict) or not isinstance(
+            media_object.get("media_key"), str
+        ):
+            raise XApiRequestError(
+                status=response.status,
+                category="unexpected_response_shape",
+                endpoint=endpoint,
+                rate_limits=rate_limits,
+            )
+        media_by_key[media_object["media_key"]] = dict(media_object)
+
     next_token = meta.get("next_token")
     if next_token is not None and not isinstance(next_token, str):
         raise XApiRequestError(
@@ -328,6 +372,8 @@ def parse_content_page(
         status=response.status,
         posts=tuple(posts),
         users_by_id=users_by_id,
+        expanded_posts_by_id=expanded_posts_by_id,
+        media_by_key=media_by_key,
         next_token=next_token,
         newest_id=str(newest_id) if newest_id is not None else None,
         oldest_id=str(oldest_id) if oldest_id is not None else None,

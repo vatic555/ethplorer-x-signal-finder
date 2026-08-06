@@ -109,3 +109,11 @@ Task 004A validates the shortest operational path from X API through the Python 
 Only the OAuth refresh token is stored in the ignored local `.env`. Access tokens remain in memory. A successful refresh-token rotation is persisted before collection begins so a later API or database failure does not lose the usable refresh credential.
 
 The first bounded run establishes a current baseline even when older history is available and records `initial_history_not_backfilled`. This is an explicit Task 004A viability tradeoff, not a claim of historical completeness. After a checkpoint exists, incomplete pagination, response-level partial errors, missing pagination metadata, or duplicate Post IDs prevent checkpoint advancement. Full historical recovery, automatic retention and deletion handling, and the rest of Stage 3 hardening remain deferred.
+
+## 2026-08-06 - Task 004B content completeness and manual review views
+
+Status: Accepted
+
+Long-form Post content uses `note_tweet.text` when available and falls back to `text`. The original X fields remain at the top level of `raw_json`; returned referenced Post context and matching media metadata are added only under `_expanded`, and collector-derived provenance is added under `_collector`. Missing expansions are recorded when useful but are nonfatal and never cause an additional X request or a media download.
+
+Versioned migration 002 adds security-invoker PostgreSQL views for Post review, stored home-author statistics, and manual unfollow candidates. Their keyword and low-information reply flags are coarse review heuristics, not AI relevance decisions, rejection actions, or account changes. The explicit bounded `--refresh-existing` mode omits `since_id`, anchors its window at the stored checkpoint with documented `until_id`, upserts the returned window, preserves first-seen values and workflow state, and does not write `sync_state`. Stage 3 remains In Progress, and Stage 4 is not started.

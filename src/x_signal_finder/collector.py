@@ -1,4 +1,4 @@
-"""Bounded X collection and PostgreSQL persistence for Task 004A."""
+"""Bounded X collection and PostgreSQL persistence for Stage 3."""
 
 from __future__ import annotations
 
@@ -55,6 +55,7 @@ class FetchedSource:
     checkpoint_before: str | None
     checkpoint_candidate: str | None
     checkpoint_can_advance: bool
+    refresh_existing: bool
     estimated_cost_usd: Decimal
     warnings: tuple[str, ...]
 
@@ -84,6 +85,7 @@ class SourceCollectionSummary:
     oldest_post_id: str | None
     checkpoint_before: str | None
     checkpoint_after: str | None
+    refresh_existing: bool
     estimated_cost_usd: Decimal
     warnings: tuple[str, ...]
 
@@ -114,6 +116,7 @@ class SourceCollectionSummary:
             "oldest_post_id": self.oldest_post_id,
             "checkpoint_before": self.checkpoint_before,
             "checkpoint_after": self.checkpoint_after,
+            "refresh_existing": self.refresh_existing,
             "estimated_x_cost_usd": format(self.estimated_cost_usd, "f"),
             "errors": [],
             "warnings": list(self.warnings),
@@ -161,20 +164,55 @@ def _post_relationship(post: Mapping[str, Any]) -> tuple[str, str | None]:
     return "original", None
 
 
+def _full_text(post: Mapping[str, Any]) -> tuple[str, str]:
+    """Return validated full Post text and its source without truncation."""
+    note_tweet = post.get("note_tweet")
+    if note_tweet is not None and not isinstance(note_tweet, Mapping):
+        raise CollectionError("X Post contains invalid note_tweet data.")
+    note_text = note_tweet.get("text") if note_tweet is not None else None
+    if note_text is not None and not isinstance(note_text, str):
+        raise CollectionError("X Post contains invalid note_tweet text data.")
+    if note_text:
+        return note_text, "note_tweet"
+
+    text = post.get("text")
+    if not isinstance(text, str):
+        raise CollectionError("X Post is missing a required text field.")
+    return text, "text"
+
+
+def _media_keys(post: Mapping[str, Any]) -> tuple[str, ...]:
+    attachments = post.get("attachments")
+    if attachments is None:
+        return ()
+    if not isinstance(attachments, Mapping):
+        raise CollectionError("X Post contains invalid attachments data.")
+    raw_keys = attachments.get("media_keys", [])
+    if raw_keys is None:
+        return ()
+    if not isinstance(raw_keys, list) or not all(
+        isinstance(media_key, str) for media_key in raw_keys
+    ):
+        raise CollectionError("X Post contains invalid media_keys data.")
+    return tuple(raw_keys)
+
+
 def map_x_post(
     post: Mapping[str, Any],
     *,
     users_by_id: Mapping[str, Mapping[str, Any]],
+    expanded_posts_by_id: Mapping[str, Mapping[str, Any]] | None = None,
+    media_by_key: Mapping[str, Mapping[str, Any]] | None = None,
     source: Source,
     run_id: UUID,
     collected_at: datetime,
 ) -> dict[str, Any] | None:
     """Map one X Post to the existing schema, excluding simple reposts."""
     post_id = post.get("id")
-    text = post.get("text")
+    text, full_text_source = _full_text(post)
     created_at_raw = post.get("created_at")
-    if not isinstance(post_id, str) or not isinstance(text, str):
-        raise CollectionError("X Post is missing a required id or text field.")
+    if not isinstance(post_id, str):
+        raise CollectionError("X Post is missing a required id field.")
     if not isinstance(created_at_raw, str):
         raise CollectionError("X Post is missing the requested created_at field.")
     try:
@@ -199,6 +237,55 @@ def map_x_post(
     if conversation_id is not None and not isinstance(conversation_id, str):
         raise CollectionError("X Post contains an invalid conversation_id field.")
 
+    raw_json = dict(post)
+    collector_metadata: dict[str, object] = {
+        "full_text_source": full_text_source,
+    }
+    expanded_context: dict[str, object] = {}
+
+    expanded_posts = expanded_posts_by_id or {}
+    referenced_post = (
+        expanded_posts.get(referenced_post_id) if referenced_post_id else None
+    )
+    if referenced_post is not None:
+        if not isinstance(referenced_post, Mapping):
+            raise CollectionError("X Post contains invalid expanded Post data.")
+        _full_text(referenced_post)
+        expanded_context["referenced_post"] = dict(referenced_post)
+        referenced_author_id = referenced_post.get("author_id")
+        if referenced_author_id is not None and not isinstance(
+            referenced_author_id, str
+        ):
+            raise CollectionError("Expanded X Post contains invalid author_id data.")
+        referenced_author = (
+            users_by_id.get(referenced_author_id) if referenced_author_id else None
+        )
+        if isinstance(referenced_author, Mapping):
+            referenced_username = referenced_author.get("username")
+            author_context: dict[str, str] = {"id": referenced_author_id}
+            if isinstance(referenced_username, str):
+                author_context["username"] = referenced_username
+            expanded_context["referenced_post_author"] = author_context
+
+    media_keys = _media_keys(post)
+    media_lookup = media_by_key or {}
+    expanded_media = [
+        dict(media_lookup[media_key])
+        for media_key in media_keys
+        if media_key in media_lookup
+        and isinstance(media_lookup[media_key], Mapping)
+    ]
+    if media_keys:
+        expanded_context["media"] = expanded_media
+        missing_media_count = len(media_keys) - len(expanded_media)
+        if missing_media_count:
+            collector_metadata["media_expansion_incomplete"] = True
+            collector_metadata["missing_media_count"] = missing_media_count
+
+    if expanded_context:
+        raw_json["_expanded"] = expanded_context
+    raw_json["_collector"] = collector_metadata
+
     return {
         "post_id": post_id,
         "author_id": author_id,
@@ -209,7 +296,7 @@ def map_x_post(
         "post_type": post_type,
         "source_key": source_key_for(source),
         "text": text,
-        "raw_json": dict(post),
+        "raw_json": raw_json,
         "first_seen_run_id": run_id,
         "last_seen_run_id": run_id,
         "first_collected_at": collected_at,
@@ -230,6 +317,7 @@ def fetch_source(
     checkpoint_before: str | None,
     max_pages: int,
     max_results: int,
+    refresh_existing: bool = False,
 ) -> FetchedSource:
     """Fetch a bounded source window and prepare schema-compatible records."""
     if max_pages < 1:
@@ -245,13 +333,16 @@ def fetch_source(
         "expansions": EXPANSIONS,
         "user.fields": USER_FIELDS,
         "media.fields": MEDIA_FIELDS,
-        "since_id": checkpoint_before,
+        "since_id": None if refresh_existing else checkpoint_before,
+        "until_id": checkpoint_before if refresh_existing else None,
     }
     if source == "home":
         base_params["exclude"] = "retweets"
 
     pages = []
     users_by_id: dict[str, Mapping[str, Any]] = {}
+    expanded_posts_by_id: dict[str, Mapping[str, Any]] = {}
+    media_by_key: dict[str, Mapping[str, Any]] = {}
     pagination_token: str | None = None
     while len(pages) < max_pages:
         params = dict(base_params)
@@ -260,6 +351,8 @@ def fetch_source(
         page = client.get_content_page(endpoint, params)
         pages.append(page)
         users_by_id.update(page.users_by_id)
+        expanded_posts_by_id.update(page.expanded_posts_by_id)
+        media_by_key.update(page.media_by_key)
         pagination_token = page.next_token
         if not pagination_token:
             break
@@ -278,6 +371,8 @@ def fetch_source(
         record = map_x_post(
             post,
             users_by_id=users_by_id,
+            expanded_posts_by_id=expanded_posts_by_id,
+            media_by_key=media_by_key,
             source=source,
             run_id=run_id,
             collected_at=collected_at,
@@ -297,12 +392,14 @@ def fetch_source(
     if duplicate_ids:
         warnings.add("duplicate_post_ids_detected")
     if last_page.next_token:
-        if checkpoint_before is None:
+        if refresh_existing:
+            warnings.add("refresh_window_bounded")
+        elif checkpoint_before is None:
             warnings.add("initial_history_not_backfilled")
         else:
             warnings.add("incremental_page_limit_reached")
 
-    checkpoint_can_advance = not warnings.intersection(
+    checkpoint_can_advance = not refresh_existing and not warnings.intersection(
         {
             "partial_errors_present",
             "pagination_metadata_missing",
@@ -310,7 +407,11 @@ def fetch_source(
             "incremental_page_limit_reached",
         }
     )
-    checkpoint_candidate = first_page.newest_id or checkpoint_before
+    checkpoint_candidate = (
+        checkpoint_before
+        if refresh_existing
+        else first_page.newest_id or checkpoint_before
+    )
     return FetchedSource(
         source=source,
         source_key=source_key_for(source),
@@ -324,6 +425,7 @@ def fetch_source(
         checkpoint_before=checkpoint_before,
         checkpoint_candidate=checkpoint_candidate,
         checkpoint_can_advance=checkpoint_can_advance,
+        refresh_existing=refresh_existing,
         estimated_cost_usd=POST_READ_COST_USD * len(raw_posts),
         warnings=tuple(sorted(warnings)),
     )
@@ -356,27 +458,28 @@ def save_source_collection(
     previous_success_run = (
         previous_state.get("last_successful_run_id") if previous_state else None
     )
-    repository.update_sync_state(
-        source_key=fetched.source_key,
-        checkpoint_value=checkpoint_after,
-        checkpoint_metadata={
-            "source": fetched.source,
-            "requests_count": fetched.requests_count,
-            "fetched_posts": fetched.fetched_posts,
-            "max_pages": max_pages,
-            "max_results": max_results,
-            "warnings": list(fetched.warnings),
-        },
-        last_attempt_at=collected_at,
-        last_successful_at=(
-            collected_at if fetched.checkpoint_can_advance else previous_success_at
-        ),
-        last_successful_run_id=(
-            run_id if fetched.checkpoint_can_advance else previous_success_run
-        ),
-        last_warning_code=fetched.warnings[0] if fetched.warnings else None,
-        updated_at=collected_at,
-    )
+    if not fetched.refresh_existing:
+        repository.update_sync_state(
+            source_key=fetched.source_key,
+            checkpoint_value=checkpoint_after,
+            checkpoint_metadata={
+                "source": fetched.source,
+                "requests_count": fetched.requests_count,
+                "fetched_posts": fetched.fetched_posts,
+                "max_pages": max_pages,
+                "max_results": max_results,
+                "warnings": list(fetched.warnings),
+            },
+            last_attempt_at=collected_at,
+            last_successful_at=(
+                collected_at if fetched.checkpoint_can_advance else previous_success_at
+            ),
+            last_successful_run_id=(
+                run_id if fetched.checkpoint_can_advance else previous_success_run
+            ),
+            last_warning_code=fetched.warnings[0] if fetched.warnings else None,
+            updated_at=collected_at,
+        )
     repository.record_usage_event(
         {
             "usage_event_id": usage_event_id,
@@ -410,6 +513,7 @@ def save_source_collection(
         oldest_post_id=fetched.oldest_post_id,
         checkpoint_before=fetched.checkpoint_before,
         checkpoint_after=checkpoint_after,
+        refresh_existing=fetched.refresh_existing,
         estimated_cost_usd=fetched.estimated_cost_usd,
         warnings=fetched.warnings,
     )

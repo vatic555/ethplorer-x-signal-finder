@@ -8,13 +8,14 @@ Status: Canonical implementation sequence and progress record
 - Stage 1 - Durable Storage Foundation - Completed
 - Stage 2 - X API Access Spike - Completed
 - Stage 3 - X Collection Pipeline - In Progress
-- Current task - Task 004A - Minimal X Collector to PostgreSQL - Completed
-- Next task - Await the next explicit Stage 3 task specification
+- Current task - Task 004B - Content Completeness and Review Views - Completed
+- Next task - Further Stage 3 hardening requires an explicit specification
 - Local PostgreSQL implementation is ready
 - Real Supabase migration and database validation are complete
 - Task 003 documentation review, diagnostic probe, live OAuth, endpoint, pagination, refresh, and checkpoint validation are complete
 - Stage 2 decision - `constrained-go`; Stage 3 has started with the bounded Task 004A collector
 - Task 004A implementation, synthetic validation, and bounded live X-to-Supabase validation are complete
+- Task 004B implementation, migration 002, synthetic validation, and bounded live validation are complete
 
 Stage 1 must not be marked Completed until the real Supabase database has been created, migrations have been applied, and database validation has passed.
 
@@ -57,7 +58,7 @@ Post-MVP work may cover:
 | 0 | Repository Bootstrap | Completed | Task 001 | Yes |
 | 1 | Durable Storage Foundation | Completed | Task 002 | Yes |
 | 2 | X API Access Spike | Completed | Task 003 | Yes |
-| 3 | X Collection Pipeline | In Progress | Task 004A | Yes |
+| 3 | X Collection Pipeline | In Progress | Further hardening | Yes |
 | 4 | Minimum Knowledge Base | Planned | Task 005 | Yes |
 | 5 | Relevance Filtering and Signal Clustering | Planned | Task 006 | Yes |
 | 6 | Opportunity Gate and Context Enrichment | Planned | Task 007 | Yes |
@@ -193,12 +194,17 @@ Current state:
 - an intentionally bounded first run establishes a current baseline and records that older history was not backfilled;
 - incomplete incremental pagination, partial response errors, or duplicate IDs prevent checkpoint advancement;
 - required bounded live home, repeated-home, and mentions runs against X and Supabase passed;
+- Task 004B content completeness and review-view implementation is complete;
+- long Posts now prefer returned `note_tweet.text`, and returned referenced Post and media metadata are retained under service keys in the original `raw_json`;
+- an explicit bounded refresh mode reads the checkpoint only to anchor `until_id`, updates the bounded stored window, and does not change the operational checkpoint;
+- migration 002 defines manual Post review, author statistics, and manual unfollow-candidate views;
 - full Stage 3 pagination, retry hardening, missed-window recovery, and compliance automation are not part of Task 004A.
 
 ### Tasks
 
 - Task 004A - Minimal X Collector to PostgreSQL - Completed
-- Further Stage 3 hardening - Planned; task not yet assigned
+- Task 004B - Content Completeness and Review Views - Completed
+- Further Stage 3 hardening - Planned
 
 ### Task 004A Validation Record
 
@@ -211,6 +217,19 @@ Current state:
 - Database validation: PostgreSQL 17.6; migration 1 current; no pending migrations; required tables present; RLS enabled; no new migration created.
 - Tests: 42 passed and 3 optional integration tests skipped before live validation.
 - Remaining limitations: bounded initial baseline, no historical backfill, no full Stage 3 recovery workflow, no automated X Content revalidation or deletion, and one stored `source_key` value per Post row.
+
+### Task 004B Validation Record
+
+- Completion date: 2026-08-06
+- Scope: full long-Post text, returned referenced context, returned media metadata, manual review views, and explicit bounded refresh of existing rows
+- Database: migration 002 applied; PostgreSQL 17.6 healthy; migrations 1 and 2 current; no pending migrations; operational-table RLS unchanged; all three views use `security_invoker=true`
+- Target Post `2085122221501239463`: stored text increased from 319 to 1,320 characters and exactly matches `note_tweet.text`; quote relationship, referenced Post context, direct URLs, video metadata, and `has_video=true` validated
+- Target Post `2085122224563126320`: reply relationship, referenced context, direct URLs, `low_information_reply_candidate=true`, `processing_status=unprocessed`, and no rejection validated
+- Refresh integrity: first-seen run and first-collected timestamp were preserved; last-seen values advanced; checkpoint fingerprint was identical before and after; duplicate groups were zero
+- Views: `posts_review`, `author_source_stats`, and `author_unfollow_candidates` validated with real and rollback-only synthetic data; 0 authors currently meet the manual unfollow-candidate heuristic
+- Live usage: 78 X Post Reads and $0.390 estimated cost across three bounded attempts. The first two attempts exposed current-window drift; the accepted fix anchors refresh at the stored checkpoint with `until_id`, and the final one-page attempt validated both required Posts
+- Tests: 58 default tests passed with 4 external tests skipped; 2 PostgreSQL integration tests passed explicitly
+- Stage boundary: Stage 3 remains In Progress; Stage 4 and AI processing are not started; no automatic unfollow, X write access, or media download was added
 
 ### Completion Record
 

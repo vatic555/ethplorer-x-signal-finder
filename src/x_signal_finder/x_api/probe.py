@@ -13,7 +13,7 @@ Source = Literal["home", "mentions"]
 TWEET_FIELDS = (
     "attachments,author_id,conversation_id,created_at,entities,"
     "in_reply_to_user_id,lang,possibly_sensitive,public_metrics,"
-    "referenced_tweets,withheld"
+    "referenced_tweets,note_tweet,withheld"
 )
 EXPANSIONS = (
     "attachments.media_keys,author_id,in_reply_to_user_id,"

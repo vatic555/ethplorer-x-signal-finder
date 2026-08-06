@@ -10,6 +10,7 @@ from x_signal_finder.x_api.client import (
     HttpResponse,
     XApiClient,
     XApiRequestError,
+    parse_content_page,
     parse_page,
     parse_rate_limit_headers,
     redact_x_secrets,
@@ -66,6 +67,33 @@ def test_response_and_rate_limit_parsing() -> None:
     assert page.post_field_keys == ("author_id", "created_at", "id", "text")
     assert page.rate_limits["x-rate-limit-remaining"] == "179"
     assert parse_rate_limit_headers({"Unrelated": "value"}) == {}
+
+
+def test_content_parser_keeps_expanded_maps_and_has_content_safe_repr() -> None:
+    body = json.dumps(
+        {
+            "data": [{"id": "1", "text": "sensitive main text"}],
+            "includes": {
+                "users": [{"id": "10", "username": "author"}],
+                "tweets": [{"id": "2", "text": "sensitive referenced text"}],
+                "media": [{"media_key": "m1", "type": "video"}],
+            },
+            "meta": {"newest_id": "1", "oldest_id": "1"},
+        }
+    ).encode()
+    page = parse_content_page(
+        HttpResponse(status=200, headers={}, body=body),
+        endpoint="/synthetic",
+        elapsed=0.0,
+    )
+
+    assert page.expanded_posts_by_id["2"]["text"] == "sensitive referenced text"
+    assert page.media_by_key["m1"]["type"] == "video"
+    rendered = repr(page)
+    assert "sensitive main text" not in rendered
+    assert "sensitive referenced text" not in rendered
+    assert "expanded_post_count=1" in rendered
+    assert "media_count=1" in rendered
 
 
 def test_pagination_checkpoint_and_duplicates_are_reported() -> None:

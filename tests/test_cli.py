@@ -17,7 +17,7 @@ def test_project_status_does_not_require_database(capsys) -> None:
     output = capsys.readouterr().out
     assert "PostgreSQL storage foundation is implemented" in output
     assert "access spike is complete with a constrained-go decision" in output
-    assert "Task 004A X collector is complete" in output
+    assert "Task 004B content completeness and review views are complete" in output
 
 
 def test_x_api_subcommands_parse() -> None:
@@ -38,6 +38,15 @@ def test_collect_defaults_are_bounded() -> None:
     assert args.command == "collect"
     assert args.max_pages == 1
     assert args.max_results == 20
+    assert args.refresh_existing is False
+
+
+def test_collect_refresh_existing_requires_explicit_flag() -> None:
+    args = build_parser().parse_args(
+        ["collect", "--source", "home", "--refresh-existing"]
+    )
+
+    assert args.refresh_existing is True
 
 
 def test_collect_rejects_invalid_shared_page_size_before_external_calls(capsys) -> None:

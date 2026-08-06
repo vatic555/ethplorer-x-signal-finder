@@ -131,12 +131,7 @@ class StorageRepository:
                 raw_json = EXCLUDED.raw_json,
                 last_seen_run_id = EXCLUDED.last_seen_run_id,
                 last_collected_at = EXCLUDED.last_collected_at,
-                processing_status = EXCLUDED.processing_status,
-                rejection_stage = EXCLUDED.rejection_stage,
-                rejection_reason = EXCLUDED.rejection_reason,
-                availability_status = EXCLUDED.availability_status,
-                last_verified_at = EXCLUDED.last_verified_at,
-                content_deleted_at = EXCLUDED.content_deleted_at
+                last_verified_at = EXCLUDED.last_verified_at
         """
         parameters = []
         for post in posts:

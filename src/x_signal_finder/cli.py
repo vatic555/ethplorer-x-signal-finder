@@ -50,7 +50,8 @@ from x_signal_finder.x_api.probe import run_probe
 STATUS_MESSAGE = (
     "Durable PostgreSQL storage foundation is implemented. "
     "The X API access spike is complete with a constrained-go decision. "
-    "The bounded Task 004A X collector is complete and Stage 3 remains in progress. "
+    "Task 004B content completeness and review views are complete; "
+    "Stage 3 remains in progress. "
     "LLM integration is not implemented."
 )
 
@@ -130,7 +131,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     collect = subparsers.add_parser(
         "collect",
-        help="Run the bounded Task 004A X collector and persist to PostgreSQL.",
+        help="Run the bounded Stage 3 X collector and persist to PostgreSQL.",
     )
     collect.add_argument(
         "--source",
@@ -139,6 +140,15 @@ def build_parser() -> argparse.ArgumentParser:
     )
     collect.add_argument("--max-pages", type=int, default=1)
     collect.add_argument("--max-results", type=int, default=20)
+    collect.add_argument(
+        "--refresh-existing",
+        action="store_true",
+        help=(
+            "Use one explicit bounded window ending at the stored checkpoint, "
+            "omit since_id, and refresh Post content without changing the "
+            "operational checkpoint."
+        ),
+    )
     return parser
 
 
@@ -468,13 +478,18 @@ def _run_collect(args: argparse.Namespace) -> int:
             repository.create_run(
                 run_id=run_id,
                 started_at=started_at,
-                trigger_type="manual_x_collection",
+                trigger_type=(
+                    "manual_x_refresh"
+                    if args.refresh_existing
+                    else "manual_x_collection"
+                ),
                 application_version=__version__,
                 metadata={
                     "source": args.source,
                     "max_pages": args.max_pages,
                     "max_results": args.max_results,
-                    "task": "004A",
+                    "task": "004B" if args.refresh_existing else "004A",
+                    "refresh_existing": args.refresh_existing,
                 },
             )
 
@@ -501,6 +516,7 @@ def _run_collect(args: argparse.Namespace) -> int:
                     checkpoint_before=checkpoint_before,
                     max_pages=args.max_pages,
                     max_results=args.max_results,
+                    refresh_existing=args.refresh_existing,
                 )
             except XApiRequestError as error:
                 failure = _failed_source_diagnostic(
@@ -511,14 +527,15 @@ def _run_collect(args: argparse.Namespace) -> int:
                         "rate_limits": error.rate_limits,
                     },
                 )
-                with connection.transaction():
-                    record_failed_source_attempt(
-                        repository=repository,
-                        source=source,
-                        previous_state=previous_state,
-                        attempted_at=collected_at,
-                        warning_code=error.category,
-                    )
+                if not args.refresh_existing:
+                    with connection.transaction():
+                        record_failed_source_attempt(
+                            repository=repository,
+                            source=source,
+                            previous_state=previous_state,
+                            attempted_at=collected_at,
+                            warning_code=error.category,
+                        )
                 failures.append(failure)
                 continue
             except CollectionError:
@@ -526,14 +543,15 @@ def _run_collect(args: argparse.Namespace) -> int:
                     source=source,
                     error_category="unexpected_post_shape",
                 )
-                with connection.transaction():
-                    record_failed_source_attempt(
-                        repository=repository,
-                        source=source,
-                        previous_state=previous_state,
-                        attempted_at=collected_at,
-                        warning_code="unexpected_post_shape",
-                    )
+                if not args.refresh_existing:
+                    with connection.transaction():
+                        record_failed_source_attempt(
+                            repository=repository,
+                            source=source,
+                            previous_state=previous_state,
+                            attempted_at=collected_at,
+                            warning_code="unexpected_post_shape",
+                        )
                 failures.append(failure)
                 continue
 
@@ -550,14 +568,15 @@ def _run_collect(args: argparse.Namespace) -> int:
                         max_results=args.max_results,
                     )
             except Exception:
-                with connection.transaction():
-                    record_failed_source_attempt(
-                        repository=repository,
-                        source=source,
-                        previous_state=previous_state,
-                        attempted_at=collected_at,
-                        warning_code="database_write_failed",
-                    )
+                if not args.refresh_existing:
+                    with connection.transaction():
+                        record_failed_source_attempt(
+                            repository=repository,
+                            source=source,
+                            previous_state=previous_state,
+                            attempted_at=collected_at,
+                            warning_code="database_write_failed",
+                        )
                 failures.append(
                     _failed_source_diagnostic(
                         source=source,

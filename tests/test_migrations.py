@@ -45,3 +45,23 @@ def test_checksum_mismatch_is_rejected(tmp_path: Path) -> None:
 def test_missing_applied_migration_is_rejected() -> None:
     with pytest.raises(MigrationError, match="missing locally"):
         validate_applied_migrations((), {1: ("001_missing.sql", "checksum")})
+
+
+def test_content_review_migration_contains_bounded_manual_review_views() -> None:
+    sql = (
+        Path(__file__).parents[1] / "migrations" / "002_content_review_views.sql"
+    ).read_text(encoding="utf-8")
+
+    assert "CREATE VIEW public.posts_review" in sql
+    assert "CREATE VIEW public.author_source_stats" in sql
+    assert "CREATE VIEW public.author_unfollow_candidates" in sql
+    assert "https://x.com/i/web/status/" in sql
+    assert "full_text_source" in sql
+    assert "referenced_post_text" in sql
+    assert "media_types" in sql
+    assert "low_information_reply_candidate" in sql
+    assert "estimated_stored_post_cost_usd" in sql
+    assert "observed_posts >= 20 OR observation_span_days >= 7" in sql
+    assert "blockchain_keyword_matches = 0" in sql
+    assert "DELETE" not in sql.upper()
+    assert "UPDATE" not in sql.upper()
