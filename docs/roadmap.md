@@ -287,6 +287,55 @@ Relevance alone must not create an Opportunity.
 ### Tasks
 
 - Task 006 - Relevance Filtering and Signal Clustering - Planned
+- Task 006B - Author Quality Monitoring and Follow-list Hygiene - Planned
+
+### Task 006B - Planned Scope
+
+Task 006B starts only after Task 006 produces real AI relevance decisions. The existing `author_source_stats` and `author_unfollow_candidates` views are preliminary keyword-based MVP tools for manual inspection. They are not a complete source-quality assessment and do not authorize any account action.
+
+An author becomes eligible for manual review after at least 20 observed Posts or at least seven days of observation. Future metrics must include:
+
+- observed Posts and estimated X Post Read cost;
+- original, quote, reply, and low-information reply counts;
+- main-text, referenced-text, and combined keyword matches;
+- AI relevance counts for kept, rejected, and uncertain Posts;
+- relevance ratio;
+- Signals created and Opportunities accepted;
+- last useful Post, last Signal, and observation span.
+
+For every Post, future author analysis must use:
+
+```text
+effective_analysis_text = main Post text + referenced_post_text when available
+```
+
+Quote and reply context must participate in keyword matching, AI relevance filtering, author relevance statistics, and the manual candidate decision. The metrics `main_text_keyword_matches`, `referenced_text_keyword_matches`, and `combined_keyword_matches` must remain separate. `blockchain_keyword_matches` must represent the combined result and count a match found in either source. A short neutral main comment must not make its author look irrelevant when the quoted or parent Post contains a relevant blockchain discussion.
+
+Missing referenced expansion must be represented as context unavailable. It must not cause a failure or a false conclusion that the unavailable context is irrelevant.
+
+Manual author-review states are planned as:
+
+- `unreviewed`;
+- `keep`;
+- `watch`;
+- `unfollow_candidate`;
+- `unfollowed`;
+- `dismissed`.
+
+Each review must retain the reviewer, review timestamp, reason, status, optional `review_again_after`, and a snapshot of the metrics used. An author may enter the manual queue only after reaching the observation threshold and having no AI-kept Posts or Signals, a very high rejected ratio, or meaningful cost without useful results. A zero keyword count can support review but is never a final decision, and quoted or referenced context must be considered.
+
+Authors marked `keep` or `dismissed` must not repeatedly reappear. Re-evaluation may occur only after `review_again_after`, substantial new Post volume, a sharp relevance-ratio decline, meaningful cost growth, or a long period without a useful Post or Signal.
+
+A future manual view such as `author_review_queue` should show username, profile URL, observed Posts, estimated cost, relevance statistics, Signals, Opportunities, last useful Post, suggested reason, and current review status.
+
+Future Task 006B validation must include:
+
+1. A quote with neutral main text and `Ethereum` in referenced text counts as a combined match and does not enter a zero-match candidate queue.
+2. A short reply with relevant referenced blockchain context remains eligible for a low-information reply flag while preserving that context for AI and author statistics.
+3. A Post without referenced context uses only its main text.
+4. A missing expansion is safe, records unavailable context, and does not assert that the context is irrelevant.
+
+Task 006B must not implement automatic unfollow, X write access, write OAuth scopes, or automatic follow-list changes. Every unfollow decision and action remains manual in X.
 
 ### Completion Record
 

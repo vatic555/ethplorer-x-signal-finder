@@ -4,6 +4,8 @@ Ethplorer X Signal Finder is an AI-assisted X intelligence pipeline foundation. 
 
 It is not a generic crypto-news aggregator, an automatic publishing bot, or a mechanism for forcing Ethplorer into unrelated conversations.
 
+> Start here for current project state: [`HANDOFF.md`](HANDOFF.md)
+
 ## Current Status
 
 The durable PostgreSQL storage foundation is implemented and validated against the real Supabase database. PostgreSQL is the operational source of truth, with Supabase selected as the initial managed provider. Application code uses the standard PostgreSQL protocol through `psycopg` and does not use the Supabase Python SDK.
@@ -152,6 +154,9 @@ python -m pytest -m integration
 - No GitHub Actions
 - No automatic publication
 - No automatic unfollow or X write access
+- Author unfollow candidates currently use a coarse keyword heuristic
+- Full author-quality evaluation is planned in Task 006B after real AI relevance decisions exist
+- Automatic unfollow remains prohibited; every follow-list change is a manual human action in X
 - No media download, audio extraction, speech-to-text, or image analysis
 
 Before changing architecture or product behavior, read `docs/project-spec.md`.

@@ -1,5 +1,6 @@
 # Repository Instructions
 
+- Read `HANDOFF.md` before starting work. Update it at the end of every completed task and whenever the current stage, next task, validated commit, architecture, operational commands, or major limitations change. `HANDOFF.md` is a current-state summary and must not override the canonical specification, roadmap, or decisions log.
 - Read `docs/project-spec.md` before making architectural or product changes.
 - Treat `docs/project-spec.md` as the canonical product and technical specification.
 - Read `docs/roadmap.md` before implementation work and follow its canonical stage order.

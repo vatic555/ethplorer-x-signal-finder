@@ -1,0 +1,206 @@
+# Ethplorer X Signal Finder - Handoff
+
+Last updated: 2026-08-06
+
+Validated commit: `25554b015b425645bb48cfc8eb69fc50b8ae72a8` (latest validated implementation baseline)
+
+This file is a short current-state snapshot. It is not a canonical product, technical, architecture, or roadmap source.
+
+## Source Hierarchy
+
+1. [`docs/project-spec.md`](docs/project-spec.md) - canonical product and technical specification.
+2. [`docs/roadmap.md`](docs/roadmap.md) - canonical stage order and status record.
+3. [`docs/decisions.md`](docs/decisions.md) - accepted architecture decisions.
+4. [`AGENTS.md`](AGENTS.md) - mandatory rules for contributors and AI agents.
+5. [`HANDOFF.md`](HANDOFF.md) - concise current snapshot, not a source of truth.
+
+If this file conflicts with a canonical document, update this file to match the canonical source.
+
+## 1. Project Goal
+
+The project is building an AI-assisted X intelligence pipeline for Ethplorer. It collects an authorized account's home timeline and `@Ethplorer` mentions, then will identify relevant blockchain discussions, group evidence into Signals, and apply an Opportunity Gate before producing reviewable Opportunities or drafts. A human reviews every result and publishes manually. Automatic publication is not allowed.
+
+## 2. Current Status
+
+- Current stage: Stage 3 - X Collection Pipeline - In Progress.
+- Last completed task: Task 004B - Content Completeness and Review Views.
+- Next task: further Stage 3 hardening, after a new explicit task specification is provided.
+- Roadmap status: Stages 0 through 2 are Completed; Stage 3 is In Progress; Stage 4 and later MVP stages are Planned; Stage 8 automation is Deferred.
+- Task 006B - Author Quality Monitoring and Follow-list Hygiene is Planned after Task 006 produces real AI relevance decisions. It is not current work.
+
+## 3. What Works Now
+
+The following capabilities have been implemented and validated:
+
+- protected PostgreSQL storage hosted in Supabase;
+- checksum-tracked migrations 001 and 002;
+- Row Level Security on operational tables;
+- OAuth 2.0 Authorization Code flow with S256 PKCE;
+- local refresh-token persistence and refresh-token rotation;
+- authorized reverse-chronological home timeline access;
+- direct mentions endpoint access;
+- manually invoked bounded collection for home and mentions;
+- independent source checkpoints and safe non-advancement on known incomplete conditions;
+- `post_id` upsert deduplication;
+- full long-Post text from `note_tweet.text` with `text` fallback;
+- returned referenced Post and author context in `raw_json._expanded`;
+- returned media metadata without media download;
+- explicit bounded refresh of existing content without changing `sync_state`;
+- Post, media, referenced-context, author-statistics, and manual candidate review views.
+
+## 4. Current Data Flow
+
+```text
+X API
+  -> collector
+  -> PostgreSQL posts
+  -> future relevance filter
+  -> future Signals
+  -> future Opportunity Gate
+  -> future human review workflow
+  -> manual publication
+```
+
+The X API, collector, and PostgreSQL portion exists. Runtime relevance filtering, Signals, Opportunity Gate evaluation, Opportunity creation, draft generation, and the human review workflow are not implemented. Publication remains outside the application and must be performed manually.
+
+## 5. Architecture Snapshot
+
+- Python 3.11 or newer is the cross-platform runtime.
+- PostgreSQL is the operational source of truth.
+- Supabase is the current managed PostgreSQL provider.
+- Application database access uses standard `psycopg` and parameterized SQL.
+- Local configuration and credentials exist only in ignored `.env` or real environment variables.
+- The GitHub repository is public.
+- The application does not use the Supabase Python SDK.
+- MongoDB is not part of the architecture.
+- GitHub Actions and scheduled execution are not implemented at the current stage.
+
+## 6. Important Files
+
+- [`AGENTS.md`](AGENTS.md) - mandatory repository and safety rules.
+- [`README.md`](README.md) - project overview, setup, commands, and visible status.
+- [`docs/project-spec.md`](docs/project-spec.md) - canonical product and technical behavior.
+- [`docs/roadmap.md`](docs/roadmap.md) - canonical implementation order, task status, and validation records.
+- [`docs/decisions.md`](docs/decisions.md) - accepted architecture and product decisions.
+- [`docs/x-api-access-spike.md`](docs/x-api-access-spike.md) - Task 003 evidence, constraints, pricing, and compliance analysis.
+- [`docs/x-collector.md`](docs/x-collector.md) - Stage 3 collector behavior and operating guide.
+- [`src/x_signal_finder/collector.py`](src/x_signal_finder/collector.py) - X Post mapping, bounded fetching, refresh behavior, and persistence orchestration.
+- [`src/x_signal_finder/x_api/`](src/x_signal_finder/x_api/) - read-only X API client, OAuth, configuration, and probe code.
+- [`src/x_signal_finder/db/`](src/x_signal_finder/db/) - PostgreSQL connection, migration, checks, and repository code.
+- [`migrations/`](migrations/) - ordered, checksum-tracked PostgreSQL schema migrations.
+- [`knowledge/`](knowledge/) - terminology, capability catalog, and source tracking.
+- [`prompts/`](prompts/) - future processing-stage prompt contracts; not executed yet.
+- [`tests/`](tests/) - default synthetic tests and optional explicit integration tests.
+
+## 7. Database Snapshot
+
+Operational tables:
+
+- `runs` - execution status and counters;
+- `posts` - deduplicated X Posts and audit metadata;
+- `sync_state` - independent source checkpoints and collection state;
+- `usage_events` - request and estimated-cost records;
+- `signals` - future structured Signal records;
+- `signal_posts` - future Signal-to-Post evidence links;
+- `opportunities` - future Opportunity and reviewable artifact records;
+- `human_reviews` - future human decisions and edits.
+
+Review views:
+
+- `posts_review` - direct links, full text source, referenced context, and media indicators;
+- `author_source_stats` - preliminary stored home-author statistics;
+- `author_unfollow_candidates` - preliminary keyword-based candidates for manual review only.
+
+The author views are not AI source-quality evaluation and never change X account state.
+
+## 8. Commands
+
+Activate the existing virtual environment on macOS or Linux:
+
+```sh
+source .venv/bin/activate
+```
+
+On Windows PowerShell:
+
+```powershell
+.venv\Scripts\Activate.ps1
+```
+
+Install the package in editable mode and run default tests:
+
+```sh
+python -m pip install --editable ".[dev]"
+python -m pytest
+```
+
+Inspect or explicitly migrate PostgreSQL:
+
+```sh
+python -m x_signal_finder db doctor
+python -m x_signal_finder db migrate
+```
+
+Run bounded collection explicitly:
+
+```sh
+python -m x_signal_finder collect --source home --max-pages 1 --max-results 20
+python -m x_signal_finder collect --source mentions --max-pages 1 --max-results 20
+python -m x_signal_finder collect --source home --max-pages 1 --max-results 20 --refresh-existing
+```
+
+These commands read required values from local environment configuration. Never put secret values in command examples or documentation.
+
+## 9. Live Validation Record
+
+- OAuth 2.0 PKCE authorization and token refresh succeeded live.
+- Home timeline and direct mentions requests returned HTTP 200.
+- Task 004A fetched 21 home Posts across two requests, excluded 4 simple reposts, stored 17 unique home rows, and completed an empty mentions request. Its recorded estimate was 21 X Post Reads and $0.105.
+- Task 004B applied migration 002, validated complete long-Post text, referenced context, video metadata, review flags, preserved first-seen values, and unchanged checkpoint state during refresh.
+- Task 004B live validation used 78 X Post Reads with an estimated cost of $0.390 across three bounded attempts.
+- Latest database check found 49 Post rows, 49 distinct `post_id` values, and zero duplicate groups.
+- PostgreSQL 17.6 was healthy with migrations 1 and 2 current, no pending migrations, and operational-table RLS intact.
+- Latest default suite: 58 passed and 4 external tests skipped. Explicit PostgreSQL integration suite: 2 passed.
+
+These are validation estimates and observations, not a Developer Console billing statement. No raw Post text or raw X response belongs in this file.
+
+## 10. Known Limitations
+
+- Stage 3 is not complete.
+- The collector is intentionally bounded and manually invoked.
+- Complete pagination, full historical backfill, and production missed-window recovery are not implemented.
+- No LLM calls or runtime relevance filter exist.
+- The knowledge base is not integrated into runtime processing.
+- Signals and Opportunities have schema placeholders but no runtime creation pipeline.
+- Telegram delivery is not implemented.
+- No scheduler or GitHub Actions workflow exists.
+- Automatic publication is not implemented and remains prohibited.
+- Current author candidates use a coarse keyword heuristic rather than AI relevance decisions.
+- Current author keyword statistics do not yet provide the future separate main, referenced, and combined relevance metrics.
+- Automatic unfollow and X write access are prohibited.
+- Compliance revalidation and deletion automation are deferred.
+
+## 11. Next Intended Work
+
+The next intended work is one explicitly specified Stage 3 hardening task. It should advance the remaining collection requirements without bypassing the roadmap. Completion requires its own written acceptance criteria, passing task-specific validation, and synchronized updates to the roadmap, README, decisions or specification when applicable, and this handoff.
+
+Stage 4, LLM integration, Signals, Opportunities, Task 006B, delivery automation, and publication are intentionally outside that next task unless a new explicit specification changes the scope.
+
+## 12. Deferred and Planned Work
+
+- Full Stage 3 hardening beyond the next explicitly assigned increment.
+- Task 006B - Author Quality Monitoring and Follow-list Hygiene, after Task 006 produces real AI relevance decisions. It must combine main and referenced context, keep separate main, referenced, and combined metrics, and produce a manual review queue only.
+- X Content compliance revalidation, removal, and deletion automation.
+- A future database-hosting decision if the current Supabase arrangement is reconsidered.
+- GitHub Actions and another scheduler.
+- Automatic publication remains prohibited and would require an explicit specification and architecture decision change.
+
+## 13. Safety
+
+- The repository is public. Treat every committed file as publicly visible.
+- Never commit secrets, credentials, `.env`, database URLs, raw operational X content, runtime databases, dumps, or private and licensed exports.
+- Never print access tokens, refresh tokens, authorization headers, or raw API response bodies.
+- Do not invent Ethplorer capabilities. Use only reviewed knowledge-base evidence.
+- Keep verified facts, inference, and unresolved uncertainty distinct.
+- Do not start the next stage or implement a planned task without an explicit task specification.
+- Do not add X write access, automatic unfollow, scheduling, or automatic publication without explicit approved changes.
