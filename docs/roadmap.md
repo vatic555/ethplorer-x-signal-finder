@@ -298,7 +298,7 @@ Create the minimum reviewed knowledge required for credible Opportunity decision
 - Capability contract: the compact CSV catalog uses stable `asset_id` values and mandatory `source_ids`; a reviewed capability requires at least one reviewed source
 - Safety: no real Ethplorer article batch, private or licensed source text, invented product capability, or capability row was added
 - Validation: offline knowledge validation reported 0 errors with 0 imported sources and 0 assets; the full default suite passed with 99 tests and 4 external tests skipped, without network requests, database access, or model calls
-- Final implementation commit: pending Task 005A commit
+- Final implementation commit: `ec6c3d91428abd3cc770c8c3c34e8ed2c7db021d`
 - Stage boundary: Stage 4 remains In Progress; Task 005B is next and Task 006 has not started
 
 ### Completion Record
