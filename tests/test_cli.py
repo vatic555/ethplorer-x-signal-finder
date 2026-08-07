@@ -27,7 +27,20 @@ def test_project_status_does_not_require_database(capsys) -> None:
     output = capsys.readouterr().out
     assert "PostgreSQL storage foundation is implemented" in output
     assert "access spike is complete with a constrained-go decision" in output
-    assert "Task 004C complete incremental collection is implemented" in output
+    assert "Stage 3 collection is complete" in output
+    assert "Task 005A Git-backed knowledge architecture is implemented" in output
+
+
+def test_knowledge_validate_is_offline_and_valid(capsys) -> None:
+    result = main(["knowledge", "validate"])
+
+    assert result == 0
+    report = json.loads(capsys.readouterr().out)
+    assert report["status"] == "valid"
+    assert report["source_count"] == 0
+    assert report["asset_count"] == 0
+    assert report["network_requests"] == 0
+    assert report["llm_calls"] == 0
 
 
 def test_x_api_subcommands_parse() -> None:

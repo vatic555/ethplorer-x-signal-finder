@@ -42,6 +42,7 @@ from x_signal_finder.db.migrations import (
     discover_migrations,
 )
 from x_signal_finder.db.repository import StorageRepository
+from x_signal_finder.knowledge import validate_knowledge
 from x_signal_finder.x_api.client import XApiClient, XApiRequestError
 from x_signal_finder.x_api.config import (
     XApiConfigurationError,
@@ -59,8 +60,8 @@ from x_signal_finder.x_api.probe import run_probe
 STATUS_MESSAGE = (
     "Durable PostgreSQL storage foundation is implemented. "
     "The X API access spike is complete with a constrained-go decision. "
-    "Task 004C complete incremental collection is implemented; "
-    "Stage 3 validation status is documented in HANDOFF.md. "
+    "Stage 3 collection is complete. "
+    "Task 005A Git-backed knowledge architecture is implemented; "
     "LLM integration is not implemented."
 )
 
@@ -96,6 +97,15 @@ def build_parser() -> argparse.ArgumentParser:
     database_subparsers.add_parser(
         "smoke-test",
         help="Exercise repository operations and roll back all synthetic data.",
+    )
+    knowledge = subparsers.add_parser(
+        "knowledge",
+        help="Validate the local Git-backed knowledge base.",
+    )
+    knowledge_subparsers = knowledge.add_subparsers(dest="knowledge_command")
+    knowledge_subparsers.add_parser(
+        "validate",
+        help="Run offline knowledge structure and reference validation.",
     )
     x_api = subparsers.add_parser(
         "x-api",
@@ -908,6 +918,13 @@ def main(argv: Sequence[str] | None = None) -> int:
                 file=sys.stderr,
             )
             return 1
+    if args.command == "knowledge":
+        if args.knowledge_command is None:
+            parser.parse_args(["knowledge", "--help"])
+            return 0
+        result = validate_knowledge()
+        print(result.to_json())
+        return 0 if result.valid else 1
     if args.command == "x-api":
         if args.x_api_command is None:
             parser.parse_args(["x-api", "--help"])

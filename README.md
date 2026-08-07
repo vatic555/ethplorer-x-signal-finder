@@ -10,7 +10,9 @@ It is not a generic crypto-news aggregator, an automatic publishing bot, or a me
 
 The durable PostgreSQL storage foundation is implemented and validated against the real Supabase database. PostgreSQL is the operational source of truth, with Supabase selected as the initial managed provider. Application code uses the standard PostgreSQL protocol through `psycopg` and does not use the Supabase Python SDK.
 
-Stage 2 is complete with a `constrained-go` decision. Stage 3 is complete. Tasks 004A through 004C.1 are implemented and live-validated. The manually started collector uses OAuth refresh, fetches home or `@Ethplorer` mentions, excludes simple reposts from home, and upserts Posts plus independent source checkpoints into PostgreSQL. It preserves long-form `note_tweet.text`, returned referenced Post context, and returned media metadata without downloading media. It follows incremental pagination until completion or an explicit page, primary-Post, cost, partial-response, or error guard. Incomplete work saves available Posts and estimated usage but does not advance its source checkpoint. An explicit confirmation-gated baseline action can accept the newest first-page ID from a validated incomplete run without making another X request.
+Stage 2 is complete with a `constrained-go` decision, and Stage 3 collection is complete. Stage 4 is In Progress. Task 005A defines a Git-backed knowledge source of truth, normalized source-document contract, evidence-linked asset catalog, and offline validator. The existing knowledge inventory contains two separate terminology documents, no imported evidence documents, and no capability rows. Task 005B will import real reviewed Ethplorer materials under a separate explicit specification.
+
+The manually started collector uses OAuth refresh, fetches home or `@Ethplorer` mentions, excludes simple reposts from home, and upserts Posts plus independent source checkpoints into PostgreSQL. It preserves long-form `note_tweet.text`, returned referenced Post context, and returned media metadata without downloading media. It follows incremental pagination until completion or an explicit page, primary-Post, cost, partial-response, or error guard. Incomplete work saves available Posts and estimated usage but does not advance its source checkpoint. An explicit confirmation-gated baseline action can accept the newest first-page ID from a validated incomplete run without making another X request.
 
 LLM integration, Telegram, and publication are not implemented. All publication remains a mandatory human action.
 
@@ -22,8 +24,9 @@ The repository remains public during the MVP. Public visibility does not change 
 - Stage 1 - Durable Storage Foundation - Completed
 - Stage 2 - X API Access Spike - Completed
 - Stage 3 - X Collection Pipeline - Completed
-- Current task - Task 004C.1 - Explicit Baseline Acceptance - Completed
-- Next task - Task 005A - Knowledge Base Inventory and Schema - Planned, awaiting its explicit task specification
+- Stage 4 - Minimum Knowledge Base - In Progress
+- Current task - Task 005A - Knowledge Architecture + Import Contract - Completed
+- Next task - Task 005B - Ethplorer Knowledge Import - Planned, awaiting its explicit task specification
 
 See the canonical [implementation roadmap](docs/roadmap.md), [product and technical specification](docs/project-spec.md), and [architecture decision log](docs/decisions.md).
 
@@ -33,7 +36,7 @@ See the canonical [implementation roadmap](docs/roadmap.md), [product and techni
 .
 |-- AGENTS.md
 |-- docs/                      # Canonical specification and decisions
-|-- knowledge/                 # Terminology, sources, and asset catalog
+|-- knowledge/                 # Git-backed terminology, evidence sources, and asset catalog
 |-- migrations/                # Reviewable PostgreSQL migrations
 |-- prompts/                   # Processing-stage prompt templates
 |-- src/x_signal_finder/       # Cross-platform package, CLI, and storage code
@@ -90,6 +93,14 @@ General commands:
 python -m x_signal_finder --help
 python -m x_signal_finder status
 ```
+
+Offline knowledge validation:
+
+```sh
+python -m x_signal_finder knowledge validate
+```
+
+The knowledge validator reads local Markdown and CSV only. It checks structure, metadata, unique IDs, review statuses, evidence links, and local references without network access, database access, or LLM calls. See the [knowledge architecture and import contract](knowledge/README.md).
 
 X API access-spike diagnostics:
 
@@ -152,6 +163,8 @@ python -m pytest -m integration
 - X Developer Console billing remains unreconciled; stored cost values are estimates
 - Mentions pagination was not observed live because the validated response was empty
 - No LLM calls or prompt execution
+- No real Ethplorer knowledge articles or evidence-backed capability rows have been imported yet
+- No knowledge database, embeddings, vector search, crawler, or runtime knowledge integration
 - No context enrichment from external sources
 - No Telegram delivery
 - No automatic image generation

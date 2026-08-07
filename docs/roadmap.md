@@ -8,8 +8,9 @@ Status: Canonical implementation sequence and progress record
 - Stage 1 - Durable Storage Foundation - Completed
 - Stage 2 - X API Access Spike - Completed
 - Stage 3 - X Collection Pipeline - Completed
-- Current task - Task 004C.1 - Explicit Baseline Acceptance - Completed
-- Next task - Task 005A - Knowledge Base Inventory and Schema - Planned, awaiting its explicit task specification
+- Stage 4 - Minimum Knowledge Base - In Progress
+- Current task - Task 005A - Knowledge Architecture + Import Contract - Completed
+- Next task - Task 005B - Ethplorer Knowledge Import - Planned, awaiting its explicit task specification
 - Local PostgreSQL implementation is ready
 - Real Supabase migration and database validation are complete
 - Task 003 documentation review, diagnostic probe, live OAuth, endpoint, pagination, refresh, and checkpoint validation are complete
@@ -17,6 +18,7 @@ Status: Canonical implementation sequence and progress record
 - Task 004A implementation, synthetic validation, and bounded live X-to-Supabase validation are complete
 - Task 004B implementation, migration 002, synthetic validation, and bounded live validation are complete
 - Task 004C and Task 004C.1 implementation, synthetic validation, explicit baseline acceptance, and bounded incremental live validation are complete
+- Task 005A knowledge inventory, Git-backed source contract, catalog evidence linkage, and offline validation are complete
 
 Stage 1 must not be marked Completed until the real Supabase database has been created, migrations have been applied, and database validation has passed.
 
@@ -60,7 +62,7 @@ Post-MVP work may cover:
 | 1 | Durable Storage Foundation | Completed | Task 002 | Yes |
 | 2 | X API Access Spike | Completed | Task 003 | Yes |
 | 3 | X Collection Pipeline | Completed | Tasks 004A through 004C.1 | Yes |
-| 4 | Minimum Knowledge Base | Planned | Task 005A next | Yes |
+| 4 | Minimum Knowledge Base | In Progress | Task 005A complete; Task 005B next | Yes |
 | 5 | Relevance Filtering and Signal Clustering | Planned | Task 006 | Yes |
 | 6 | Opportunity Gate and Context Enrichment | Planned | Task 007 | Yes |
 | 7 | Drafts, Human Review and Pilot | Planned | Task 008 | Yes |
@@ -266,7 +268,7 @@ Current state:
 
 ## Stage 4 - Minimum Knowledge Base
 
-Status: Planned
+Status: In Progress
 
 Create the minimum reviewed knowledge required for credible Opportunity decisions:
 
@@ -283,16 +285,28 @@ Create the minimum reviewed knowledge required for credible Opportunity decision
 
 ### Tasks
 
-- Task 005 - Minimum Knowledge Base - Planned
-- Task 005A - Knowledge Base Inventory and Schema - Planned and next
-- Task 005B - Populate Ethplorer Assets - Planned after Task 005A
+- Task 005 - Minimum Knowledge Base - In Progress
+- Task 005A - Knowledge Architecture + Import Contract - Completed
+- Task 005B - Ethplorer Knowledge Import - Planned and next
+
+### Task 005A Validation Record
+
+- Completion date: 2026-08-07
+- Inventory: two existing terminology documents preserved in separate namespaces; zero normalized evidence documents; zero asset or capability rows; one pending upstream terminology source retained with provenance
+- Architecture: reviewed Git content under `knowledge/` is the MVP knowledge source of truth; PostgreSQL remains operational storage and no database, embedding, vector, search, crawler, or LLM runtime was added
+- Source contract: normalized Markdown with stable `source_id`, TOML metadata, public or approved provenance, product and network scope, review status, supported claims, limitations, and optional known dates
+- Capability contract: the compact CSV catalog uses stable `asset_id` values and mandatory `source_ids`; a reviewed capability requires at least one reviewed source
+- Safety: no real Ethplorer article batch, private or licensed source text, invented product capability, or capability row was added
+- Validation: offline knowledge validation reported 0 errors with 0 imported sources and 0 assets; the full default suite passed with 99 tests and 4 external tests skipped, without network requests, database access, or model calls
+- Final implementation commit: pending Task 005A commit
+- Stage boundary: Stage 4 remains In Progress; Task 005B is next and Task 006 has not started
 
 ### Completion Record
 
 - Completion date:
 - Final commit:
-- Validation summary:
-- Remaining limitations:
+- Validation summary: Pending Task 005B and Stage 4 completion.
+- Remaining limitations: No real Ethplorer source documents or evidence-backed capability rows have been imported yet.
 
 ## Stage 5 - Relevance Filtering and Signal Clustering
 

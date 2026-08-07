@@ -2,11 +2,11 @@
 
 Last updated: 2026-08-07
 
-Repository HEAD: `098a163cfd40859ff3088d192462c0c37c923746` at implementation validation; a HANDOFF-only metadata commit follows it
+Repository HEAD: `7d7e6dc8736434dc016ec390d5308dbe2a7a3fd5`; Task 005A changes are local until final validation and commit
 
-Validated commit: `098a163cfd40859ff3088d192462c0c37c923746`
+Validated commit: `098a163cfd40859ff3088d192462c0c37c923746` before Task 005A
 
-Validated implementation commit: `098a163cfd40859ff3088d192462c0c37c923746`
+Validated implementation commit: pending Task 005A validation and commit
 
 This file is a short current-state snapshot. It is not a canonical product, technical, architecture, or roadmap source.
 
@@ -26,11 +26,11 @@ The project is building an AI-assisted X intelligence pipeline for Ethplorer. It
 
 ## 2. Current Status
 
-- Current stage: Stage 3 - X Collection Pipeline - Completed.
-- Current task: Task 004C.1 - Explicit Baseline Acceptance - Completed.
-- Last completed task: Task 004C.1 - Explicit Baseline Acceptance.
-- Next task: Task 005A - Knowledge Base Inventory and Schema. It is Planned and must wait for its explicit task specification.
-- Roadmap status: Stages 0 through 3 are Completed; Stage 4 and later MVP stages are Planned; Stage 8 automation is Deferred.
+- Current stage: Stage 4 - Minimum Knowledge Base - In Progress.
+- Current task: Task 005A - Knowledge Architecture + Import Contract - Completed after validation.
+- Last completed task: Task 005A - Knowledge Architecture + Import Contract.
+- Next task: Task 005B - Ethplorer Knowledge Import. It is Planned and must wait for its explicit task specification.
+- Roadmap status: Stages 0 through 3 are Completed; Stage 4 is In Progress; Stages 5 through 7 are Planned; Stage 8 automation is Deferred.
 - Task 006B - Author Quality Monitoring and Follow-list Hygiene is Planned after Task 006 produces real AI relevance decisions. It is not current work.
 
 ## 3. What Works Now
@@ -59,6 +59,11 @@ The following capabilities have been implemented and validated:
 - explicit bounded refresh of existing content without changing `sync_state`;
 - explicit confirmation-gated baseline acceptance from a validated incomplete run without an X request;
 - Post, media, referenced-context, author-statistics, and manual candidate review views.
+- Git-backed MVP knowledge source of truth with separate evidence and capability layers;
+- separate shared analytics and X Signal Finder terminology namespaces;
+- normalized source-document template with stable IDs, provenance, review status, supported claims, and limitations;
+- asset catalog schema with mandatory source-ID evidence links;
+- offline knowledge validation for structure, metadata, IDs, statuses, evidence links, and local references.
 
 ## 4. Current Data Flow
 
@@ -75,10 +80,13 @@ X API
 
 The X API, collector, and PostgreSQL portion exists. Runtime relevance filtering, Signals, Opportunity Gate evaluation, Opportunity creation, draft generation, and the human review workflow are not implemented. Publication remains outside the application and must be performed manually.
 
+The Git-backed knowledge architecture exists, but Task 005B has not imported real Ethplorer evidence or capability rows. Future relevance and Opportunity processing may read reviewed knowledge only after their own explicit tasks are implemented.
+
 ## 5. Architecture Snapshot
 
 - Python 3.11 or newer is the cross-platform runtime.
 - PostgreSQL is the operational source of truth.
+- Reviewed Git content under `knowledge/` is the MVP knowledge source of truth.
 - Supabase is the current managed PostgreSQL provider.
 - Application database access uses standard `psycopg` and parameterized SQL.
 - Local configuration and credentials exist only in ignored `.env` or real environment variables.
@@ -86,6 +94,7 @@ The X API, collector, and PostgreSQL portion exists. Runtime relevance filtering
 - The application does not use the Supabase Python SDK.
 - MongoDB is not part of the architecture.
 - GitHub Actions and scheduled execution are not implemented at the current stage.
+- No knowledge content is stored canonically in PostgreSQL, embeddings, or a vector database.
 
 ## 6. Important Files
 
@@ -96,6 +105,12 @@ The X API, collector, and PostgreSQL portion exists. Runtime relevance filtering
 - [`docs/decisions.md`](docs/decisions.md) - accepted architecture and product decisions.
 - [`docs/x-api-access-spike.md`](docs/x-api-access-spike.md) - Task 003 evidence, constraints, pricing, and compliance analysis.
 - [`docs/x-collector.md`](docs/x-collector.md) - Stage 3 collector behavior and operating guide.
+- [`knowledge/README.md`](knowledge/README.md) - Task 005A source-document, capability, import, and validation contracts.
+- [`knowledge/source_documents.md`](knowledge/source_documents.md) - current source inventory and provenance index.
+- [`knowledge/terminology/`](knowledge/terminology/) - separate shared analytics and project terminology.
+- [`knowledge/sources/`](knowledge/sources/) - normalized public or approved evidence documents and import template.
+- [`knowledge/assets_catalog.csv`](knowledge/assets_catalog.csv) - compact evidence-linked asset and capability catalog.
+- [`src/x_signal_finder/knowledge.py`](src/x_signal_finder/knowledge.py) - offline knowledge validator.
 - [`src/x_signal_finder/collector.py`](src/x_signal_finder/collector.py) - X Post mapping, bounded fetching, refresh behavior, and persistence orchestration.
 - [`src/x_signal_finder/x_api/`](src/x_signal_finder/x_api/) - read-only X API client, OAuth, configuration, and probe code.
 - [`src/x_signal_finder/db/`](src/x_signal_finder/db/) - PostgreSQL connection, migration, checks, and repository code.
@@ -146,6 +161,12 @@ python -m pip install --editable ".[dev]"
 python -m pytest
 ```
 
+Validate the Git-backed knowledge base offline:
+
+```sh
+python -m x_signal_finder knowledge validate
+```
+
 Inspect or explicitly migrate PostgreSQL:
 
 ```sh
@@ -181,7 +202,8 @@ These commands read required values from local environment configuration. Never 
 - Across the two Task 004C guarded runs and the final cheap validation, estimated usage was 331 distinct Post resources and $1.655. Developer Console billing remains unreconciled.
 - Latest database check found 214 Post rows, 214 distinct `post_id` values, and zero duplicate groups. The home checkpoint is the accepted baseline `2085449523904778414`.
 - PostgreSQL 17.6 was healthy with migrations 1 and 2 current, no pending migrations, and operational-table RLS intact.
-- Latest default suite: 88 passed with 4 external tests skipped. Explicit PostgreSQL integration suite: 2 passed.
+- Latest default suite: 99 passed with 4 external tests skipped. Explicit PostgreSQL integration suite: 2 passed during the unchanged Stage 3 database validation.
+- Task 005A inventory found two terminology documents, zero normalized evidence documents, and zero asset or capability rows. The source contract, catalog evidence rules, template, local-link checks, and offline CLI validation passed without network requests, database access, or model calls.
 
 These are validation estimates and observations, not a Developer Console billing statement. No raw Post text or raw X response belongs in this file.
 
@@ -192,6 +214,8 @@ These are validation estimates and observations, not a Developer Console billing
 - X Developer Console billing remains unreconciled; stored cost values are estimates.
 - No LLM calls or runtime relevance filter exist.
 - The knowledge base is not integrated into runtime processing.
+- No real Ethplorer evidence document or evidence-backed capability row has been imported; this is reserved for Task 005B.
+- PostgreSQL, embeddings, vector search, crawling, and semantic retrieval are not part of the knowledge architecture.
 - Signals and Opportunities have schema placeholders but no runtime creation pipeline.
 - Telegram delivery is not implemented.
 - No scheduler or GitHub Actions workflow exists.
@@ -203,9 +227,9 @@ These are validation estimates and observations, not a Developer Console billing
 
 ## 11. Next Intended Work
 
-The next intended work is Task 005A - Knowledge Base Inventory and Schema. Its completion criterion is a reviewed inventory of the existing `knowledge/` content and an agreed minimum structure for Ethplorer products, networks, documented capabilities, limitations, terminology, and evidence sources.
+The next intended work is Task 005B - Ethplorer Knowledge Import. Its completion criterion is a reviewed import of approved real Ethplorer source material and extraction of only the capabilities directly supported by those source IDs.
 
-Populating unverified capabilities, implementing Task 005B assets, runtime knowledge integration, LLM calls, Signals, Opportunities, Task 006B, delivery automation, and publication are outside Task 005A.
+Private or licensed source text, unsupported capabilities, crawling, database or vector storage, runtime knowledge integration, LLM calls, Task 006 relevance filtering, Signals, Opportunities, delivery automation, and publication are outside Task 005B unless its explicit specification says otherwise within canonical project boundaries.
 
 ## 12. Deferred and Planned Work
 

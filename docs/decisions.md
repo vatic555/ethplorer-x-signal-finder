@@ -20,7 +20,7 @@ Status: Accepted
 
 Status: Accepted
 
-Shared Ethplorer analytics terminology and project-specific X Signal Finder terminology are maintained separately in `knowledge/shared-analytics-terminology.md` and `knowledge/x-signal-terminology.md`. Definitions must not be synchronized or changed silently.
+Shared Ethplorer analytics terminology and project-specific X Signal Finder terminology are maintained separately. Task 005A moved them without merging or redefining terms to `knowledge/terminology/shared-analytics.md` and `knowledge/terminology/x-signal.md`. Definitions must not be synchronized or changed silently.
 
 ## 2026-07-22 - Manual local execution for the first MVP stage
 
@@ -135,3 +135,13 @@ Status: Accepted
 An operator may explicitly accept the newest collected point from the current incomplete source run as a new forward baseline when the MVP intentionally declines to pay for the older remaining window. The action is PostgreSQL-only, requires a source, run ID, and `--confirm-skip-older-posts`, and never calls X, creates Posts, deletes Posts, or creates a collection run or usage event.
 
 Acceptance is limited to a completed-with-warnings collection run with one matching incomplete source usage record, a recognized blocking reason, valid newest Post evidence, and a current matching incomplete `sync_state`. The audit record retains the source run, previous and accepted checkpoints, incomplete reason, primary and saved Post counts, acceptance time, provenance, and an explicit `older_window_may_have_been_skipped=true` marker. The source run metadata and later checkpoint metadata preserve the acceptance record. This is a deliberate forward-MVP baseline, not historical completeness or recovery.
+
+## 2026-08-07 - Git-backed knowledge source of truth and evidence contract
+
+Status: Accepted
+
+For the MVP, reviewed files under `knowledge/` are the knowledge source of truth. PostgreSQL remains the operational source of truth but does not store canonical knowledge. No knowledge migration, embeddings, vector database, semantic search, crawler, or runtime LLM integration is introduced by Task 005A. A later database or index may be derived from Git but cannot silently become canonical.
+
+Normalized public or explicitly approved source documents live under `knowledge/sources/` and use stable source IDs plus TOML front matter for provenance, scope, review status, supported claims, and limitations. The compact asset catalog is the structured capability layer. Every capability must reference existing source IDs, and a reviewed capability must have at least one reviewed supporting source. A URL or product positioning alone is not evidence.
+
+The shared analytics and X Signal Finder terminology documents remain separate and retain their existing ownership and provenance. The public repository must not contain full private, internal, confidential, or licensed source text. Task 005A creates only architecture, an import template, and offline validation; real Ethplorer source import and evidence-backed capability extraction are reserved for Task 005B.

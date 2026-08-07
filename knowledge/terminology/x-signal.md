@@ -1,5 +1,7 @@
 # X Signal Finder Terminology
 
+Review status: maintained project contract
+
 These definitions are operational contracts for prompts, validation, storage, and editorial review. They are project-specific and must not be changed silently.
 
 ## Signal

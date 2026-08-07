@@ -6,7 +6,8 @@ This file is the temporary local source for shared Ethplorer analytics terminolo
 
 ## Provenance
 
-- Current source: https://github.com/vatic555/ethereum-top-addresses-pipeline/blob/main/docs/terminology.md
+- Upstream source: https://github.com/vatic555/ethereum-top-addresses-pipeline/blob/main/docs/terminology.md
+- Review status: pending
 - Import status: Not yet imported or reviewed
 - Last source comparison: Not performed
 

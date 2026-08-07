@@ -1,27 +1,23 @@
-# Source Documents
+# Source Documents Inventory
 
-This index records approved or pending sources for the knowledge base. A heading without a link is an intentional placeholder, not evidence of a capability.
+This index inventories the knowledge material present before Task 005B. A listed URL or placeholder is provenance, not evidence that a product capability exists. Normalized evidence documents must live under [`sources/`](sources/) and satisfy the contract in [`README.md`](README.md).
 
-## Canonical Project Specification
+## Current Inventory
 
-- [`docs/project-spec.md`](../docs/project-spec.md) - canonical local product and technical specification
+- [`../docs/project-spec.md`](../docs/project-spec.md) - canonical local product and technical specification; it defines project behavior but is not capability evidence.
+- [`terminology/shared-analytics.md`](terminology/shared-analytics.md) - shared terminology placeholders with upstream provenance and pending review.
+- [`terminology/x-signal.md`](terminology/x-signal.md) - maintained project terminology contracts.
+- [Shared analytics upstream terminology](https://github.com/vatic555/ethereum-top-addresses-pipeline/blob/main/docs/terminology.md) - pending upstream source; no definitions have yet been imported or reviewed locally.
 
-## Shared Analytics Terminology Source
+## Normalized Evidence Sources
 
-- https://github.com/vatic555/ethereum-top-addresses-pipeline/blob/main/docs/terminology.md - source to copy and review before shared definitions are used
+No public or approved source document has been imported yet. Task 005B will import reviewed Ethplorer material using [`sources/_source-template.md`](sources/_source-template.md).
 
-## Ethplorer Product Documentation
+## Not Present in the Public Repository
 
-TODO: Add reviewed product documentation sources. Do not add or infer capabilities without a source.
+- No private, internal, confidential, or licensed document text.
+- No reviewed Ethplorer or Binplorer product articles.
+- No capability evidence records.
+- No generated summaries presented as source material.
 
-## Internal Research and Articles
-
-TODO: Add approved internal sources with access and provenance notes.
-
-## Network Explorer Documentation
-
-TODO: Add reviewed documentation for supported network explorers without fabricating links.
-
-## Future Shared Knowledge Repository
-
-TODO: Add the repository location if a common Ethplorer knowledge repository is established. A future comparison process should report differences for review rather than automatically overwrite local terminology.
+Future source documents must be added to this inventory by stable `source_id`. A heading, URL, TODO, or directory name never establishes a capability by itself.
