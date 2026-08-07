@@ -260,7 +260,7 @@ Current state:
 ### Completion Record
 
 - Completion date: 2026-08-07
-- Final commit: pending the Task 004C and Task 004C.1 implementation commit
+- Final implementation commit: `098a163cfd40859ff3088d192462c0c37c923746`
 - Validation summary: guarded pagination, incomplete-checkpoint safety, explicit no-request baseline acceptance, and one cheap incremental run from the accepted checkpoint passed; PostgreSQL ended with 214 unique Posts and no duplicate IDs
 - Remaining limitations: no historical backfill or automatic missed-window recovery; Developer Console billing was not reconciled; mentions pagination was not observed beyond an empty live response
 
