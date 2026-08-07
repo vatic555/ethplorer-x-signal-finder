@@ -1,8 +1,12 @@
 # Ethplorer X Signal Finder - Handoff
 
-Last updated: 2026-08-06
+Last updated: 2026-08-07
 
-Validated commit: `25554b015b425645bb48cfc8eb69fc50b8ae72a8` (latest validated implementation baseline)
+Repository HEAD: pending the Task 004C and Task 004C.1 commits
+
+Validated commit: pending the Task 004C and Task 004C.1 implementation commit
+
+Validated implementation commit: pending the Task 004C and Task 004C.1 implementation commit
 
 This file is a short current-state snapshot. It is not a canonical product, technical, architecture, or roadmap source.
 
@@ -22,10 +26,11 @@ The project is building an AI-assisted X intelligence pipeline for Ethplorer. It
 
 ## 2. Current Status
 
-- Current stage: Stage 3 - X Collection Pipeline - In Progress.
-- Last completed task: Task 004B - Content Completeness and Review Views.
-- Next task: further Stage 3 hardening, after a new explicit task specification is provided.
-- Roadmap status: Stages 0 through 2 are Completed; Stage 3 is In Progress; Stage 4 and later MVP stages are Planned; Stage 8 automation is Deferred.
+- Current stage: Stage 3 - X Collection Pipeline - Completed.
+- Current task: Task 004C.1 - Explicit Baseline Acceptance - Completed.
+- Last completed task: Task 004C.1 - Explicit Baseline Acceptance.
+- Next task: Task 005A - Knowledge Base Inventory and Schema. It is Planned and must wait for its explicit task specification.
+- Roadmap status: Stages 0 through 3 are Completed; Stage 4 and later MVP stages are Planned; Stage 8 automation is Deferred.
 - Task 006B - Author Quality Monitoring and Follow-list Hygiene is Planned after Task 006 produces real AI relevance decisions. It is not current work.
 
 ## 3. What Works Now
@@ -40,12 +45,19 @@ The following capabilities have been implemented and validated:
 - authorized reverse-chronological home timeline access;
 - direct mentions endpoint access;
 - manually invoked bounded collection for home and mentions;
+- forward incremental pagination until `next_token` ends or an explicit guard stops the source;
 - independent source checkpoints and safe non-advancement on known incomplete conditions;
+- global primary-Post and estimated-cost guards across home then mentions;
+- bounded transient-error retries with mockable sleep;
+- distinct primary and expanded Post-resource cost accounting;
+- best-effort usage persistence before Post upsert;
+- home missed-window and mentions truncation-risk warnings;
 - `post_id` upsert deduplication;
 - full long-Post text from `note_tweet.text` with `text` fallback;
 - returned referenced Post and author context in `raw_json._expanded`;
 - returned media metadata without media download;
 - explicit bounded refresh of existing content without changing `sync_state`;
+- explicit confirmation-gated baseline acceptance from a validated incomplete run without an X request;
 - Post, media, referenced-context, author-statistics, and manual candidate review views.
 
 ## 4. Current Data Flow
@@ -146,7 +158,11 @@ Run bounded collection explicitly:
 ```sh
 python -m x_signal_finder collect --source home --max-pages 1 --max-results 20
 python -m x_signal_finder collect --source mentions --max-pages 1 --max-results 20
+python -m x_signal_finder collect --source both --max-pages 5 --max-results 100 --max-estimated-cost-usd 1.00
+python -m x_signal_finder collect --source home --max-pages 1 --max-results 20 --max-primary-posts-total 20 --max-estimated-cost-usd 0.15
 python -m x_signal_finder collect --source home --max-pages 1 --max-results 20 --refresh-existing
+python -m x_signal_finder collect accept-baseline --source home --run-id RUN_ID
+python -m x_signal_finder collect accept-baseline --source home --run-id RUN_ID --confirm-skip-older-posts
 ```
 
 These commands read required values from local environment configuration. Never put secret values in command examples or documentation.
@@ -158,17 +174,22 @@ These commands read required values from local environment configuration. Never 
 - Task 004A fetched 21 home Posts across two requests, excluded 4 simple reposts, stored 17 unique home rows, and completed an empty mentions request. Its recorded estimate was 21 X Post Reads and $0.105.
 - Task 004B applied migration 002, validated complete long-Post text, referenced context, video metadata, review flags, preserved first-seen values, and unchanged checkpoint state during refresh.
 - Task 004B live validation used 78 X Post Reads with an estimated cost of $0.390 across three bounded attempts.
-- Latest database check found 49 Post rows, 49 distinct `post_id` values, and zero duplicate groups.
+- Task 004C bounded validation received 20 primary and 17 expanded Posts, counted 30 distinct Post resources, recorded a $0.150 estimate, saved 18 Posts after repost exclusion, returned incomplete, and preserved the home checkpoint.
+- Task 004C full guarded validation received 194 primary and 113 expanded Posts over two home requests, counted 272 distinct Post resources, recorded a $1.360 estimate, saved 152 Posts including 134 new rows after repost exclusion, and correctly stopped incomplete at the cost guard. Mentions was not requested because the run guard was exhausted.
+- Task 004C.1 accepted `2085449523904778414` as the explicit home baseline from the incomplete guarded run. Acceptance used PostgreSQL only, produced no X request, did not create or change Posts, and retained audit metadata.
+- The single cheap incremental validation from that baseline received 19 primary and 10 expanded Posts, counted 29 distinct resources, saved 13 new Posts after 6 repost exclusions, estimated $0.145, and correctly left the checkpoint unchanged because the explicit one-page limit made the source incomplete.
+- Across the two Task 004C guarded runs and the final cheap validation, estimated usage was 331 distinct Post resources and $1.655. Developer Console billing remains unreconciled.
+- Latest database check found 214 Post rows, 214 distinct `post_id` values, and zero duplicate groups. The home checkpoint is the accepted baseline `2085449523904778414`.
 - PostgreSQL 17.6 was healthy with migrations 1 and 2 current, no pending migrations, and operational-table RLS intact.
-- Latest default suite: 58 passed and 4 external tests skipped. Explicit PostgreSQL integration suite: 2 passed.
+- Latest default suite: 88 passed with 4 external tests skipped. Explicit PostgreSQL integration suite: 2 passed.
 
 These are validation estimates and observations, not a Developer Console billing statement. No raw Post text or raw X response belongs in this file.
 
 ## 10. Known Limitations
 
-- Stage 3 is not complete.
-- The collector is intentionally bounded and manually invoked.
-- Complete pagination, full historical backfill, and production missed-window recovery are not implemented.
+- The collector is manually invoked and bounded by explicit page and cost guards.
+- Full historical backfill and automatic missed-window recovery are not implemented.
+- X Developer Console billing remains unreconciled; stored cost values are estimates.
 - No LLM calls or runtime relevance filter exist.
 - The knowledge base is not integrated into runtime processing.
 - Signals and Opportunities have schema placeholders but no runtime creation pipeline.
@@ -182,13 +203,13 @@ These are validation estimates and observations, not a Developer Console billing
 
 ## 11. Next Intended Work
 
-The next intended work is one explicitly specified Stage 3 hardening task. It should advance the remaining collection requirements without bypassing the roadmap. Completion requires its own written acceptance criteria, passing task-specific validation, and synchronized updates to the roadmap, README, decisions or specification when applicable, and this handoff.
+The next intended work is Task 005A - Knowledge Base Inventory and Schema. Its completion criterion is a reviewed inventory of the existing `knowledge/` content and an agreed minimum structure for Ethplorer products, networks, documented capabilities, limitations, terminology, and evidence sources.
 
-Stage 4, LLM integration, Signals, Opportunities, Task 006B, delivery automation, and publication are intentionally outside that next task unless a new explicit specification changes the scope.
+Populating unverified capabilities, implementing Task 005B assets, runtime knowledge integration, LLM calls, Signals, Opportunities, Task 006B, delivery automation, and publication are outside Task 005A.
 
 ## 12. Deferred and Planned Work
 
-- Full Stage 3 hardening beyond the next explicitly assigned increment.
+- Historical backfill and automatic missed-window recovery.
 - Task 006B - Author Quality Monitoring and Follow-list Hygiene, after Task 006 produces real AI relevance decisions. It must combine main and referenced context, keep separate main, referenced, and combined metrics, and produce a manual review queue only.
 - X Content compliance revalidation, removal, and deletion automation.
 - A future database-hosting decision if the current Supabase arrangement is reconsidered.

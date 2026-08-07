@@ -5,19 +5,28 @@ from __future__ import annotations
 import argparse
 from collections.abc import Sequence
 from datetime import datetime, timezone
+from decimal import Decimal
 import json
 import sys
 from uuid import uuid4
+from uuid import UUID
 
 import psycopg
 
 from x_signal_finder import __version__
+from x_signal_finder.baseline import (
+    BaselineAcceptanceError,
+    accept_baseline_candidate,
+    inspect_baseline_candidate,
+)
 from x_signal_finder.collector import (
     CollectionError,
     fetch_source,
     record_failed_source_attempt,
+    record_source_usage,
     save_source_collection,
     source_key_for,
+    source_minimum_page_size,
 )
 from x_signal_finder.config import (
     ConfigurationError,
@@ -50,8 +59,8 @@ from x_signal_finder.x_api.probe import run_probe
 STATUS_MESSAGE = (
     "Durable PostgreSQL storage foundation is implemented. "
     "The X API access spike is complete with a constrained-go decision. "
-    "Task 004B content completeness and review views are complete; "
-    "Stage 3 remains in progress. "
+    "Task 004C complete incremental collection is implemented; "
+    "Stage 3 validation status is documented in HANDOFF.md. "
     "LLM integration is not implemented."
 )
 
@@ -134,12 +143,41 @@ def build_parser() -> argparse.ArgumentParser:
         help="Run the bounded Stage 3 X collector and persist to PostgreSQL.",
     )
     collect.add_argument(
+        "collect_action",
+        nargs="?",
+        choices=("accept-baseline",),
+        help="Explicitly accept an incomplete run as a new source baseline.",
+    )
+    collect.add_argument(
         "--source",
         choices=("home", "mentions", "both"),
         default="both",
     )
-    collect.add_argument("--max-pages", type=int, default=1)
-    collect.add_argument("--max-results", type=int, default=20)
+    collect.add_argument("--max-pages", type=int, default=5)
+    collect.add_argument("--max-results", type=int, default=100)
+    collect.add_argument(
+        "--max-estimated-cost-usd",
+        type=Decimal,
+        default=Decimal("1.00"),
+        help="Stop before another page once estimated run cost reaches this guard.",
+    )
+    collect.add_argument(
+        "--max-primary-posts-total",
+        type=int,
+        default=None,
+        help="Optional primary Post limit shared by all requested sources.",
+    )
+    collect.add_argument("--max-attempts", type=int, default=3)
+    collect.add_argument("--max-retry-wait-seconds", type=float, default=60)
+    collect.add_argument(
+        "--run-id",
+        help="Incomplete collection run to inspect or accept as a baseline.",
+    )
+    collect.add_argument(
+        "--confirm-skip-older-posts",
+        action="store_true",
+        help="Confirm that older Posts may be skipped when accepting a baseline.",
+    )
     collect.add_argument(
         "--refresh-existing",
         action="store_true",
@@ -444,6 +482,45 @@ def _failed_source_diagnostic(
     return diagnostic
 
 
+def _run_accept_baseline(args: argparse.Namespace) -> int:
+    if args.source not in {"home", "mentions"}:
+        raise BaselineAcceptanceError(
+            "accept-baseline requires exactly one source: home or mentions."
+        )
+    if not args.run_id:
+        raise BaselineAcceptanceError("accept-baseline requires --run-id.")
+    try:
+        run_id = UUID(args.run_id)
+    except ValueError as error:
+        raise BaselineAcceptanceError("--run-id must be a valid UUID.") from error
+
+    database_config = load_database_config()
+    accepted_at = datetime.now(timezone.utc)
+    with connect_database(database_config) as connection:
+        repository = StorageRepository(connection)
+        with connection.transaction():
+            candidate = inspect_baseline_candidate(
+                repository=repository,
+                run_id=run_id,
+                source=args.source,
+            )
+        if candidate["status"] == "already_accepted":
+            print(json.dumps(candidate, indent=2, sort_keys=True))
+            return 0
+        if not args.confirm_skip_older_posts:
+            print(json.dumps(candidate, indent=2, sort_keys=True))
+            return 1
+        with connection.transaction():
+            result = accept_baseline_candidate(
+                repository=repository,
+                candidate=candidate,
+                accepted_at=accepted_at,
+                run_id=run_id,
+            )
+    print(json.dumps(result, indent=2, sort_keys=True))
+    return 0
+
+
 def _run_collect(args: argparse.Namespace) -> int:
     if args.max_pages < 1:
         raise ValueError("max_pages must be at least 1")
@@ -451,6 +528,17 @@ def _run_collect(args: argparse.Namespace) -> int:
         raise ValueError("max_results for mentions must be between 5 and 100")
     if not 1 <= args.max_results <= 100:
         raise ValueError("max_results must be between 1 and 100")
+    if args.max_estimated_cost_usd <= 0:
+        raise ValueError("max_estimated_cost_usd must be positive")
+    if (
+        args.max_primary_posts_total is not None
+        and args.max_primary_posts_total < 1
+    ):
+        raise ValueError("max_primary_posts_total must be at least 1")
+    if args.max_attempts < 1:
+        raise ValueError("max_attempts must be at least 1")
+    if args.max_retry_wait_seconds < 0:
+        raise ValueError("max_retry_wait_seconds must not be negative")
 
     database_config = load_database_config()
     x_config = load_x_api_config()
@@ -471,6 +559,11 @@ def _run_collect(args: argparse.Namespace) -> int:
     }
     summaries = []
     failures: list[dict[str, object]] = []
+    source_reports: list[dict[str, object]] = []
+    run_primary_posts = 0
+    run_expanded_posts = 0
+    run_distinct_resources = 0
+    run_estimated_cost = Decimal("0")
 
     with connect_database(database_config) as connection:
         repository = StorageRepository(connection)
@@ -488,7 +581,13 @@ def _run_collect(args: argparse.Namespace) -> int:
                     "source": args.source,
                     "max_pages": args.max_pages,
                     "max_results": args.max_results,
-                    "task": "004B" if args.refresh_existing else "004A",
+                    "max_estimated_cost_usd": format(
+                        args.max_estimated_cost_usd, "f"
+                    ),
+                    "max_primary_posts_total": args.max_primary_posts_total,
+                    "max_attempts": args.max_attempts,
+                    "max_retry_wait_seconds": args.max_retry_wait_seconds,
+                    "task": "004C",
                     "refresh_existing": args.refresh_existing,
                 },
             )
@@ -502,6 +601,54 @@ def _run_collect(args: argparse.Namespace) -> int:
                 if previous_state and previous_state.get("checkpoint_value") is not None
                 else None
             )
+            remaining_primary = (
+                None
+                if args.max_primary_posts_total is None
+                else args.max_primary_posts_total - run_primary_posts
+            )
+            if (
+                remaining_primary is not None
+                and remaining_primary < source_minimum_page_size(source)
+            ):
+                failure = _failed_source_diagnostic(
+                    source=source,
+                    error_category="not_requested_due_to_primary_post_limit",
+                    details={
+                        "checkpoint_before": checkpoint_before,
+                        "checkpoint_after": checkpoint_before,
+                        "completion_state": "incomplete",
+                        "primary_posts_received": 0,
+                        "expanded_posts_received": 0,
+                        "distinct_post_resources_received": 0,
+                        "unit_cost_usd": format(
+                            x_config.post_read_unit_cost_usd, "f"
+                        ),
+                        "estimated_x_cost_usd": "0.000",
+                    },
+                )
+                failures.append(failure)
+                source_reports.append(failure)
+                continue
+            if run_estimated_cost >= args.max_estimated_cost_usd:
+                failure = _failed_source_diagnostic(
+                    source=source,
+                    error_category="not_requested_due_to_cost_guard",
+                    details={
+                        "checkpoint_before": checkpoint_before,
+                        "checkpoint_after": checkpoint_before,
+                        "completion_state": "incomplete",
+                        "primary_posts_received": 0,
+                        "expanded_posts_received": 0,
+                        "distinct_post_resources_received": 0,
+                        "unit_cost_usd": format(
+                            x_config.post_read_unit_cost_usd, "f"
+                        ),
+                        "estimated_x_cost_usd": "0.000",
+                    },
+                )
+                failures.append(failure)
+                source_reports.append(failure)
+                continue
             collected_at = datetime.now(timezone.utc)
             try:
                 fetched = fetch_source(
@@ -517,6 +664,17 @@ def _run_collect(args: argparse.Namespace) -> int:
                     max_pages=args.max_pages,
                     max_results=args.max_results,
                     refresh_existing=args.refresh_existing,
+                    max_primary_posts_total=remaining_primary,
+                    max_estimated_cost_usd=args.max_estimated_cost_usd,
+                    estimated_cost_before_usd=run_estimated_cost,
+                    unit_cost_usd=x_config.post_read_unit_cost_usd,
+                    max_attempts=args.max_attempts,
+                    max_retry_wait_seconds=args.max_retry_wait_seconds,
+                    previous_successful_at=(
+                        previous_state.get("last_successful_at")
+                        if previous_state
+                        else None
+                    ),
                 )
             except XApiRequestError as error:
                 failure = _failed_source_diagnostic(
@@ -525,18 +683,30 @@ def _run_collect(args: argparse.Namespace) -> int:
                     details={
                         "http_result": error.status,
                         "rate_limits": error.rate_limits,
+                        "completion_state": "incomplete",
+                        "primary_posts_received": 0,
+                        "expanded_posts_received": 0,
+                        "distinct_post_resources_received": 0,
+                        "unit_cost_usd": format(
+                            x_config.post_read_unit_cost_usd, "f"
+                        ),
+                        "estimated_x_cost_usd": "0.000",
                     },
                 )
                 if not args.refresh_existing:
-                    with connection.transaction():
-                        record_failed_source_attempt(
-                            repository=repository,
-                            source=source,
-                            previous_state=previous_state,
-                            attempted_at=collected_at,
-                            warning_code=error.category,
-                        )
+                    try:
+                        with connection.transaction():
+                            record_failed_source_attempt(
+                                repository=repository,
+                                source=source,
+                                previous_state=previous_state,
+                                attempted_at=collected_at,
+                                warning_code=error.category,
+                            )
+                    except Exception:
+                        failure["sync_failure_recorded"] = False
                 failures.append(failure)
+                source_reports.append(failure)
                 continue
             except CollectionError:
                 failure = _failed_source_diagnostic(
@@ -544,16 +714,39 @@ def _run_collect(args: argparse.Namespace) -> int:
                     error_category="unexpected_post_shape",
                 )
                 if not args.refresh_existing:
-                    with connection.transaction():
-                        record_failed_source_attempt(
-                            repository=repository,
-                            source=source,
-                            previous_state=previous_state,
-                            attempted_at=collected_at,
-                            warning_code="unexpected_post_shape",
-                        )
+                    try:
+                        with connection.transaction():
+                            record_failed_source_attempt(
+                                repository=repository,
+                                source=source,
+                                previous_state=previous_state,
+                                attempted_at=collected_at,
+                                warning_code="unexpected_post_shape",
+                            )
+                    except Exception:
+                        failure["sync_failure_recorded"] = False
                 failures.append(failure)
+                source_reports.append(failure)
                 continue
+
+            run_primary_posts += fetched.fetched_posts
+            run_expanded_posts += fetched.expanded_posts_received
+            run_distinct_resources += fetched.distinct_post_resources_received
+            run_estimated_cost += fetched.estimated_cost_usd
+
+            usage_recorded = False
+            try:
+                with connection.transaction():
+                    record_source_usage(
+                        repository=repository,
+                        fetched=fetched,
+                        run_id=run_id,
+                        usage_event_id=uuid4(),
+                        collected_at=collected_at,
+                    )
+                usage_recorded = True
+            except Exception:
+                fetched = fetched.with_warning("usage_recording_failed")
 
             try:
                 with connection.transaction():
@@ -562,37 +755,71 @@ def _run_collect(args: argparse.Namespace) -> int:
                         fetched=fetched,
                         previous_state=previous_state,
                         run_id=run_id,
-                        usage_event_id=uuid4(),
                         collected_at=collected_at,
                         max_pages=args.max_pages,
                         max_results=args.max_results,
                     )
             except Exception:
+                sync_failure_recorded = None if args.refresh_existing else True
                 if not args.refresh_existing:
-                    with connection.transaction():
-                        record_failed_source_attempt(
-                            repository=repository,
-                            source=source,
-                            previous_state=previous_state,
-                            attempted_at=collected_at,
-                            warning_code="database_write_failed",
-                        )
+                    try:
+                        with connection.transaction():
+                            record_failed_source_attempt(
+                                repository=repository,
+                                source=source,
+                                previous_state=previous_state,
+                                attempted_at=collected_at,
+                                warning_code="database_write_failed",
+                            )
+                    except Exception:
+                        sync_failure_recorded = False
                 failures.append(
                     _failed_source_diagnostic(
                         source=source,
                         error_category="database_write_failed",
+                        details={
+                            "checkpoint_before": checkpoint_before,
+                            "checkpoint_after": checkpoint_before,
+                            "completion_state": "incomplete",
+                            "primary_posts_received": fetched.fetched_posts,
+                            "expanded_posts_received": (
+                                fetched.expanded_posts_received
+                            ),
+                            "distinct_post_resources_received": (
+                                fetched.distinct_post_resources_received
+                            ),
+                            "unit_cost_usd": format(fetched.unit_cost_usd, "f"),
+                            "estimated_x_cost_usd": format(
+                                fetched.estimated_cost_usd, "f"
+                            ),
+                            "usage_recorded": usage_recorded,
+                            "sync_failure_recorded": sync_failure_recorded,
+                        },
                     )
                 )
+                source_reports.append(failures[-1])
                 continue
             summaries.append(summary)
+            diagnostic = summary.safe_diagnostic()
+            diagnostic["usage_recorded"] = usage_recorded
+            if fetched.terminal_error_category:
+                diagnostic["errors"] = [
+                    {
+                        "error_category": fetched.terminal_error_category,
+                        "http_result": fetched.terminal_http_status,
+                        "rate_limits": dict(fetched.terminal_rate_limits or {}),
+                    }
+                ]
+            source_reports.append(diagnostic)
 
-        warning_count = sum(len(summary.warnings) for summary in summaries) + len(
-            failures
-        )
+        warning_count = sum(len(summary.warnings) for summary in summaries) + len(failures)
         fetched_count = sum(summary.fetched_posts for summary in summaries)
         new_count = sum(summary.new_posts for summary in summaries)
         rejected_count = sum(summary.reposts_excluded for summary in summaries)
         finished_at = datetime.now(timezone.utc)
+        incomplete = bool(failures) or any(
+            summary.has_blocking_warning for summary in summaries
+        )
         if failures and not summaries:
             run_status = "failed"
             with connection.transaction():
@@ -603,9 +830,11 @@ def _run_collect(args: argparse.Namespace) -> int:
                     warning_count=warning_count,
                 )
         else:
-            completed_with_warnings = bool(failures) or bool(warning_count)
+            completed_with_warnings = incomplete or bool(warning_count)
             run_status = (
-                "completed_with_warnings" if completed_with_warnings else "completed"
+                "incomplete" if incomplete else (
+                    "completed_with_warnings" if completed_with_warnings else "completed"
+                )
             )
             with connection.transaction():
                 repository.complete_run(
@@ -626,7 +855,15 @@ def _run_collect(args: argparse.Namespace) -> int:
     report = {
         "run_id": str(run_id),
         "status": run_status,
-        "sources": [summary.safe_diagnostic() for summary in summaries],
+        "sources": source_reports,
+        "usage": {
+            "primary_posts_received": run_primary_posts,
+            "expanded_posts_received": run_expanded_posts,
+            "distinct_post_resources_received": run_distinct_resources,
+            "unit_cost_usd": format(x_config.post_read_unit_cost_usd, "f"),
+            "estimated_x_cost_usd": format(run_estimated_cost, "f"),
+            "reported_cost_usd": None,
+        },
         "errors": failures,
     }
     print(json.dumps(report, indent=2, sort_keys=True))
@@ -688,8 +925,16 @@ def main(argv: Sequence[str] | None = None) -> int:
             return 2
     if args.command == "collect":
         try:
+            if args.collect_action == "accept-baseline":
+                return _run_accept_baseline(args)
             return _run_collect(args)
-        except (ConfigurationError, XApiConfigurationError, OAuthFlowError, ValueError) as error:
+        except (
+            BaselineAcceptanceError,
+            ConfigurationError,
+            XApiConfigurationError,
+            OAuthFlowError,
+            ValueError,
+        ) as error:
             safe_error = redact_secrets(str(error))
             print(f"Collection failed: {safe_error}", file=sys.stderr)
             return 2

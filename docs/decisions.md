@@ -117,3 +117,21 @@ Status: Accepted
 Long-form Post content uses `note_tweet.text` when available and falls back to `text`. The original X fields remain at the top level of `raw_json`; returned referenced Post context and matching media metadata are added only under `_expanded`, and collector-derived provenance is added under `_collector`. Missing expansions are recorded when useful but are nonfatal and never cause an additional X request or a media download.
 
 Versioned migration 002 adds security-invoker PostgreSQL views for Post review, stored home-author statistics, and manual unfollow candidates. Their keyword and low-information reply flags are coarse review heuristics, not AI relevance decisions, rejection actions, or account changes. The explicit bounded `--refresh-existing` mode omits `since_id`, anchors its window at the stored checkpoint with documented `until_id`, upserts the returned window, preserves first-seen values and workflow state, and does not write `sync_state`. Stage 3 remains In Progress, and Stage 4 is not started.
+
+## 2026-08-06 - Task 004C incremental completeness and cost guardrails
+
+Status: Accepted
+
+Forward incremental collection paginates each source from its stored checkpoint until `next_token` disappears or an explicit safety guard stops collection. Home and mentions remain independent and run in that order. Page, global primary-Post, estimated-cost, partial-response, malformed-content, and terminal-request conditions make the affected source incomplete, preserve fetched data and estimated usage, prevent checkpoint advancement, and produce a non-zero CLI result.
+
+Estimated X usage counts distinct Post IDs returned in primary `data` and expanded `includes.tweets` within each source. The configurable unit estimate defaults to $0.005. The cost guard controls whether another page is requested and is not a billing cap, so one-page and expansion overshoot is expected. Actual cost remains a Developer Console observation.
+
+Successful-response usage is committed separately before Post upsert. This preserves a best-effort paid-fetch record if a later database write fails without creating a second event. Retries are bounded and restricted to connection failures, timeouts, HTTP 500, 502, 503, 504, and short HTTP 429 waits. Manual execution, forward collection, and safe warnings are part of the MVP. Historical backfill, automatic missed-window recovery, and compliance revalidation or deletion automation remain deferred.
+
+## 2026-08-07 - Explicit manual baseline acceptance
+
+Status: Accepted
+
+An operator may explicitly accept the newest collected point from the current incomplete source run as a new forward baseline when the MVP intentionally declines to pay for the older remaining window. The action is PostgreSQL-only, requires a source, run ID, and `--confirm-skip-older-posts`, and never calls X, creates Posts, deletes Posts, or creates a collection run or usage event.
+
+Acceptance is limited to a completed-with-warnings collection run with one matching incomplete source usage record, a recognized blocking reason, valid newest Post evidence, and a current matching incomplete `sync_state`. The audit record retains the source run, previous and accepted checkpoints, incomplete reason, primary and saved Post counts, acceptance time, provenance, and an explicit `older_window_may_have_been_skipped=true` marker. The source run metadata and later checkpoint metadata preserve the acceptance record. This is a deliberate forward-MVP baseline, not historical completeness or recovery.

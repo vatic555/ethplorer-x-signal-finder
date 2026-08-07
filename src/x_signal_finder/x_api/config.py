@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import dataclass
+from decimal import Decimal, InvalidOperation
 import os
 from pathlib import Path
 import re
@@ -31,6 +32,7 @@ class XApiConfig:
     bearer_token: str = ""
     home_user_id: str = ""
     ethplorer_user_id: str = ""
+    post_read_unit_cost_usd: Decimal = Decimal("0.005")
     base_url: str = X_API_BASE_URL
 
     def __repr__(self) -> str:
@@ -100,6 +102,18 @@ def load_x_api_config(
         raw = environment[name] if name in environment else file_values.get(name, default)
         return str(raw or "").strip()
 
+    raw_unit_cost = value("X_POST_READ_UNIT_COST_USD", "0.005") or "0.005"
+    try:
+        unit_cost = Decimal(raw_unit_cost)
+    except InvalidOperation as error:
+        raise XApiConfigurationError(
+            "X_POST_READ_UNIT_COST_USD must be a decimal number."
+        ) from error
+    if unit_cost <= 0:
+        raise XApiConfigurationError(
+            "X_POST_READ_UNIT_COST_USD must be positive."
+        )
+
     return XApiConfig(
         client_id=value("X_CLIENT_ID"),
         redirect_uri=value("X_REDIRECT_URI", DEFAULT_REDIRECT_URI)
@@ -109,6 +123,7 @@ def load_x_api_config(
         bearer_token=value("X_BEARER_TOKEN"),
         home_user_id=value("X_HOME_USER_ID"),
         ethplorer_user_id=value("X_ETHPLORER_USER_ID"),
+        post_read_unit_cost_usd=unit_cost,
     )
 
 

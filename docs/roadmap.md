@@ -7,15 +7,16 @@ Status: Canonical implementation sequence and progress record
 - Stage 0 - Repository Bootstrap - Completed
 - Stage 1 - Durable Storage Foundation - Completed
 - Stage 2 - X API Access Spike - Completed
-- Stage 3 - X Collection Pipeline - In Progress
-- Current task - Task 004B - Content Completeness and Review Views - Completed
-- Next task - Further Stage 3 hardening requires an explicit specification
+- Stage 3 - X Collection Pipeline - Completed
+- Current task - Task 004C.1 - Explicit Baseline Acceptance - Completed
+- Next task - Task 005A - Knowledge Base Inventory and Schema - Planned, awaiting its explicit task specification
 - Local PostgreSQL implementation is ready
 - Real Supabase migration and database validation are complete
 - Task 003 documentation review, diagnostic probe, live OAuth, endpoint, pagination, refresh, and checkpoint validation are complete
 - Stage 2 decision - `constrained-go`; Stage 3 has started with the bounded Task 004A collector
 - Task 004A implementation, synthetic validation, and bounded live X-to-Supabase validation are complete
 - Task 004B implementation, migration 002, synthetic validation, and bounded live validation are complete
+- Task 004C and Task 004C.1 implementation, synthetic validation, explicit baseline acceptance, and bounded incremental live validation are complete
 
 Stage 1 must not be marked Completed until the real Supabase database has been created, migrations have been applied, and database validation has passed.
 
@@ -58,8 +59,8 @@ Post-MVP work may cover:
 | 0 | Repository Bootstrap | Completed | Task 001 | Yes |
 | 1 | Durable Storage Foundation | Completed | Task 002 | Yes |
 | 2 | X API Access Spike | Completed | Task 003 | Yes |
-| 3 | X Collection Pipeline | In Progress | Further hardening | Yes |
-| 4 | Minimum Knowledge Base | Planned | Task 005 | Yes |
+| 3 | X Collection Pipeline | Completed | Tasks 004A through 004C.1 | Yes |
+| 4 | Minimum Knowledge Base | Planned | Task 005A next | Yes |
 | 5 | Relevance Filtering and Signal Clustering | Planned | Task 006 | Yes |
 | 6 | Opportunity Gate and Context Enrichment | Planned | Task 007 | Yes |
 | 7 | Drafts, Human Review and Pilot | Planned | Task 008 | Yes |
@@ -169,7 +170,7 @@ Current state:
 
 ## Stage 3 - X Collection Pipeline
 
-Status: In Progress
+Status: Completed
 
 Build reliable automatic collection while keeping execution manually initiated:
 
@@ -187,24 +188,30 @@ Build reliable automatic collection while keeping execution manually initiated:
 
 Current state:
 
-- Task 004A implements a manually invoked `collect` command with one-page and 20-Post safe defaults;
+- Task 004C changes collector defaults to five pages, 100 primary Posts per page, a $1 estimated-cost guard, three attempts, and a 60-second maximum retry wait;
 - OAuth access tokens are refreshed in memory, and only the rotated refresh token is stored in ignored local `.env`;
 - home and mentions use independent `sync_state` keys;
 - Post mapping, simple-repost exclusion, upsert deduplication, safe checkpoint updates, minimal usage estimates, and secret-safe summaries are implemented without a schema migration;
 - an intentionally bounded first run establishes a current baseline and records that older history was not backfilled;
-- incomplete incremental pagination, partial response errors, or duplicate IDs prevent checkpoint advancement;
+- complete incremental pagination follows `next_token` until exhaustion or an explicit guard, and incomplete sources preserve Posts and usage without advancing their checkpoint;
+- the optional total primary-Post limit is global across home then mentions, while expanded Post resources count only toward estimated cost;
+- retry is limited to connection failures, timeouts, HTTP 500, 502, 503, 504, and bounded HTTP 429 waits;
+- successful-response usage is committed independently before Post upsert so a later database failure does not erase the paid-fetch estimate;
+- home missed-window and mentions truncation-risk warnings are persisted without claiming proven data loss;
 - required bounded live home, repeated-home, and mentions runs against X and Supabase passed;
 - Task 004B content completeness and review-view implementation is complete;
 - long Posts now prefer returned `note_tweet.text`, and returned referenced Post and media metadata are retained under service keys in the original `raw_json`;
 - an explicit bounded refresh mode reads the checkpoint only to anchor `until_id`, updates the bounded stored window, and does not change the operational checkpoint;
 - migration 002 defines manual Post review, author statistics, and manual unfollow-candidate views;
-- full Stage 3 pagination, retry hardening, missed-window recovery, and compliance automation are not part of Task 004A.
+- automatic missed-window recovery and compliance automation remain deferred.
+- explicit manual baseline acceptance can advance a stalled checkpoint from a validated incomplete run without an X request, only after confirmation that older Posts may be skipped.
 
 ### Tasks
 
 - Task 004A - Minimal X Collector to PostgreSQL - Completed
 - Task 004B - Content Completeness and Review Views - Completed
-- Further Stage 3 hardening - Planned
+- Task 004C - Complete Incremental Collection and Cost Guardrails - Completed
+- Task 004C.1 - Explicit Baseline Acceptance - Completed
 
 ### Task 004A Validation Record
 
@@ -231,12 +238,31 @@ Current state:
 - Tests: 58 default tests passed with 4 external tests skipped; 2 PostgreSQL integration tests passed explicitly
 - Stage boundary: Stage 3 remains In Progress; Stage 4 and AI processing are not started; no automatic unfollow, X write access, or media download was added
 
+### Task 004C Validation Record
+
+- Implementation: complete forward pagination, independent source outcomes, global primary-Post limit, estimated-cost guard, bounded retry policy, partial-response handling, durable usage-before-upsert behavior, and missed-window warnings are implemented
+- Default tests: 77 passed with 4 external tests skipped; no external requests or real retry sleep occurred
+- PostgreSQL integration: 2 tests passed explicitly against the configured database
+- Database health: PostgreSQL 17.6 healthy; migrations 1 and 2 current; no pending migrations; operational-table RLS intact
+- Pre-live data: 49 Post rows, 49 distinct Post IDs, zero duplicates; home checkpoint `2085127387939807652`; mentions checkpoint empty
+- Bounded run: 20 primary Posts, 17 expanded Posts, 30 distinct resources, 18 saved Posts after 2 repost exclusions, $0.150 estimate, exit 1 as incomplete, and unchanged home checkpoint
+- Full guarded run: 194 primary Posts, 113 expanded Posts, 272 distinct resources, 152 saved Posts including 134 new rows after 42 repost exclusions, $1.360 estimate, and exit 1 after the cost guard; one-page overshoot is within the documented guard semantics
+- Source independence: mentions was not requested because home exhausted the run cost guard; its checkpoint remained unchanged
+- Post-live data: 201 Post rows, 201 distinct Post IDs, zero duplicates; home and mentions checkpoints unchanged
+- Recorded validation usage: 3 HTTP requests, 214 primary Posts, 130 expanded Posts, 302 estimated distinct Post resources, and $1.510 estimated cost across the two permitted live runs; `reported_cost` remains NULL
+- Remaining validation: authenticate to X Developer Console and record before/after count, cost, and balance; then run one explicitly approved incremental collection with enough guard headroom to exhaust `next_token` and demonstrate live checkpoint advancement
+- Baseline acceptance: the incomplete guarded home run was accepted manually at `2085449523904778414`; the operation made no X request, created no Posts, and preserved all 201 existing rows with 201 distinct IDs and zero duplicates
+- Cheap incremental validation: one request from the accepted checkpoint returned 19 primary and 10 expanded Posts, counted 29 distinct resources, saved 13 new rows after 6 repost exclusions, estimated $0.145, and remained incomplete at the explicit one-page limit, so the checkpoint correctly stayed unchanged
+- Post-validation data: 214 Post rows, 214 distinct Post IDs, zero duplicates; baseline audit metadata is retained in both `sync_state` and the source run
+- Final default tests: 88 passed with 4 external tests skipped; explicit PostgreSQL integration tests: 2 passed
+- Stage boundary: Task 004C and Task 004C.1 are complete; Stage 3 is Completed; Stage 4 and AI runtime remain unstarted
+
 ### Completion Record
 
-- Completion date:
-- Final commit:
-- Validation summary:
-- Remaining limitations:
+- Completion date: 2026-08-07
+- Final commit: pending the Task 004C and Task 004C.1 implementation commit
+- Validation summary: guarded pagination, incomplete-checkpoint safety, explicit no-request baseline acceptance, and one cheap incremental run from the accepted checkpoint passed; PostgreSQL ended with 214 unique Posts and no duplicate IDs
+- Remaining limitations: no historical backfill or automatic missed-window recovery; Developer Console billing was not reconciled; mentions pagination was not observed beyond an empty live response
 
 ## Stage 4 - Minimum Knowledge Base
 
@@ -258,6 +284,8 @@ Create the minimum reviewed knowledge required for credible Opportunity decision
 ### Tasks
 
 - Task 005 - Minimum Knowledge Base - Planned
+- Task 005A - Knowledge Base Inventory and Schema - Planned and next
+- Task 005B - Populate Ethplorer Assets - Planned after Task 005A
 
 ### Completion Record
 

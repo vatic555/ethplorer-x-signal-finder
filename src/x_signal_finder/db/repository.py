@@ -105,6 +105,25 @@ class StorageRepository:
             (finished_at, "failed", error_summary, warning_count, run_id),
         )
 
+    def record_run_baseline_acceptance(
+        self,
+        *,
+        run_id: UUID,
+        metadata: JsonObject,
+    ) -> None:
+        """Attach an auditable manual baseline record to its source run."""
+        self._connection.execute(
+            """
+            UPDATE runs
+            SET metadata = metadata || jsonb_build_object(
+                'baseline_acceptance', %s::jsonb
+            )
+            WHERE run_id = %s
+              AND status = 'completed_with_warnings'
+            """,
+            (Jsonb(dict(metadata)), run_id),
+        )
+
     def upsert_posts(self, posts: Iterable[JsonObject]) -> None:
         statement = """
             INSERT INTO posts (
@@ -199,6 +218,61 @@ class StorageRepository:
             "last_successful_run_id",
             "last_warning_code",
             "updated_at",
+        )
+        return dict(zip(columns, row, strict=True))
+
+    def get_collection_run_source(
+        self,
+        *,
+        run_id: UUID,
+        source: str,
+        source_key: str,
+    ) -> dict[str, Any] | None:
+        """Return safe source-level evidence for manual baseline acceptance."""
+        rows = self._connection.execute(
+            """
+            SELECT
+                r.status,
+                r.trigger_type,
+                r.started_at,
+                r.finished_at,
+                r.metadata,
+                u.metadata,
+                u.created_at,
+                (
+                    SELECT count(*)
+                    FROM posts p
+                    WHERE p.last_seen_run_id = r.run_id
+                      AND p.source_key = %s
+                ) AS saved_posts,
+                (
+                    SELECT max(p.post_id::numeric)::text
+                    FROM posts p
+                    WHERE p.last_seen_run_id = r.run_id
+                      AND p.source_key = %s
+                      AND p.post_id ~ '^[0-9]{1,19}$'
+                ) AS highest_saved_post_id
+            FROM runs r
+            JOIN usage_events u ON u.run_id = r.run_id
+            WHERE r.run_id = %s
+              AND u.provider = 'x'
+              AND u.operation = %s
+            """,
+            (source_key, source_key, run_id, f"collect_{source}"),
+        ).fetchall()
+        if len(rows) != 1:
+            return None
+        row = rows[0]
+        columns = (
+            "run_status",
+            "trigger_type",
+            "started_at",
+            "finished_at",
+            "run_metadata",
+            "usage_metadata",
+            "usage_created_at",
+            "saved_posts",
+            "highest_saved_post_id",
         )
         return dict(zip(columns, row, strict=True))
 

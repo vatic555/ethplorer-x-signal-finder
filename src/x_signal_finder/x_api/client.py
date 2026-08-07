@@ -14,6 +14,7 @@ from urllib.request import Request, urlopen
 
 
 RATE_LIMIT_HEADERS = (
+    "retry-after",
     "x-rate-limit-limit",
     "x-rate-limit-remaining",
     "x-rate-limit-reset",
@@ -279,6 +280,7 @@ def parse_content_page(
         not isinstance(data, list)
         or not isinstance(meta, dict)
         or not isinstance(includes, dict)
+        or not isinstance(errors, list)
     ):
         raise XApiRequestError(
             status=response.status,
@@ -378,7 +380,7 @@ def parse_content_page(
         newest_id=str(newest_id) if newest_id is not None else None,
         oldest_id=str(oldest_id) if oldest_id is not None else None,
         rate_limits=rate_limits,
-        partial_error_count=len(errors) if isinstance(errors, list) else 0,
+        partial_error_count=len(errors),
         elapsed_seconds=elapsed,
         meta_present=meta_present,
     )
