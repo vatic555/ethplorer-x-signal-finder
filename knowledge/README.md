@@ -1,8 +1,44 @@
 # Knowledge Base
 
-For the MVP, this directory is the source of truth for reviewed knowledge. PostgreSQL, a search index, or another derived representation may be added later, but it must be reproducible from the reviewed Git content and must not replace it as the canonical knowledge source.
+For the MVP, this directory is the source of truth for static reviewed knowledge. PostgreSQL, a search index, or another derived representation may be added later, but it must be reproducible from the reviewed Git content and must not replace it as the canonical static knowledge source.
 
-The knowledge base contains two layers:
+The architecture distinguishes three knowledge source classes. They have different authority, storage, and future read contracts and must not be blended silently.
+
+## Knowledge Source Classes
+
+### 1. Static Reviewed Knowledge
+
+This class includes product articles, product documentation, terminology, capabilities, and limitations. Reviewed files in this Git repository are its source of truth.
+
+Static evidence uses the normalized source-document contract below. Structured assets and capabilities may be established only from supporting static source IDs with sufficient review status.
+
+### 2. First-Party Editorial Corpus
+
+This future class consists of historical Ethplorer and Binplorer X Posts and replies. It may later support style guidance, reaction-pattern analysis, and evidence of prior public positioning.
+
+The corpus is not imported by Task 005A and does not belong in the static evidence layer merely because it is first-party content. Its future importer and compliant storage must preserve at least the X Post ID and URL, account, publication and retrieval dates, conversation or reply context when available, and source provenance. The future reader must expose why a corpus item was selected and its intended editorial use.
+
+An editorial item can show what Ethplorer or Binplorer previously said. It must not silently establish a product capability, limitation, current fact, or supported network. Any such capability claim still requires reviewed supporting evidence from the static knowledge class.
+
+### 3. Dynamic Analytical Evidence
+
+This future class includes current or comparative metrics produced outside this repository, especially by `ethereum-top-addresses-pipeline`. Its upstream repository and generated analytical state remain separate and are not copied into the static knowledge base.
+
+A future analytics adapter must query the latest appropriate snapshot or comparison on demand. Every returned metric must preserve:
+
+- as-of date;
+- comparison dates when a comparison is used;
+- metric name;
+- scope, including the applicable network, asset, address set, or cohort;
+- source provenance, including the upstream repository and snapshot, run, revision, or equivalent stable reference.
+
+Dynamic evidence may support a time-bound analytical statement. It does not by itself establish that Ethplorer has a product capability. Missing dates, scope, or provenance make the analytical claim unresolved.
+
+Task 005A documents these future contracts only. It does not implement the X corpus importer, corpus storage, analytics adapter, snapshot query, or runtime integration.
+
+## Evidence and Capability Layers
+
+Within static reviewed knowledge, the knowledge base contains two layers:
 
 - A source document is evidence: normalized public or explicitly approved material with stable provenance.
 - An asset or capability record is a structured claim that the pipeline may use only when its `source_ids` point to supporting source documents.
@@ -25,11 +61,11 @@ knowledge/
   README.md
 ```
 
-Current inventory: two terminology documents, zero normalized evidence documents, and zero asset or capability rows. Task 005A defines the structure and contract only. Task 005B will import actual reviewed Ethplorer sources.
+Current inventory: two terminology documents, zero normalized static evidence documents, zero editorial corpus items, zero dynamic analytical records, and zero asset or capability rows. Task 005A defines the structure and contracts only. Task 005B will import actual reviewed Ethplorer static sources.
 
 ## Source Document Contract
 
-Every imported source is one normalized Markdown file below `sources/`. Filenames should be stable and descriptive. Each file starts with TOML front matter between `+++` delimiters, followed by normalized source content.
+Every imported static source is one normalized Markdown file below `sources/`. Filenames should be stable and descriptive. Each file starts with TOML front matter between `+++` delimiters, followed by normalized source content.
 
 Required metadata:
 
@@ -83,6 +119,8 @@ Definitions must not be merged, reconstructed from general knowledge, or changed
 
 ## Import Workflow
 
+This workflow applies only to static reviewed knowledge:
+
 1. Confirm that the material is public or explicitly approved for storage in this public repository.
 2. Copy the source template into the appropriate product or topic directory.
 3. Assign a stable `source_id`, complete metadata, and normalize the content without adding claims.
@@ -98,3 +136,5 @@ python -m x_signal_finder knowledge validate
 ```
 
 Validation reads local Markdown and CSV only. It makes no network requests and performs no LLM calls. It checks required structure and metadata, unique IDs, review statuses, catalog-to-source references, reviewed-evidence rules, and local Markdown links.
+
+The validator does not access or validate the future editorial corpus or dynamic analytical evidence. Those classes require separate task-specific adapters and tests before runtime use.

@@ -1,12 +1,12 @@
 # Ethplorer X Signal Finder - Handoff
 
-Last updated: 2026-08-07
+Last updated: 2026-08-10
 
-Repository HEAD: `ec6c3d91428abd3cc770c8c3c34e8ed2c7db021d` at implementation validation; a HANDOFF-only metadata commit follows it
+Repository HEAD: `c2cda99f976aaea963f2d22cf66a8faf8de82ef9`; the Task 005A architecture amendment is local until final validation and commit
 
-Validated commit: `ec6c3d91428abd3cc770c8c3c34e8ed2c7db021d`
+Validated commit: `ec6c3d91428abd3cc770c8c3c34e8ed2c7db021d` before the 2026-08-10 architecture amendment
 
-Validated implementation commit: `ec6c3d91428abd3cc770c8c3c34e8ed2c7db021d`
+Validated implementation commit: pending validation and commit of the Task 005A architecture amendment
 
 This file is a short current-state snapshot. It is not a canonical product, technical, architecture, or roadmap source.
 
@@ -59,11 +59,12 @@ The following capabilities have been implemented and validated:
 - explicit bounded refresh of existing content without changing `sync_state`;
 - explicit confirmation-gated baseline acceptance from a validated incomplete run without an X request;
 - Post, media, referenced-context, author-statistics, and manual candidate review views.
-- Git-backed MVP knowledge source of truth with separate evidence and capability layers;
+- Git-backed MVP source of truth for static reviewed knowledge, with separate evidence and capability layers;
 - separate shared analytics and X Signal Finder terminology namespaces;
 - normalized source-document template with stable IDs, provenance, review status, supported claims, and limitations;
 - asset catalog schema with mandatory source-ID evidence links;
 - offline knowledge validation for structure, metadata, IDs, statuses, evidence links, and local references.
+- documented separation of static reviewed knowledge, first-party editorial corpus, and dynamic analytical evidence, with distinct future authority and read contracts.
 
 ## 4. Current Data Flow
 
@@ -80,13 +81,13 @@ X API
 
 The X API, collector, and PostgreSQL portion exists. Runtime relevance filtering, Signals, Opportunity Gate evaluation, Opportunity creation, draft generation, and the human review workflow are not implemented. Publication remains outside the application and must be performed manually.
 
-The Git-backed knowledge architecture exists, but Task 005B has not imported real Ethplorer evidence or capability rows. Future relevance and Opportunity processing may read reviewed knowledge only after their own explicit tasks are implemented.
+The Git-backed static knowledge architecture exists, but Task 005B has not imported real Ethplorer evidence or capability rows. A future first-party X corpus may inform style, reaction patterns, and prior public positioning only. Future dynamic analytics must be queried from their upstream source with temporal scope and provenance. Neither adapter exists yet.
 
 ## 5. Architecture Snapshot
 
 - Python 3.11 or newer is the cross-platform runtime.
 - PostgreSQL is the operational source of truth.
-- Reviewed Git content under `knowledge/` is the MVP knowledge source of truth.
+- Reviewed Git content under `knowledge/` is the MVP source of truth for static reviewed knowledge.
 - Supabase is the current managed PostgreSQL provider.
 - Application database access uses standard `psycopg` and parameterized SQL.
 - Local configuration and credentials exist only in ignored `.env` or real environment variables.
@@ -95,6 +96,7 @@ The Git-backed knowledge architecture exists, but Task 005B has not imported rea
 - MongoDB is not part of the architecture.
 - GitHub Actions and scheduled execution are not implemented at the current stage.
 - No knowledge content is stored canonically in PostgreSQL, embeddings, or a vector database.
+- `ethereum-top-addresses-pipeline` and other dynamic analytical evidence remain upstream and are not copied into static knowledge.
 
 ## 6. Important Files
 
@@ -204,6 +206,7 @@ These commands read required values from local environment configuration. Never 
 - PostgreSQL 17.6 was healthy with migrations 1 and 2 current, no pending migrations, and operational-table RLS intact.
 - Latest default suite: 99 passed with 4 external tests skipped. Explicit PostgreSQL integration suite: 2 passed during the unchanged Stage 3 database validation.
 - Task 005A inventory found two terminology documents, zero normalized evidence documents, and zero asset or capability rows. The source contract, catalog evidence rules, template, local-link checks, and offline CLI validation passed without network requests, database access, or model calls.
+- The 2026-08-10 Task 005A amendment documents three knowledge source classes and future import/read contracts only. It adds no X corpus data, importer, analytics adapter, metric retrieval, capability, database change, or runtime integration.
 
 These are validation estimates and observations, not a Developer Console billing statement. No raw Post text or raw X response belongs in this file.
 
@@ -216,6 +219,8 @@ These are validation estimates and observations, not a Developer Console billing
 - The knowledge base is not integrated into runtime processing.
 - No real Ethplorer evidence document or evidence-backed capability row has been imported; this is reserved for Task 005B.
 - PostgreSQL, embeddings, vector search, crawling, and semantic retrieval are not part of the knowledge architecture.
+- The first-party Ethplorer/Binplorer X editorial corpus importer and compliant corpus storage are not implemented.
+- The dynamic analytics adapter is not implemented; `ethereum-top-addresses-pipeline` remains separate and no snapshot is copied into this repository.
 - Signals and Opportunities have schema placeholders but no runtime creation pipeline.
 - Telegram delivery is not implemented.
 - No scheduler or GitHub Actions workflow exists.
@@ -227,13 +232,15 @@ These are validation estimates and observations, not a Developer Console billing
 
 ## 11. Next Intended Work
 
-The next intended work is Task 005B - Ethplorer Knowledge Import. Its completion criterion is a reviewed import of approved real Ethplorer source material and extraction of only the capabilities directly supported by those source IDs.
+The next intended work is Task 005B - Ethplorer Knowledge Import. Its completion criterion is a reviewed import of approved real static Ethplorer source material and extraction of only the capabilities directly supported by those source IDs.
 
 Private or licensed source text, unsupported capabilities, crawling, database or vector storage, runtime knowledge integration, LLM calls, Task 006 relevance filtering, Signals, Opportunities, delivery automation, and publication are outside Task 005B unless its explicit specification says otherwise within canonical project boundaries.
 
 ## 12. Deferred and Planned Work
 
 - Historical backfill and automatic missed-window recovery.
+- A first-party Ethplorer/Binplorer X editorial corpus importer and compliant read contract implementation.
+- An on-demand adapter for dated, scoped, provenance-rich dynamic evidence from `ethereum-top-addresses-pipeline` and other approved analytical sources.
 - Task 006B - Author Quality Monitoring and Follow-list Hygiene, after Task 006 produces real AI relevance decisions. It must combine main and referenced context, keep separate main, referenced, and combined metrics, and produce a manual review queue only.
 - X Content compliance revalidation, removal, and deletion automation.
 - A future database-hosting decision if the current Supabase arrangement is reconsidered.
@@ -246,6 +253,7 @@ Private or licensed source text, unsupported capabilities, crawling, database or
 - Never commit secrets, credentials, `.env`, database URLs, raw operational X content, runtime databases, dumps, or private and licensed exports.
 - Never print access tokens, refresh tokens, authorization headers, or raw API response bodies.
 - Do not invent Ethplorer capabilities. Use only reviewed knowledge-base evidence.
+- Do not treat first-party editorial history or dynamic metrics as capability proof without reviewed supporting static evidence.
 - Keep verified facts, inference, and unresolved uncertainty distinct.
 - Do not start the next stage or implement a planned task without an explicit task specification.
 - Do not add X write access, automatic unfollow, scheduling, or automatic publication without explicit approved changes.

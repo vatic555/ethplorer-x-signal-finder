@@ -282,6 +282,7 @@ Create the minimum reviewed knowledge required for credible Opportunity decision
 - public and internal provenance;
 - stable asset IDs;
 - human review process.
+- explicit separation of static reviewed knowledge, first-party editorial corpus, and dynamic analytical evidence.
 
 ### Tasks
 
@@ -293,12 +294,16 @@ Create the minimum reviewed knowledge required for credible Opportunity decision
 
 - Completion date: 2026-08-07
 - Inventory: two existing terminology documents preserved in separate namespaces; zero normalized evidence documents; zero asset or capability rows; one pending upstream terminology source retained with provenance
-- Architecture: reviewed Git content under `knowledge/` is the MVP knowledge source of truth; PostgreSQL remains operational storage and no database, embedding, vector, search, crawler, or LLM runtime was added
+- Architecture: reviewed Git content under `knowledge/` is the MVP source of truth for static reviewed knowledge; PostgreSQL remains operational storage and no database, embedding, vector, search, crawler, or LLM runtime was added
+- Source classes: static reviewed knowledge is canonical in Git; the future first-party Ethplorer/Binplorer X corpus is editorial context only; dynamic analytics such as `ethereum-top-addresses-pipeline` stay upstream and require dated, scoped, provenance-preserving on-demand reads
+- Authority boundary: editorial history and dynamic metrics cannot silently establish a product capability; reviewed capability rows still require reviewed supporting static source IDs
 - Source contract: normalized Markdown with stable `source_id`, TOML metadata, public or approved provenance, product and network scope, review status, supported claims, limitations, and optional known dates
 - Capability contract: the compact CSV catalog uses stable `asset_id` values and mandatory `source_ids`; a reviewed capability requires at least one reviewed source
 - Safety: no real Ethplorer article batch, private or licensed source text, invented product capability, or capability row was added
 - Validation: offline knowledge validation reported 0 errors with 0 imported sources and 0 assets; the full default suite passed with 99 tests and 4 external tests skipped, without network requests, database access, or model calls
 - Final implementation commit: `ec6c3d91428abd3cc770c8c3c34e8ed2c7db021d`
+- Architecture amendment date: 2026-08-10
+- Architecture amendment commit: pending
 - Stage boundary: Stage 4 remains In Progress; Task 005B is next and Task 006 has not started
 
 ### Completion Record

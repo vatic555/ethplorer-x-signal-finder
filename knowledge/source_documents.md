@@ -1,6 +1,6 @@
 # Source Documents Inventory
 
-This index inventories the knowledge material present before Task 005B. A listed URL or placeholder is provenance, not evidence that a product capability exists. Normalized evidence documents must live under [`sources/`](sources/) and satisfy the contract in [`README.md`](README.md).
+This index inventories static reviewed knowledge present before Task 005B. A listed URL or placeholder is provenance, not evidence that a product capability exists. Normalized static evidence documents must live under [`sources/`](sources/) and satisfy the contract in [`README.md`](README.md).
 
 ## Current Inventory
 
@@ -12,6 +12,13 @@ This index inventories the knowledge material present before Task 005B. A listed
 ## Normalized Evidence Sources
 
 No public or approved source document has been imported yet. Task 005B will import reviewed Ethplorer material using [`sources/_source-template.md`](sources/_source-template.md).
+
+## Other Knowledge Classes
+
+- First-party editorial corpus - not imported; a future task may ingest historical Ethplorer and Binplorer X Posts and replies for style, reaction patterns, and prior public positioning only.
+- Dynamic analytical evidence - not copied here; a future adapter may query dated, scoped, provenance-rich snapshots or comparisons from `ethereum-top-addresses-pipeline` on demand.
+
+Neither class can silently establish a product capability. Capability records continue to require reviewed supporting static `source_id` values.
 
 ## Not Present in the Public Repository
 

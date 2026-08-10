@@ -120,7 +120,15 @@ Enrichment must record what was requested, which sources were consulted, which c
 
 ## 10. Knowledge Base
 
-For the MVP, reviewed Git content under `knowledge/` is the knowledge source of truth. PostgreSQL, embeddings, vector databases, semantic search, and runtime knowledge integration are not part of Task 005A. A future database or search index may be a reproducible derivative of Git but must not replace it as the canonical knowledge source without an explicit specification and architecture decision change.
+For the MVP, reviewed Git content under `knowledge/` is the source of truth for static reviewed knowledge. PostgreSQL, embeddings, vector databases, semantic search, and runtime knowledge integration are not part of Task 005A. A future database or search index may be a reproducible derivative of Git but must not replace it as the canonical static knowledge source without an explicit specification and architecture decision change.
+
+The architecture defines three knowledge source classes:
+
+1. Static reviewed knowledge includes product articles, product documentation, terminology, capabilities, and limitations. Its reviewed Git content is canonical. A capability may be established only through reviewed supporting static evidence.
+2. First-party editorial corpus consists of historical Ethplorer and Binplorer X Posts and replies. A future importer may use it for style, reaction patterns, and prior public positioning. It must preserve Post identity, account, dates, context, selection rationale, and provenance, but it must not silently establish a product capability, limitation, current fact, or supported network.
+3. Dynamic analytical evidence includes dated metrics and comparisons produced outside this repository, especially by `ethereum-top-addresses-pipeline`. That repository and its analytical state remain separate and are not copied into the static knowledge base. A future adapter must query the latest appropriate snapshot or comparison on demand and retain the as-of date, comparison dates, metric name, scope, and source provenance for every retrieved value.
+
+The editorial corpus and dynamic analytical evidence are contextual evidence classes, not substitutes for reviewed static capability evidence. Missing authority, dates, scope, or provenance must produce an unresolved result rather than an inferred claim. Task 005A defines only their future import and read contracts; it does not implement an X corpus importer, corpus store, analytics adapter, snapshot query, or runtime integration.
 
 The knowledge base currently consists of:
 
@@ -175,7 +183,7 @@ All operational tables have Row Level Security enabled with no anonymous or auth
 
 Git must not be used as the operational store for raw X content. Runtime databases, raw runtime data, and private or licensed exports must not be committed. CSV and XLSX files are analytical exports, not the operational source of truth.
 
-This operational-data rule does not conflict with the Git-backed knowledge source of truth. Knowledge files contain reviewed public or explicitly approved evidence and structured capability claims, not raw operational X content. PostgreSQL remains the operational source of truth, while Git is the MVP knowledge source of truth.
+This operational-data rule does not conflict with the Git-backed static knowledge source of truth. Knowledge files contain reviewed public or explicitly approved static evidence and structured capability claims, not raw operational X content. Historical first-party X content is a separate future editorial corpus and must not be committed as raw operational content. Dynamic analytics remain in their upstream repository and are read later through a provenance-preserving adapter. PostgreSQL remains the operational source of truth, while Git is the MVP source of truth for static reviewed knowledge.
 
 Audit records must make it possible to reconstruct which inputs, evidence, knowledge-base version, processing outcome, usage, and human decision produced an Opportunity. Retention and deletion must comply with applicable X platform requirements.
 
