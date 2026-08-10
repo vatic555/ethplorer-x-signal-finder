@@ -2,11 +2,11 @@
 
 Last updated: 2026-08-10
 
-Repository HEAD: `c2cda99f976aaea963f2d22cf66a8faf8de82ef9`; the Task 005A architecture amendment is local until final validation and commit
+Repository HEAD: `3e37ee6e52524f458e6023100c5af0398b40a04c` at amendment validation; a HANDOFF-only metadata commit follows it
 
-Validated commit: `ec6c3d91428abd3cc770c8c3c34e8ed2c7db021d` before the 2026-08-10 architecture amendment
+Validated commit: `3e37ee6e52524f458e6023100c5af0398b40a04c`
 
-Validated implementation commit: pending validation and commit of the Task 005A architecture amendment
+Validated implementation commit: `3e37ee6e52524f458e6023100c5af0398b40a04c` for the Task 005A architecture amendment
 
 This file is a short current-state snapshot. It is not a canonical product, technical, architecture, or roadmap source.
 

@@ -303,7 +303,7 @@ Create the minimum reviewed knowledge required for credible Opportunity decision
 - Validation: offline knowledge validation reported 0 errors with 0 imported sources and 0 assets; the full default suite passed with 99 tests and 4 external tests skipped, without network requests, database access, or model calls
 - Final implementation commit: `ec6c3d91428abd3cc770c8c3c34e8ed2c7db021d`
 - Architecture amendment date: 2026-08-10
-- Architecture amendment commit: pending
+- Architecture amendment commit: `3e37ee6e52524f458e6023100c5af0398b40a04c`
 - Stage boundary: Stage 4 remains In Progress; Task 005B is next and Task 006 has not started
 
 ### Completion Record
