@@ -2,11 +2,11 @@
 
 Last updated: 2026-08-13
 
-Repository HEAD: `d0eb79b5b0ddcbb174145aedd889c87cf1796486`; five DOCX article conversions are local until final validation and commit
+Repository HEAD: `1475479b9a2336c25d5f5b42ea22b6aa02b19444` at DOCX-import validation; a HANDOFF-only metadata commit follows it
 
-Validated commit: `32f742baf7cec7e95468c535e6baf3b6875877ed` before the five DOCX article conversions
+Validated commit: `1475479b9a2336c25d5f5b42ea22b6aa02b19444`
 
-Validated implementation commit: pending validation and commit of the five DOCX article conversions
+Validated implementation commit: `1475479b9a2336c25d5f5b42ea22b6aa02b19444` for the five DOCX article conversions and flat image assets
 
 This file is a short current-state snapshot. It is not a canonical product, technical, architecture, or roadmap source.
 

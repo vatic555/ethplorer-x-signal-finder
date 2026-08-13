@@ -315,6 +315,7 @@ Create the minimum reviewed knowledge required for credible Opportunity decision
 - DOCX media: 16 meaningful image instances consolidated into 11 unique local image assets stored directly under `knowledge/sources/posts/assets/`; the Q&A divider line was removed as an export artifact; two real Word tables were preserved as Markdown tables
 - DOCX cleanup: the temporary `knowledge/sources/posts/Delete/` staging directory and all five source DOCX files were removed only after successful conversion checks
 - Current inventory validation: 17 sources and 0 capability assets validated with 0 errors, 0 network requests, and 0 LLM calls; the full default suite passed with 108 tests and 4 external tests skipped
+- DOCX conversion implementation commit: `1475479b9a2336c25d5f5b42ea22b6aa02b19444`
 - Deferred to Task 005B: capability, limitation, topic, product, network, and `assets_catalog.csv` extraction
 - Article inventory amendment commit: `29db23781fb5dca3373198477b19ea43303124b3`
 - Stage boundary: Stage 4 remains In Progress; Task 005B is next and Task 006 has not started
