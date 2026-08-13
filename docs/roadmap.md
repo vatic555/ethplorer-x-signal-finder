@@ -308,6 +308,7 @@ Create the minimum reviewed knowledge required for credible Opportunity decision
 - Article inventory: all 12 files read in full; each has one unique H1, a substantial coherent body, distinct body content, stable source metadata, and `source_type = ethplorer_article`; Task 005A did not bulk-reformat the articles
 - Article validator: canonical location, source type, title-to-H1 match, body completeness guard, fenced-block closure, and duplicate content checks are offline; validation targets structural usability rather than byte identity
 - Normalization correction: Task 005B may make meaning-preserving Markdown repairs or normalization only where machine readability improves or an actual artifact is repaired; source identity, provenance, claims, historical facts, and meaning remain unchanged
+- Normalization correction commit: `32f742baf7cec7e95468c535e6baf3b6875877ed`
 - Article inventory validation: 12 sources and 0 assets validated with 0 errors, 0 network requests, and 0 LLM calls; the full default suite passed with 105 tests and 4 external tests skipped
 - Deferred to Task 005B: capability, limitation, topic, product, network, and `assets_catalog.csv` extraction
 - Article inventory amendment commit: `29db23781fb5dca3373198477b19ea43303124b3`

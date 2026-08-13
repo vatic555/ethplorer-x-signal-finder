@@ -2,11 +2,11 @@
 
 Last updated: 2026-08-13
 
-Repository HEAD: `a9522fba3a7733f440b552c396acdb59bdc61e85`; the article-normalization contract correction is local until validation and commit
+Repository HEAD: `32f742baf7cec7e95468c535e6baf3b6875877ed` at normalization-contract validation; a HANDOFF-only metadata commit follows it
 
-Validated commit: `29db23781fb5dca3373198477b19ea43303124b3`
+Validated commit: `32f742baf7cec7e95468c535e6baf3b6875877ed`
 
-Validated implementation commit: `29db23781fb5dca3373198477b19ea43303124b3` for the Task 005A canonical article inventory; normalization-contract correction pending validation and commit
+Validated implementation commit: `32f742baf7cec7e95468c535e6baf3b6875877ed` for the Task 005A knowledge normalization contract
 
 This file is a short current-state snapshot. It is not a canonical product, technical, architecture, or roadmap source.
 
