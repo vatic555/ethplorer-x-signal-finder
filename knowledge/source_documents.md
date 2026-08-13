@@ -1,6 +1,6 @@
 # Source Documents Inventory
 
-This index inventories static reviewed knowledge present before Task 005B. A listed URL or placeholder is provenance, not evidence that a product capability exists. Static evidence documents must live under [`sources/`](sources/) and satisfy the preservation and metadata contract in [`README.md`](README.md).
+This index inventories static reviewed knowledge present before Task 005B. A listed URL or placeholder is provenance, not evidence that a product capability exists. Static evidence documents must live under [`sources/`](sources/) and satisfy the identity, provenance, normalization, and metadata contract in [`README.md`](README.md).
 
 ## Current Inventory
 
@@ -11,7 +11,7 @@ This index inventories static reviewed knowledge present before Task 005B. A lis
 
 ## Canonical Ethplorer Article Sources
 
-`sources/posts/` is the canonical location for the current article archive. All 12 files were read in full during Task 005A. Each has one unique H1, a non-empty coherent body, a distinct content signature, and `source_type = ethplorer_article`. Bodies, existing headings, and links were preserved exactly. Review remains `pending`; capability, limitation, topic, and asset-catalog extraction belongs to Task 005B.
+`sources/posts/` is the canonical location for the current article archive. All 12 files were read in full during Task 005A. Each has one unique H1, a non-empty coherent body, a distinct content signature, and `source_type = ethplorer_article`. Task 005A did not bulk-reformat them. Byte identity is not part of the source contract: Task 005B may make meaning-preserving structural repairs or normalization where it improves machine readability. Review remains `pending`; capability, limitation, topic, and asset-catalog extraction belongs to Task 005B.
 
 | source_id | file | title | status |
 |---|---|---|---|

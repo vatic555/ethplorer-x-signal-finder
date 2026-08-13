@@ -2,11 +2,11 @@
 
 Last updated: 2026-08-13
 
-Repository HEAD: `29db23781fb5dca3373198477b19ea43303124b3` at article-inventory validation; a HANDOFF-only metadata commit follows it
+Repository HEAD: `a9522fba3a7733f440b552c396acdb59bdc61e85`; the article-normalization contract correction is local until validation and commit
 
 Validated commit: `29db23781fb5dca3373198477b19ea43303124b3`
 
-Validated implementation commit: `29db23781fb5dca3373198477b19ea43303124b3` for the Task 005A canonical article inventory
+Validated implementation commit: `29db23781fb5dca3373198477b19ea43303124b3` for the Task 005A canonical article inventory; normalization-contract correction pending validation and commit
 
 This file is a short current-state snapshot. It is not a canonical product, technical, architecture, or roadmap source.
 
@@ -111,7 +111,7 @@ The Git-backed static knowledge architecture and 12-article Ethplorer source inv
 - [`knowledge/README.md`](knowledge/README.md) - Task 005A source-document, capability, import, and validation contracts.
 - [`knowledge/source_documents.md`](knowledge/source_documents.md) - current source inventory and provenance index.
 - [`knowledge/terminology/`](knowledge/terminology/) - separate shared analytics and project terminology.
-- [`knowledge/sources/`](knowledge/sources/) - preserved public or approved evidence documents and import template.
+- [`knowledge/sources/`](knowledge/sources/) - public or approved evidence documents with stable identity and provenance, plus the import template.
 - [`knowledge/sources/posts/`](knowledge/sources/posts/) - canonical location for the 12 preserved Ethplorer Markdown articles.
 - [`knowledge/assets_catalog.csv`](knowledge/assets_catalog.csv) - compact evidence-linked asset and capability catalog.
 - [`src/x_signal_finder/knowledge.py`](src/x_signal_finder/knowledge.py) - offline knowledge validator.
@@ -207,7 +207,7 @@ These commands read required values from local environment configuration. Never 
 - Latest database check found 214 Post rows, 214 distinct `post_id` values, and zero duplicate groups. The home checkpoint is the accepted baseline `2085449523904778414`.
 - PostgreSQL 17.6 was healthy with migrations 1 and 2 current, no pending migrations, and operational-table RLS intact.
 - Latest default suite: 105 passed with 4 external tests skipped. Explicit PostgreSQL integration suite: 2 passed during the unchanged Stage 3 database validation.
-- Task 005A inventory found two terminology documents, 12 canonical Ethplorer articles, and zero asset or capability rows. All articles were read in full and have unique H1 titles, substantial coherent bodies, distinct content, stable pending metadata, and exactly preserved bodies. The source contract, catalog evidence rules, template, local-link checks, and offline CLI validation use no network requests, database access, or model calls.
+- Task 005A inventory found two terminology documents, 12 canonical Ethplorer articles, and zero asset or capability rows. All articles were read in full and have unique H1 titles, substantial coherent bodies, distinct content, and stable pending metadata. The source contract allows meaning-preserving structural normalization while preserving identity, provenance, claims, historical facts, and meaning. The validator checks machine usability rather than byte identity and uses no network requests, database access, or model calls.
 - The 2026-08-10 Task 005A amendment documents three knowledge source classes and future import/read contracts only. It adds no X corpus data, importer, analytics adapter, metric retrieval, capability, database change, or runtime integration.
 - The 2026-08-11 first-party X inventory made exactly two `GET /2/users/by/username/{username}` requests for Ethplorer and Binplorer with only `created_at` and `public_metrics` requested. It retrieved no Posts, timelines, search results, expansions, or raw response storage. The estimated standard User Read cost was $0.020 total; Owned Read pricing does not apply to User Lookup. Developer Console billing remains unreconciled.
 

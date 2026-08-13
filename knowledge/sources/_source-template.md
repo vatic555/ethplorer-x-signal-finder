@@ -15,6 +15,6 @@ limitations = []
 
 # Source Content
 
-Replace this guidance with faithfully preserved public or explicitly approved source content.
+Replace this guidance with a faithful, machine-readable representation of public or explicitly approved source content.
 
-Preserve the source meaning. Do not add capabilities, conclusions, dates, products, or networks that the source does not establish.
+Meaning-preserving Markdown repair and normalization are allowed. Do not add or silently update capabilities, conclusions, facts, dates, prices, limits, products, or networks that the source does not establish.

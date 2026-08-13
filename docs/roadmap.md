@@ -297,7 +297,7 @@ Create the minimum reviewed knowledge required for credible Opportunity decision
 - Architecture: reviewed Git content under `knowledge/` is the MVP source of truth for static reviewed knowledge; PostgreSQL remains operational storage and no database, embedding, vector, search, crawler, or LLM runtime was added
 - Source classes: static reviewed knowledge is canonical in Git; the future first-party Ethplorer/Binplorer X corpus is editorial context only; dynamic analytics such as `ethereum-top-addresses-pipeline` stay upstream and require dated, scoped, provenance-preserving on-demand reads
 - Authority boundary: editorial history and dynamic metrics cannot silently establish a product capability; reviewed capability rows still require reviewed supporting static source IDs
-- Source contract: preserved Markdown with stable `source_id`, TOML metadata, public or approved provenance, product and network scope, review status, supported claims, limitations, and optional known dates
+- Source contract: reliable machine-readable Markdown with stable `source_id`, TOML metadata, public or approved provenance, product and network scope, review status, supported claims, limitations, and optional known dates; meaning-preserving structural normalization is allowed, but claim or fact changes are not
 - Capability contract: the compact CSV catalog uses stable `asset_id` values and mandatory `source_ids`; a reviewed capability requires at least one reviewed source
 - Safety: the 12 explicitly approved Ethplorer articles were inventoried in place; no private or licensed source text, invented product capability, or capability row was added
 - Initial validation: offline knowledge validation reported 0 errors with 0 imported sources and 0 assets; the then-current default suite passed with 99 tests and 4 external tests skipped, without network requests, database access, or model calls
@@ -305,8 +305,9 @@ Create the minimum reviewed knowledge required for credible Opportunity decision
 - Architecture amendment date: 2026-08-10
 - Architecture amendment commit: `3e37ee6e52524f458e6023100c5af0398b40a04c`
 - Article inventory amendment date: 2026-08-13
-- Article inventory: all 12 files read in full; each has one unique H1, a substantial coherent body, distinct body content, stable source metadata, and `source_type = ethplorer_article`; original bodies and canonical filenames remain unchanged
-- Article validator: canonical location, source type, title-to-H1 match, body completeness guard, fenced-block closure, and duplicate content checks are offline; source-site routes and media references are preserved
+- Article inventory: all 12 files read in full; each has one unique H1, a substantial coherent body, distinct body content, stable source metadata, and `source_type = ethplorer_article`; Task 005A did not bulk-reformat the articles
+- Article validator: canonical location, source type, title-to-H1 match, body completeness guard, fenced-block closure, and duplicate content checks are offline; validation targets structural usability rather than byte identity
+- Normalization correction: Task 005B may make meaning-preserving Markdown repairs or normalization only where machine readability improves or an actual artifact is repaired; source identity, provenance, claims, historical facts, and meaning remain unchanged
 - Article inventory validation: 12 sources and 0 assets validated with 0 errors, 0 network requests, and 0 LLM calls; the full default suite passed with 105 tests and 4 external tests skipped
 - Deferred to Task 005B: capability, limitation, topic, product, network, and `assets_catalog.csv` extraction
 - Article inventory amendment commit: `29db23781fb5dca3373198477b19ea43303124b3`

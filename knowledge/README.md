@@ -40,7 +40,7 @@ Task 005A documents these future contracts only. It does not implement the X cor
 
 Within static reviewed knowledge, the knowledge base contains two layers:
 
-- A source document is evidence: preserved public or explicitly approved material with stable provenance.
+- A source document is evidence: public or explicitly approved material with stable source identity and provenance, represented as reliable machine-readable Markdown.
 - An asset or capability record is a structured claim that the pipeline may use only when its `source_ids` point to supporting source documents.
 
 ## Structure
@@ -90,7 +90,28 @@ Optional dates are `published_date` and `retrieved_date` in `YYYY-MM-DD` form wh
 
 Pending sources may leave `products`, `networks`, `confirms`, and `limitations` empty until substantive review. A source cannot become `reviewed` while `confirms` is empty.
 
-Source content must preserve the source meaning and must not add inferred capabilities. Existing article titles, headings, links, wording, and layout remain unchanged when they are already usable. Do not perform editorial cleanup or normalization merely for consistency. Front matter and necessary structural repairs must be clearly separated from the preserved body. Do not commit full private, internal, confidential, or licensed documents to this public repository.
+Source content must preserve the source identity, provenance, claims, and substantive meaning. Byte-for-byte equality with imported Markdown is not required. The corpus should be structurally reliable and machine-readable.
+
+Allowed normalization includes:
+
+- removing trailing whitespace and redundant blank lines;
+- repairing clearly broken Markdown;
+- normalizing a damaged heading hierarchy;
+- normalizing lists and tables;
+- repairing malformed local or internal links when the intended target is unambiguous;
+- normalizing image references and captions;
+- removing obvious conversion or export artifacts;
+- splitting unstructured text into sections when this does not change meaning.
+
+Normalization must not:
+
+- rewrite claims merely for style;
+- silently update historical facts, prices, limits, dates, or capabilities;
+- add information absent from the source;
+- change substantive meaning;
+- present an inferred capability as a source claim.
+
+Do not commit full private, internal, confidential, or licensed documents to this public repository. Task 005A does not bulk-reformat the 12 inventoried articles. Task 005B may normalize an article only where doing so improves machine readability or repairs an actual artifact.
 
 Copy [`sources/_source-template.md`](sources/_source-template.md) when starting an import. The template itself is not a source and is ignored by validation.
 
@@ -128,7 +149,7 @@ This workflow applies only to static reviewed knowledge:
 
 1. Confirm that the material is public or explicitly approved for storage in this public repository.
 2. Keep an existing approved canonical location. For a new source without one, copy the source template into the appropriate directory.
-3. Assign a stable `source_id`, complete metadata, and preserve the content without adding claims or making cosmetic editorial changes.
+3. Assign a stable `source_id`, complete metadata, and make only meaning-preserving normalization needed for reliable machine use.
 4. Add the source to [`source_documents.md`](source_documents.md).
 5. Review the source and set its status accurately.
 6. Add or update an asset row only when the source directly supports that capability.
@@ -142,6 +163,8 @@ python -m x_signal_finder knowledge validate
 
 Validation reads local Markdown and CSV only. It makes no network requests and performs no LLM calls. It checks required structure and metadata, unique IDs, review statuses, catalog-to-source references, reviewed-evidence rules, and local Markdown links.
 
-For `sources/posts/`, it also requires `source_type = ethplorer_article`, one H1 matching metadata title, a substantial non-empty body, closed fenced blocks, and no exact body duplicate after newline normalization for comparison only. Source-site routes and article media references are preserved and are not treated as missing repository files.
+For `sources/posts/`, it also requires `source_type = ethplorer_article`, one H1 matching metadata title, a substantial non-empty body, closed fenced blocks, and no duplicate body after whitespace normalization for comparison only. Source-site routes and article media references are not treated as missing repository files.
+
+Validation targets metadata integrity and semantic or structural usability. It does not enforce byte identity with an imported Markdown file. Duplicate detection may fold whitespace and case for comparison without changing stored content.
 
 The validator does not access or validate the future editorial corpus or dynamic analytical evidence. Those classes require separate task-specific adapters and tests before runtime use.

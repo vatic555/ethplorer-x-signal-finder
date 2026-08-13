@@ -142,7 +142,7 @@ Status: Accepted
 
 For the MVP, reviewed files under `knowledge/` are the source of truth for static reviewed knowledge. PostgreSQL remains the operational source of truth but does not store canonical static knowledge. No knowledge migration, embeddings, vector database, semantic search, crawler, or runtime LLM integration is introduced by Task 005A. A later database or index may be derived from Git but cannot silently become canonical.
 
-Preserved public or explicitly approved source documents live under `knowledge/sources/` and use stable source IDs plus TOML front matter for provenance, scope, review status, supported claims, and limitations. The compact asset catalog is the structured capability layer. Every capability must reference existing source IDs, and a reviewed capability must have at least one reviewed supporting source. A URL or product positioning alone is not evidence.
+Public or explicitly approved source documents live under `knowledge/sources/` and use stable source IDs plus TOML front matter for identity, provenance, scope, review status, supported claims, and limitations. The compact asset catalog is the structured capability layer. Every capability must reference existing source IDs, and a reviewed capability must have at least one reviewed supporting source. A URL or product positioning alone is not evidence.
 
 The shared analytics and X Signal Finder terminology documents remain separate and retain their existing ownership and provenance. The public repository must not contain full private, internal, confidential, or licensed source text. Task 005A creates the architecture, import template, and offline validation. Its later inventory amendment registers the user-supplied canonical Ethplorer article archive without extracting capabilities; evidence-backed capability extraction remains reserved for Task 005B.
 
@@ -160,8 +160,18 @@ Dynamic analytical evidence, especially `ethereum-top-addresses-pipeline`, remai
 
 Status: Accepted
 
-The 12 current Ethplorer Markdown articles remain in `knowledge/sources/posts/`, which is their canonical repository location. They are not moved into product directories merely to match an earlier illustrative layout. Their filenames and usable article bodies, titles, headings, and links are preserved.
+The 12 current Ethplorer Markdown articles remain in `knowledge/sources/posts/`, which is their canonical repository location. They are not moved into product directories merely to match an earlier illustrative layout. Their stable source identities and provenance are preserved.
 
-Task 005A inventories each article with a stable source ID, `source_type = ethplorer_article`, approved provenance, and `pending` review status. This source type is static reviewed knowledge and must not be confused with the future first-party X editorial corpus. The offline validator checks metadata, H1 integrity, substantial body presence, fenced-block closure, and exact body duplicates using a comparison-only newline normalization without fetching links or media.
+Task 005A inventories each article with a stable source ID, `source_type = ethplorer_article`, approved provenance, and `pending` review status. This source type is static reviewed knowledge and must not be confused with the future first-party X editorial corpus. The offline validator checks metadata, H1 integrity, substantial body presence, fenced-block closure, and duplicate bodies using comparison-only whitespace folding without fetching links or media.
 
-Capability, limitation, topic, product, network, and asset-catalog extraction is not performed by this amendment and remains Task 005B work. No article body is rewritten for editorial consistency.
+Capability, limitation, topic, product, network, and asset-catalog extraction is not performed by this amendment and remains Task 005B work.
+
+## 2026-08-13 - Meaning-preserving article normalization
+
+Status: Accepted
+
+The Git knowledge corpus is a reliable machine-readable evidence layer, not a forensic CMS archive. Imported article bodies do not need to remain byte-for-byte identical. Stable source identity, provenance, claims, historical facts, and substantive meaning remain mandatory.
+
+Meaning-preserving normalization may remove trailing whitespace, redundant blank lines, and export artifacts; repair broken Markdown, headings, lists, tables, image references, captions, and unambiguous internal links; or add section structure without changing meaning. It may not restyle claims, silently update facts, prices, limits, dates, or capabilities, add absent information, change substantive meaning, or present inference as a source claim.
+
+The validator checks metadata and semantic or structural usability rather than byte identity. Duplicate comparison may normalize whitespace. The 12 articles are not bulk-reformatted by this correction; Task 005B may normalize only where machine readability improves or an actual artifact is repaired.
