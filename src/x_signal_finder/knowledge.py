@@ -5,6 +5,7 @@ from __future__ import annotations
 import csv
 from dataclasses import dataclass
 from datetime import date
+import hashlib
 import json
 from pathlib import Path
 import re
@@ -15,7 +16,9 @@ from urllib.parse import unquote
 
 REVIEW_STATUSES = frozenset({"pending", "reviewed", "deprecated"})
 ID_PATTERN = re.compile(r"^[a-z0-9][a-z0-9._-]*$")
-MARKDOWN_LINK_PATTERN = re.compile(r"\[[^]]*]\(([^)]+)\)")
+MARKDOWN_LINK_PATTERN = re.compile(r"(?<!!)\[[^]]*]\(([^)]+)\)")
+URI_SCHEME_PATTERN = re.compile(r"^[A-Za-z][A-Za-z0-9+.-]*:")
+ETHPLORER_ARTICLE_SOURCE_TYPE = "ethplorer_article"
 SOURCE_REQUIRED_FIELDS = (
     "source_id",
     "title",
@@ -47,6 +50,7 @@ REQUIRED_PATHS = (
     "terminology/shared-analytics.md",
     "terminology/x-signal.md",
     "sources/_source-template.md",
+    "sources/posts",
     "sources/ethplorer",
     "sources/binplorer",
     "sources/analytics",
@@ -136,7 +140,7 @@ def _validate_source(
     path: Path,
     root: Path,
     errors: list[str],
-) -> tuple[str | None, str | None]:
+) -> tuple[str | None, str | None, str | None]:
     label = path.relative_to(root).as_posix()
     metadata, body = _split_front_matter(path, errors)
     for field in SOURCE_REQUIRED_FIELDS:
@@ -158,8 +162,6 @@ def _validate_source(
         ):
             errors.append(f"{label}: {field} must be an array of strings")
     confirms = metadata.get("confirms")
-    if isinstance(confirms, list) and not _is_string_list(confirms):
-        errors.append(f"{label}: confirms must contain at least one explicit claim")
 
     status = metadata.get("review_status")
     if status not in REVIEW_STATUSES:
@@ -167,6 +169,10 @@ def _validate_source(
             f"{label}: review_status must be pending, reviewed, or deprecated"
         )
         status = None
+    if status == "reviewed" and not _is_string_list(confirms):
+        errors.append(
+            f"{label}: reviewed source must confirm at least one explicit claim"
+        )
 
     source_url = metadata.get("source_url")
     approved_provenance = metadata.get("approved_provenance")
@@ -186,8 +192,35 @@ def _validate_source(
         if value is not None and not _is_iso_date(value):
             errors.append(f"{label}: {field} must use YYYY-MM-DD when present")
     if not body:
-        errors.append(f"{label}: normalized source content is empty")
-    return source_id, status
+        errors.append(f"{label}: source content is empty")
+    body_signature = None
+    if body:
+        normalized_body = re.sub(r"\s+", " ", body).strip().casefold()
+        body_signature = hashlib.sha256(normalized_body.encode("utf-8")).hexdigest()
+
+    relative = path.relative_to(root)
+    if relative.parts[:2] == ("sources", "posts"):
+        if metadata.get("source_type") != ETHPLORER_ARTICLE_SOURCE_TYPE:
+            errors.append(
+                f"{label}: sources/posts requires source_type ethplorer_article"
+            )
+        headings = [
+            match.group(1).strip()
+            for match in re.finditer(r"^#\s+(.+?)\s*$", body, flags=re.MULTILINE)
+        ]
+        if len(headings) != 1:
+            errors.append(f"{label}: Ethplorer article must contain exactly one H1")
+        elif isinstance(metadata.get("title"), str) and (
+            headings[0] != metadata["title"].strip()
+        ):
+            errors.append(f"{label}: metadata title must match the existing H1")
+        if len(body) < 500:
+            errors.append(
+                f"{label}: Ethplorer article appears empty or unexpectedly truncated"
+            )
+        if body.count("```") % 2:
+            errors.append(f"{label}: unclosed fenced Markdown block")
+    return source_id, status, body_signature
 
 
 def _split_ids(value: str) -> tuple[str, ...]:
@@ -270,7 +303,11 @@ def _local_link_target(raw_target: str) -> str | None:
         target = target[1 : target.index(">")]
     else:
         target = target.split(maxsplit=1)[0]
-    if not target or target.startswith(("#", "http://", "https://", "mailto:")):
+    if (
+        not target
+        or target.startswith(("#", "/"))
+        or URI_SCHEME_PATTERN.match(target)
+    ):
         return None
     return unquote(target.split("#", 1)[0])
 
@@ -301,6 +338,7 @@ def validate_knowledge(root: Path | None = None) -> KnowledgeValidationResult:
 
     source_statuses: dict[str, str] = {}
     seen_source_ids: set[str] = set()
+    body_signatures: dict[str, str] = {}
     sources_root = knowledge_root / "sources"
     source_paths = (
         sorted(
@@ -312,11 +350,20 @@ def validate_knowledge(root: Path | None = None) -> KnowledgeValidationResult:
         else []
     )
     for path in source_paths:
-        source_id, status = _validate_source(path, knowledge_root, errors)
+        source_id, status, body_signature = _validate_source(
+            path, knowledge_root, errors
+        )
+        label = path.relative_to(knowledge_root).as_posix()
+        if body_signature is not None:
+            duplicate_of = body_signatures.get(body_signature)
+            if duplicate_of is not None:
+                errors.append(f"{label}: duplicate source body matches {duplicate_of}")
+            else:
+                body_signatures[body_signature] = label
         if source_id is None:
             continue
         if source_id in seen_source_ids:
-            errors.append(f"{path.relative_to(knowledge_root)}: duplicate source_id {source_id}")
+            errors.append(f"{label}: duplicate source_id {source_id}")
             continue
         seen_source_ids.add(source_id)
         if status is not None:

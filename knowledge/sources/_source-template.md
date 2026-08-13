@@ -13,8 +13,8 @@ confirms = []
 limitations = []
 +++
 
-# Normalized Source Content
+# Source Content
 
-Replace this guidance with normalized public or explicitly approved source content.
+Replace this guidance with faithfully preserved public or explicitly approved source content.
 
 Preserve the source meaning. Do not add capabilities, conclusions, dates, products, or networks that the source does not establish.

@@ -293,17 +293,23 @@ Create the minimum reviewed knowledge required for credible Opportunity decision
 ### Task 005A Validation Record
 
 - Completion date: 2026-08-07
-- Inventory: two existing terminology documents preserved in separate namespaces; zero normalized evidence documents; zero asset or capability rows; one pending upstream terminology source retained with provenance
+- Inventory: two existing terminology documents preserved in separate namespaces; 12 complete canonical Ethplorer articles inventoried under `knowledge/sources/posts/`; zero asset or capability rows; one pending upstream terminology source retained with provenance
 - Architecture: reviewed Git content under `knowledge/` is the MVP source of truth for static reviewed knowledge; PostgreSQL remains operational storage and no database, embedding, vector, search, crawler, or LLM runtime was added
 - Source classes: static reviewed knowledge is canonical in Git; the future first-party Ethplorer/Binplorer X corpus is editorial context only; dynamic analytics such as `ethereum-top-addresses-pipeline` stay upstream and require dated, scoped, provenance-preserving on-demand reads
 - Authority boundary: editorial history and dynamic metrics cannot silently establish a product capability; reviewed capability rows still require reviewed supporting static source IDs
-- Source contract: normalized Markdown with stable `source_id`, TOML metadata, public or approved provenance, product and network scope, review status, supported claims, limitations, and optional known dates
+- Source contract: preserved Markdown with stable `source_id`, TOML metadata, public or approved provenance, product and network scope, review status, supported claims, limitations, and optional known dates
 - Capability contract: the compact CSV catalog uses stable `asset_id` values and mandatory `source_ids`; a reviewed capability requires at least one reviewed source
-- Safety: no real Ethplorer article batch, private or licensed source text, invented product capability, or capability row was added
-- Validation: offline knowledge validation reported 0 errors with 0 imported sources and 0 assets; the full default suite passed with 99 tests and 4 external tests skipped, without network requests, database access, or model calls
+- Safety: the 12 explicitly approved Ethplorer articles were inventoried in place; no private or licensed source text, invented product capability, or capability row was added
+- Initial validation: offline knowledge validation reported 0 errors with 0 imported sources and 0 assets; the then-current default suite passed with 99 tests and 4 external tests skipped, without network requests, database access, or model calls
 - Final implementation commit: `ec6c3d91428abd3cc770c8c3c34e8ed2c7db021d`
 - Architecture amendment date: 2026-08-10
 - Architecture amendment commit: `3e37ee6e52524f458e6023100c5af0398b40a04c`
+- Article inventory amendment date: 2026-08-13
+- Article inventory: all 12 files read in full; each has one unique H1, a substantial coherent body, distinct body content, stable source metadata, and `source_type = ethplorer_article`; original bodies and canonical filenames remain unchanged
+- Article validator: canonical location, source type, title-to-H1 match, body completeness guard, fenced-block closure, and duplicate content checks are offline; source-site routes and media references are preserved
+- Article inventory validation: 12 sources and 0 assets validated with 0 errors, 0 network requests, and 0 LLM calls; the full default suite passed with 105 tests and 4 external tests skipped
+- Deferred to Task 005B: capability, limitation, topic, product, network, and `assets_catalog.csv` extraction
+- Article inventory amendment commit: pending
 - Stage boundary: Stage 4 remains In Progress; Task 005B is next and Task 006 has not started
 
 ### Completion Record
@@ -311,7 +317,7 @@ Create the minimum reviewed knowledge required for credible Opportunity decision
 - Completion date:
 - Final commit:
 - Validation summary: Pending Task 005B and Stage 4 completion.
-- Remaining limitations: No real Ethplorer source documents or evidence-backed capability rows have been imported yet.
+- Remaining limitations: The 12 Ethplorer articles remain pending substantive review; no evidence-backed capability rows have been extracted yet.
 
 ## Stage 5 - Relevance Filtering and Signal Clustering
 

@@ -142,9 +142,9 @@ Status: Accepted
 
 For the MVP, reviewed files under `knowledge/` are the source of truth for static reviewed knowledge. PostgreSQL remains the operational source of truth but does not store canonical static knowledge. No knowledge migration, embeddings, vector database, semantic search, crawler, or runtime LLM integration is introduced by Task 005A. A later database or index may be derived from Git but cannot silently become canonical.
 
-Normalized public or explicitly approved source documents live under `knowledge/sources/` and use stable source IDs plus TOML front matter for provenance, scope, review status, supported claims, and limitations. The compact asset catalog is the structured capability layer. Every capability must reference existing source IDs, and a reviewed capability must have at least one reviewed supporting source. A URL or product positioning alone is not evidence.
+Preserved public or explicitly approved source documents live under `knowledge/sources/` and use stable source IDs plus TOML front matter for provenance, scope, review status, supported claims, and limitations. The compact asset catalog is the structured capability layer. Every capability must reference existing source IDs, and a reviewed capability must have at least one reviewed supporting source. A URL or product positioning alone is not evidence.
 
-The shared analytics and X Signal Finder terminology documents remain separate and retain their existing ownership and provenance. The public repository must not contain full private, internal, confidential, or licensed source text. Task 005A creates only architecture, an import template, and offline validation; real Ethplorer source import and evidence-backed capability extraction are reserved for Task 005B.
+The shared analytics and X Signal Finder terminology documents remain separate and retain their existing ownership and provenance. The public repository must not contain full private, internal, confidential, or licensed source text. Task 005A creates the architecture, import template, and offline validation. Its later inventory amendment registers the user-supplied canonical Ethplorer article archive without extracting capabilities; evidence-backed capability extraction remains reserved for Task 005B.
 
 ## 2026-08-10 - Three knowledge source classes
 
@@ -155,3 +155,13 @@ Knowledge inputs are separated into static reviewed knowledge, first-party edito
 The future first-party editorial corpus contains historical Ethplorer and Binplorer X Posts and replies. It may support style, reaction-pattern analysis, and prior public positioning, but cannot silently prove a product capability, limitation, current fact, or supported network. Its importer and compliant storage are not implemented by Task 005A.
 
 Dynamic analytical evidence, especially `ethereum-top-addresses-pipeline`, remains in its own repository and is not copied into static knowledge. A future adapter must request the latest appropriate snapshot or comparison on demand and preserve the as-of date, comparison dates, metric name, scope, and source provenance for every value. Missing provenance or temporal scope leaves a claim unresolved. Task 005A records these future contracts only and does not implement either adapter.
+
+## 2026-08-13 - Canonical Ethplorer article archive
+
+Status: Accepted
+
+The 12 current Ethplorer Markdown articles remain in `knowledge/sources/posts/`, which is their canonical repository location. They are not moved into product directories merely to match an earlier illustrative layout. Their filenames and usable article bodies, titles, headings, and links are preserved.
+
+Task 005A inventories each article with a stable source ID, `source_type = ethplorer_article`, approved provenance, and `pending` review status. This source type is static reviewed knowledge and must not be confused with the future first-party X editorial corpus. The offline validator checks metadata, H1 integrity, substantial body presence, fenced-block closure, and exact body duplicates using a comparison-only newline normalization without fetching links or media.
+
+Capability, limitation, topic, product, network, and asset-catalog extraction is not performed by this amendment and remains Task 005B work. No article body is rewritten for editorial consistency.

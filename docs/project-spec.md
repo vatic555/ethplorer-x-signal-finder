@@ -134,12 +134,16 @@ The knowledge base currently consists of:
 
 - `knowledge/terminology/shared-analytics.md` for imported shared analytics concepts with upstream provenance and review status;
 - `knowledge/terminology/x-signal.md` for project-specific operational terms;
-- `knowledge/sources/` for normalized public or explicitly approved evidence documents;
+- `knowledge/sources/` for preserved public or explicitly approved static evidence documents;
 - `knowledge/assets_catalog.csv` for structured capability records linked to evidence by stable source ID;
 - `knowledge/source_documents.md` for inventory and provenance tracking;
 - `knowledge/README.md` for the source and catalog contracts.
 
-Every imported source document must use a stable `source_id`, normalized Markdown content, required metadata, approved provenance, a review status of `pending`, `reviewed`, or `deprecated`, explicit supported claims, and known limitations. Full source text may be stored only when the material is public or explicitly approved for this public repository. Private, internal, confidential, and licensed document text must not be committed.
+`knowledge/sources/posts/` is the canonical location for the 12 current Ethplorer Markdown articles. They must not be moved or renamed merely to match a proposed product-oriented layout. Each uses `source_type = ethplorer_article`, which is distinct from the future first-party X editorial corpus.
+
+Every imported source document must use a stable `source_id`, preserved Markdown source content, required metadata, approved provenance, and a review status of `pending`, `reviewed`, or `deprecated`. Pending sources may leave product, network, supported-claim, and limitation lists empty until substantive review. A reviewed source must state at least one explicit supported claim. Full source text may be stored only when the material is public or explicitly approved for this public repository. Private, internal, confidential, and licensed document text must not be committed.
+
+Existing article bodies, titles, headings, and links must remain unchanged when they are already usable. Task 005A may add metadata and make only necessary structural repairs. Capability, limitation, topic, and asset-catalog extraction from these articles is reserved for Task 005B.
 
 Every asset or capability record must use a stable `asset_id` and reference one or more existing `source_id` values. A reviewed capability must have at least one reviewed supporting source. A URL, product positioning, TODO, filename, or general knowledge is not capability evidence. If the exact supporting asset is absent or insufficient, the candidate is unresolved.
 

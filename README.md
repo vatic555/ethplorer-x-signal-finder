@@ -10,9 +10,9 @@ It is not a generic crypto-news aggregator, an automatic publishing bot, or a me
 
 The durable PostgreSQL storage foundation is implemented and validated against the real Supabase database. PostgreSQL is the operational source of truth, with Supabase selected as the initial managed provider. Application code uses the standard PostgreSQL protocol through `psycopg` and does not use the Supabase Python SDK.
 
-Stage 2 is complete with a `constrained-go` decision, and Stage 3 collection is complete. Stage 4 is In Progress. Task 005A defines a Git-backed static knowledge source of truth, normalized source-document contract, evidence-linked asset catalog, and offline validator. It also separates static reviewed knowledge from a future first-party Ethplorer/Binplorer X editorial corpus and dynamic analytical evidence such as `ethereum-top-addresses-pipeline`. Editorial history may guide style and prior positioning but cannot prove capabilities. Dynamic metrics remain upstream and must later be queried with dates, scope, metric identity, and provenance. Neither future adapter is implemented.
+Stage 2 is complete with a `constrained-go` decision, and Stage 3 collection is complete. Stage 4 is In Progress. Task 005A defines a Git-backed static knowledge source of truth, preserved source-document contract, evidence-linked asset catalog, and offline validator. It also separates static reviewed knowledge from a future first-party Ethplorer/Binplorer X editorial corpus and dynamic analytical evidence such as `ethereum-top-addresses-pipeline`. Editorial history may guide style and prior positioning but cannot prove capabilities. Dynamic metrics remain upstream and must later be queried with dates, scope, metric identity, and provenance. Neither future adapter is implemented.
 
-The existing knowledge inventory contains two separate terminology documents, no imported evidence documents, and no capability rows. Task 005B will import real reviewed static Ethplorer materials under a separate explicit specification.
+The existing knowledge inventory contains two separate terminology documents and 12 complete Ethplorer Markdown articles in their canonical `knowledge/sources/posts/` location. The articles have stable source metadata and remain pending substantive review. No capability rows exist. Task 005B will extract only evidence-supported capabilities, limitations, topics, and asset links under a separate explicit specification.
 
 The manually started collector uses OAuth refresh, fetches home or `@Ethplorer` mentions, excludes simple reposts from home, and upserts Posts plus independent source checkpoints into PostgreSQL. It preserves long-form `note_tweet.text`, returned referenced Post context, and returned media metadata without downloading media. It follows incremental pagination until completion or an explicit page, primary-Post, cost, partial-response, or error guard. Incomplete work saves available Posts and estimated usage but does not advance its source checkpoint. An explicit confirmation-gated baseline action can accept the newest first-page ID from a validated incomplete run without making another X request.
 
@@ -165,7 +165,7 @@ python -m pytest -m integration
 - X Developer Console billing remains unreconciled; stored cost values are estimates
 - Mentions pagination was not observed live because the validated response was empty
 - No LLM calls or prompt execution
-- No real Ethplorer knowledge articles or evidence-backed capability rows have been imported yet
+- The 12 Ethplorer articles are inventoried but not yet reviewed for capabilities, limitations, topics, products, networks, or asset links
 - No knowledge database, embeddings, vector search, crawler, or runtime knowledge integration
 - No first-party X editorial corpus importer or analytics adapter; `ethereum-top-addresses-pipeline` remains in its own repository
 - No context enrichment from external sources

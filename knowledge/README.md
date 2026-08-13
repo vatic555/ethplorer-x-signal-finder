@@ -10,7 +10,7 @@ The architecture distinguishes three knowledge source classes. They have differe
 
 This class includes product articles, product documentation, terminology, capabilities, and limitations. Reviewed files in this Git repository are its source of truth.
 
-Static evidence uses the normalized source-document contract below. Structured assets and capabilities may be established only from supporting static source IDs with sufficient review status.
+Static evidence uses the source-document contract below. Structured assets and capabilities may be established only from supporting static source IDs with sufficient review status.
 
 ### 2. First-Party Editorial Corpus
 
@@ -40,7 +40,7 @@ Task 005A documents these future contracts only. It does not implement the X cor
 
 Within static reviewed knowledge, the knowledge base contains two layers:
 
-- A source document is evidence: normalized public or explicitly approved material with stable provenance.
+- A source document is evidence: preserved public or explicitly approved material with stable provenance.
 - An asset or capability record is a structured claim that the pipeline may use only when its `source_ids` point to supporting source documents.
 
 ## Structure
@@ -51,6 +51,7 @@ knowledge/
     shared-analytics.md
     x-signal.md
   sources/
+    posts/                   # Canonical Ethplorer Markdown articles
     ethplorer/
     binplorer/
     analytics/
@@ -61,11 +62,13 @@ knowledge/
   README.md
 ```
 
-Current inventory: two terminology documents, zero normalized static evidence documents, zero editorial corpus items, zero dynamic analytical records, and zero asset or capability rows. Task 005A defines the structure and contracts only. Task 005B will import actual reviewed Ethplorer static sources.
+Current inventory: two terminology documents, 12 complete Ethplorer Markdown articles under `sources/posts/`, zero editorial corpus items, zero dynamic analytical records, and zero asset or capability rows. The articles are inventoried as pending static sources, but their capabilities, limitations, topics, and asset links are intentionally deferred to Task 005B.
 
 ## Source Document Contract
 
-Every imported static source is one normalized Markdown file below `sources/`. Filenames should be stable and descriptive. Each file starts with TOML front matter between `+++` delimiters, followed by normalized source content.
+Every imported static source is one Markdown file below `sources/`. Filenames and existing canonical locations are stable. Each file starts with TOML front matter between `+++` delimiters, followed by source content.
+
+`knowledge/sources/posts/` is the canonical location for the 12 current Ethplorer articles. Do not move or rename these files merely to match product-oriented directory suggestions. Their `source_type` must be `ethplorer_article`, which distinguishes them from the future first-party X editorial corpus.
 
 Required metadata:
 
@@ -75,7 +78,7 @@ Required metadata:
 - `products` - zero or more product identifiers;
 - `networks` - zero or more network identifiers;
 - `review_status` - `pending`, `reviewed`, or `deprecated`;
-- `confirms` - explicit list of claims the source supports;
+- `confirms` - explicit list of claims the source supports after review;
 - `limitations` - known gaps, boundaries, or non-claims.
 
 Provenance requires at least one non-empty field:
@@ -85,7 +88,9 @@ Provenance requires at least one non-empty field:
 
 Optional dates are `published_date` and `retrieved_date` in `YYYY-MM-DD` form when known. Unknown dates remain omitted rather than guessed.
 
-The normalized content must preserve the source meaning and must not add inferred capabilities. Public or approved material may be normalized for headings and readability. Do not commit full private, internal, confidential, or licensed documents to this public repository.
+Pending sources may leave `products`, `networks`, `confirms`, and `limitations` empty until substantive review. A source cannot become `reviewed` while `confirms` is empty.
+
+Source content must preserve the source meaning and must not add inferred capabilities. Existing article titles, headings, links, wording, and layout remain unchanged when they are already usable. Do not perform editorial cleanup or normalization merely for consistency. Front matter and necessary structural repairs must be clearly separated from the preserved body. Do not commit full private, internal, confidential, or licensed documents to this public repository.
 
 Copy [`sources/_source-template.md`](sources/_source-template.md) when starting an import. The template itself is not a source and is ignored by validation.
 
@@ -122,8 +127,8 @@ Definitions must not be merged, reconstructed from general knowledge, or changed
 This workflow applies only to static reviewed knowledge:
 
 1. Confirm that the material is public or explicitly approved for storage in this public repository.
-2. Copy the source template into the appropriate product or topic directory.
-3. Assign a stable `source_id`, complete metadata, and normalize the content without adding claims.
+2. Keep an existing approved canonical location. For a new source without one, copy the source template into the appropriate directory.
+3. Assign a stable `source_id`, complete metadata, and preserve the content without adding claims or making cosmetic editorial changes.
 4. Add the source to [`source_documents.md`](source_documents.md).
 5. Review the source and set its status accurately.
 6. Add or update an asset row only when the source directly supports that capability.
@@ -136,5 +141,7 @@ python -m x_signal_finder knowledge validate
 ```
 
 Validation reads local Markdown and CSV only. It makes no network requests and performs no LLM calls. It checks required structure and metadata, unique IDs, review statuses, catalog-to-source references, reviewed-evidence rules, and local Markdown links.
+
+For `sources/posts/`, it also requires `source_type = ethplorer_article`, one H1 matching metadata title, a substantial non-empty body, closed fenced blocks, and no exact body duplicate after newline normalization for comparison only. Source-site routes and article media references are preserved and are not treated as missing repository files.
 
 The validator does not access or validate the future editorial corpus or dynamic analytical evidence. Those classes require separate task-specific adapters and tests before runtime use.

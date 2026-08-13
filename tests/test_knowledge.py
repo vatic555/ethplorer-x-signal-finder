@@ -14,6 +14,7 @@ def _knowledge_root(tmp_path: Path) -> Path:
         "sources/binplorer",
         "sources/analytics",
         "sources/other",
+        "sources/posts",
     ):
         (root / directory).mkdir(parents=True, exist_ok=True)
     (root / "README.md").write_text("# Knowledge\n", encoding="utf-8")
@@ -92,11 +93,46 @@ def _add_asset(
     )
 
 
+def _add_article(
+    root: Path,
+    *,
+    filename: str = "synthetic-article.md",
+    source_id: str = "ethplorer.article.synthetic",
+    source_type: str = "ethplorer_article",
+    title: str = "Synthetic Ethplorer Article",
+    heading: str = "Synthetic Ethplorer Article",
+    body: str | None = None,
+) -> None:
+    article_body = body or ("Synthetic article paragraph. " * 30)
+    (root / "sources/posts" / filename).write_text(
+        dedent(
+            f"""\
+            +++
+            source_id = "{source_id}"
+            title = "{title}"
+            source_type = "{source_type}"
+            products = []
+            networks = []
+            approved_provenance = "Synthetic canonical article fixture"
+            review_status = "pending"
+            confirms = []
+            limitations = []
+            +++
+
+            # {heading}
+
+            {article_body}
+            """
+        ),
+        encoding="utf-8",
+    )
+
+
 def test_repository_knowledge_structure_is_valid() -> None:
     result = validate_knowledge()
 
     assert result.valid
-    assert result.source_count == 0
+    assert result.source_count == 12
     assert result.asset_count == 0
 
 
@@ -120,6 +156,16 @@ def test_duplicate_source_id_is_rejected(tmp_path: Path) -> None:
     result = validate_knowledge(root)
 
     assert any("duplicate source_id synthetic-source" in error for error in result.errors)
+
+
+def test_duplicate_source_body_is_rejected(tmp_path: Path) -> None:
+    root = _knowledge_root(tmp_path)
+    _add_source(root, source_id="synthetic-source-one", filename="one.md")
+    _add_source(root, source_id="synthetic-source-two", filename="two.md")
+
+    result = validate_knowledge(root)
+
+    assert any("duplicate source body matches" in error for error in result.errors)
 
 
 def test_missing_source_metadata_is_rejected(tmp_path: Path) -> None:
@@ -189,3 +235,55 @@ def test_broken_local_markdown_reference_is_rejected(tmp_path: Path) -> None:
     result = validate_knowledge(root)
 
     assert any("broken local reference sources/missing.md" in error for error in result.errors)
+
+
+def test_canonical_posts_require_ethplorer_article_type(tmp_path: Path) -> None:
+    root = _knowledge_root(tmp_path)
+    _add_article(root, source_type="article")
+
+    result = validate_knowledge(root)
+
+    assert any(
+        "sources/posts requires source_type ethplorer_article" in error
+        for error in result.errors
+    )
+
+
+def test_canonical_article_title_must_match_preserved_h1(tmp_path: Path) -> None:
+    root = _knowledge_root(tmp_path)
+    _add_article(root, heading="Different Existing Heading")
+
+    result = validate_knowledge(root)
+
+    assert any("metadata title must match the existing H1" in error for error in result.errors)
+
+
+def test_short_canonical_article_is_rejected_as_possible_truncation(
+    tmp_path: Path,
+) -> None:
+    root = _knowledge_root(tmp_path)
+    _add_article(root, body="Too short.")
+
+    result = validate_knowledge(root)
+
+    assert any("appears empty or unexpectedly truncated" in error for error in result.errors)
+
+
+def test_unclosed_article_fence_is_rejected(tmp_path: Path) -> None:
+    root = _knowledge_root(tmp_path)
+    body = ("Article content. " * 35) + "\n\n```text\nunclosed"
+    _add_article(root, body=body)
+
+    result = validate_knowledge(root)
+
+    assert any("unclosed fenced Markdown block" in error for error in result.errors)
+
+
+def test_source_site_routes_and_article_image_references_are_preserved(
+    tmp_path: Path,
+) -> None:
+    root = _knowledge_root(tmp_path)
+    body = ("Article content. " * 35) + "\n\n[Part 2](/posts/part-2)\n\n![](image.png)"
+    _add_article(root, body=body)
+
+    assert validate_knowledge(root).valid
