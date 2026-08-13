@@ -52,6 +52,7 @@ knowledge/
     x-signal.md
   sources/
     posts/                   # Canonical Ethplorer Markdown articles
+      assets/                # Shared local article images, flat namespace
     ethplorer/
     binplorer/
     analytics/
@@ -62,13 +63,13 @@ knowledge/
   README.md
 ```
 
-Current inventory: two terminology documents, 12 complete Ethplorer Markdown articles under `sources/posts/`, zero editorial corpus items, zero dynamic analytical records, and zero asset or capability rows. The articles are inventoried as pending static sources, but their capabilities, limitations, topics, and asset links are intentionally deferred to Task 005B.
+Current inventory: two terminology documents, 17 complete Ethplorer Markdown articles under `sources/posts/`, 11 deduplicated local article images directly under `sources/posts/assets/`, zero editorial corpus items, zero dynamic analytical records, and zero asset or capability rows. The articles are inventoried as pending static sources, but their capabilities, limitations, topics, and capability-catalog links are intentionally deferred to Task 005B.
 
 ## Source Document Contract
 
 Every imported static source is one Markdown file below `sources/`. Filenames and existing canonical locations are stable. Each file starts with TOML front matter between `+++` delimiters, followed by source content.
 
-`knowledge/sources/posts/` is the canonical location for the 12 current Ethplorer articles. Do not move or rename these files merely to match product-oriented directory suggestions. Their `source_type` must be `ethplorer_article`, which distinguishes them from the future first-party X editorial corpus.
+`knowledge/sources/posts/` is the canonical location for the 17 current Ethplorer articles. Do not move or rename these files merely to match product-oriented directory suggestions. Their `source_type` must be `ethplorer_article`, which distinguishes them from the future first-party X editorial corpus.
 
 Required metadata:
 
@@ -87,6 +88,10 @@ Provenance requires at least one non-empty field:
 - `approved_provenance` for material explicitly approved for repository storage.
 
 Optional dates are `published_date` and `retrieved_date` in `YYYY-MM-DD` form when known. Unknown dates remain omitted rather than guessed.
+
+For a converted source whose original file is intentionally removed from the public repository, optional `source_file_sha256` records the original file digest without retaining the DOCX itself.
+
+Managed article images use a flat namespace directly under `knowledge/sources/posts/assets/`. Markdown files reference them as `assets/<filename>`. Add a descriptive suffix when two distinct images would otherwise collide; do not create dated or temporary import subdirectories.
 
 Pending sources may leave `products`, `networks`, `confirms`, and `limitations` empty until substantive review. A source cannot become `reviewed` while `confirms` is empty.
 
@@ -111,7 +116,7 @@ Normalization must not:
 - change substantive meaning;
 - present an inferred capability as a source claim.
 
-Do not commit full private, internal, confidential, or licensed documents to this public repository. Task 005A does not bulk-reformat the 12 inventoried articles. Task 005B may normalize an article only where doing so improves machine readability or repairs an actual artifact.
+Do not commit full private, internal, confidential, or licensed documents to this public repository. Task 005A did not bulk-reformat the first 12 inventoried articles. Five later DOCX inputs were converted with meaning-preserving structural normalization and their source files removed after verification. Task 005B may further normalize an article only where doing so improves machine readability or repairs an actual artifact.
 
 Copy [`sources/_source-template.md`](sources/_source-template.md) when starting an import. The template itself is not a source and is ignored by validation.
 
@@ -163,7 +168,7 @@ python -m x_signal_finder knowledge validate
 
 Validation reads local Markdown and CSV only. It makes no network requests and performs no LLM calls. It checks required structure and metadata, unique IDs, review statuses, catalog-to-source references, reviewed-evidence rules, and local Markdown links.
 
-For `sources/posts/`, it also requires `source_type = ethplorer_article`, one H1 matching metadata title, a substantial non-empty body, closed fenced blocks, and no duplicate body after whitespace normalization for comparison only. Source-site routes and article media references are not treated as missing repository files.
+For `sources/posts/`, it also requires `source_type = ethplorer_article`, one H1 matching metadata title, a substantial non-empty body, closed fenced blocks, and no duplicate body after whitespace normalization for comparison only. Source-site routes and legacy article media references are not treated as missing repository files. Managed local image references below `assets/` must resolve to non-empty files.
 
 Validation targets metadata integrity and semantic or structural usability. It does not enforce byte identity with an imported Markdown file. Duplicate detection may fold whitespace and case for comparison without changing stored content.
 

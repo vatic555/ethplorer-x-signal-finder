@@ -293,7 +293,7 @@ Create the minimum reviewed knowledge required for credible Opportunity decision
 ### Task 005A Validation Record
 
 - Completion date: 2026-08-07
-- Inventory: two existing terminology documents preserved in separate namespaces; 12 complete canonical Ethplorer articles inventoried under `knowledge/sources/posts/`; zero asset or capability rows; one pending upstream terminology source retained with provenance
+- Inventory: two existing terminology documents preserved in separate namespaces; 17 complete canonical Ethplorer articles inventoried under `knowledge/sources/posts/`; zero asset or capability rows; one pending upstream terminology source retained with provenance
 - Architecture: reviewed Git content under `knowledge/` is the MVP source of truth for static reviewed knowledge; PostgreSQL remains operational storage and no database, embedding, vector, search, crawler, or LLM runtime was added
 - Source classes: static reviewed knowledge is canonical in Git; the future first-party Ethplorer/Binplorer X corpus is editorial context only; dynamic analytics such as `ethereum-top-addresses-pipeline` stay upstream and require dated, scoped, provenance-preserving on-demand reads
 - Authority boundary: editorial history and dynamic metrics cannot silently establish a product capability; reviewed capability rows still require reviewed supporting static source IDs
@@ -310,6 +310,11 @@ Create the minimum reviewed knowledge required for credible Opportunity decision
 - Normalization correction: Task 005B may make meaning-preserving Markdown repairs or normalization only where machine readability improves or an actual artifact is repaired; source identity, provenance, claims, historical facts, and meaning remain unchanged
 - Normalization correction commit: `32f742baf7cec7e95468c535e6baf3b6875877ed`
 - Article inventory validation: 12 sources and 0 assets validated with 0 errors, 0 network requests, and 0 LLM calls; the full default suite passed with 105 tests and 4 external tests skipped
+- DOCX conversion amendment date: 2026-08-13
+- DOCX conversion: five user-provided DOCX articles rendered across 33 pages, structurally inspected, converted to normalized Markdown with original filename and SHA-256 provenance, and checked at 99.7-100% source-token coverage
+- DOCX media: 16 meaningful image instances consolidated into 11 unique local image assets stored directly under `knowledge/sources/posts/assets/`; the Q&A divider line was removed as an export artifact; two real Word tables were preserved as Markdown tables
+- DOCX cleanup: the temporary `knowledge/sources/posts/Delete/` staging directory and all five source DOCX files were removed only after successful conversion checks
+- Current inventory validation: 17 sources and 0 capability assets validated with 0 errors, 0 network requests, and 0 LLM calls; the full default suite passed with 108 tests and 4 external tests skipped
 - Deferred to Task 005B: capability, limitation, topic, product, network, and `assets_catalog.csv` extraction
 - Article inventory amendment commit: `29db23781fb5dca3373198477b19ea43303124b3`
 - Stage boundary: Stage 4 remains In Progress; Task 005B is next and Task 006 has not started
@@ -319,7 +324,7 @@ Create the minimum reviewed knowledge required for credible Opportunity decision
 - Completion date:
 - Final commit:
 - Validation summary: Pending Task 005B and Stage 4 completion.
-- Remaining limitations: The 12 Ethplorer articles remain pending substantive review; no evidence-backed capability rows have been extracted yet.
+- Remaining limitations: The 17 Ethplorer articles remain pending substantive review; no evidence-backed capability rows have been extracted yet.
 
 ## Stage 5 - Relevance Filtering and Signal Clustering
 

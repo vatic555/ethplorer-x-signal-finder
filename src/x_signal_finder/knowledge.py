@@ -16,7 +16,9 @@ from urllib.parse import unquote
 
 REVIEW_STATUSES = frozenset({"pending", "reviewed", "deprecated"})
 ID_PATTERN = re.compile(r"^[a-z0-9][a-z0-9._-]*$")
+SHA256_PATTERN = re.compile(r"^[a-f0-9]{64}$")
 MARKDOWN_LINK_PATTERN = re.compile(r"(?<!!)\[[^]]*]\(([^)]+)\)")
+MARKDOWN_IMAGE_PATTERN = re.compile(r"!\[[^]]*]\(([^)]+)\)")
 URI_SCHEME_PATTERN = re.compile(r"^[A-Za-z][A-Za-z0-9+.-]*:")
 ETHPLORER_ARTICLE_SOURCE_TYPE = "ethplorer_article"
 SOURCE_REQUIRED_FIELDS = (
@@ -191,6 +193,12 @@ def _validate_source(
         value = metadata.get(field)
         if value is not None and not _is_iso_date(value):
             errors.append(f"{label}: {field} must use YYYY-MM-DD when present")
+    source_file_sha256 = metadata.get("source_file_sha256")
+    if source_file_sha256 is not None and (
+        not isinstance(source_file_sha256, str)
+        or not SHA256_PATTERN.fullmatch(source_file_sha256)
+    ):
+        errors.append(f"{label}: source_file_sha256 must be 64 lowercase hex characters")
     if not body:
         errors.append(f"{label}: source content is empty")
     body_signature = None
@@ -326,6 +334,14 @@ def _validate_local_links(root: Path, errors: list[str]) -> None:
             if not destination.exists():
                 label = path.relative_to(root).as_posix()
                 errors.append(f"{label}: broken local reference {target}")
+        for match in MARKDOWN_IMAGE_PATTERN.finditer(text):
+            target = _local_link_target(match.group(1))
+            if target is None or not target.startswith("assets/"):
+                continue
+            destination = path.parent / target
+            if not destination.is_file() or destination.stat().st_size == 0:
+                label = path.relative_to(root).as_posix()
+                errors.append(f"{label}: broken local image asset {target}")
 
 
 def validate_knowledge(root: Path | None = None) -> KnowledgeValidationResult:

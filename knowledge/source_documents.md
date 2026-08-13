@@ -11,7 +11,7 @@ This index inventories static reviewed knowledge present before Task 005B. A lis
 
 ## Canonical Ethplorer Article Sources
 
-`sources/posts/` is the canonical location for the current article archive. All 12 files were read in full during Task 005A. Each has one unique H1, a non-empty coherent body, a distinct content signature, and `source_type = ethplorer_article`. Task 005A did not bulk-reformat them. Byte identity is not part of the source contract: Task 005B may make meaning-preserving structural repairs or normalization where it improves machine readability. Review remains `pending`; capability, limitation, topic, and asset-catalog extraction belongs to Task 005B.
+`sources/posts/` is the canonical location for the current 17-article archive. The first 12 Markdown files were read in full during Task 005A. Five later DOCX inputs were rendered, structurally inspected, converted to normalized Markdown, checked for text and media completeness, and removed after successful validation. Each source has one unique H1, a non-empty coherent body, a distinct content signature, and `source_type = ethplorer_article`. Byte identity is not part of the source contract. Review remains `pending`; capability, limitation, topic, and asset-catalog extraction belongs to Task 005B.
 
 | source_id | file | title | status |
 |---|---|---|---|
@@ -27,6 +27,13 @@ This index inventories static reviewed knowledge present before Task 005B. A lis
 | `ethplorer.article.the-2024-year-crypto-race` | [`the-2024-year-crypto-race.md`](sources/posts/the-2024-year-crypto-race.md) | Looking Back at 2024: The Year Crypto Raced Ahead 🚀 | pending |
 | `ethplorer.article.watching-eth-addresses-service` | [`watching-eth-addresses-service.md`](sources/posts/watching-eth-addresses-service.md) | Watch your bag 👀 Ethplorer's watching service to make your life easier | pending |
 | `ethplorer.article.what-are-erc-20-tokens` | [`what-are-erc-20-tokens.md`](sources/posts/what-are-erc-20-tokens.md) | What Are ERC-20 Tokens? Find Out Now as the Decentralized Finance Industry Takes Off | pending |
+| `ethplorer.article.ethereum-capital-outside-eth-and-defi-self-issued` | [`ethereum-capital-outside-eth-and-defi-self-issued.md`](sources/posts/ethereum-capital-outside-eth-and-defi-self-issued.md) | 58% of Ethereum’s Capital Lives Outside ETH Balances - And Half of DeFi Capital Is Self-Issued | pending |
+| `ethplorer.article.beincrypto-interview-ethereum-rich-list-altseason` | [`beincrypto-interview-ethereum-rich-list-altseason.md`](sources/posts/beincrypto-interview-ethereum-rich-list-altseason.md) | BeInCrypto Interview - Ethereum Rich List by Aggregated USD Holdings. Mathematically proven - Altseason Already Happened | pending |
+| `ethplorer.article.cryptodaily-ethereum-rich-list-part-1` | [`cryptodaily-ethereum-rich-list-part-1.md`](sources/posts/cryptodaily-ethereum-rich-list-part-1.md) | CryptoDaily Part 1 - The Real Top You’ve Never Seen: Inside Ethereum Rich List by Aggregated USD Holdings | pending |
+| `ethplorer.article.cryptodaily-ethereum-rich-list-part-2` | [`cryptodaily-ethereum-rich-list-part-2.md`](sources/posts/cryptodaily-ethereum-rich-list-part-2.md) | CryptoDaily - Ethereum Rich List by Aggregated USD Holdings (Part 2): How Capital Moves and Where Risk Emerges | pending |
+| `ethplorer.article.beincrypto-interview-questions-and-answers-altseason` | [`beincrypto-interview-questions-and-answers-altseason.md`](sources/posts/beincrypto-interview-questions-and-answers-altseason.md) | Questions and answers - BeInCrypto Interview: Mathematically proven - Altseason Already Happened. | pending |
+
+The five DOCX conversions preserve original filenames and SHA-256 digests in front matter. Sixteen meaningful image instances were consolidated into 11 unique local image assets stored directly in [`sources/posts/assets/`](sources/posts/assets/). The Q&A document's repeated two-pixel divider was omitted as a conversion artifact. No capability claims have been extracted or promoted to `assets_catalog.csv`.
 
 ## Other Knowledge Classes
 

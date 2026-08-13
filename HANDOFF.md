@@ -2,11 +2,11 @@
 
 Last updated: 2026-08-13
 
-Repository HEAD: `32f742baf7cec7e95468c535e6baf3b6875877ed` at normalization-contract validation; a HANDOFF-only metadata commit follows it
+Repository HEAD: `d0eb79b5b0ddcbb174145aedd889c87cf1796486`; five DOCX article conversions are local until final validation and commit
 
-Validated commit: `32f742baf7cec7e95468c535e6baf3b6875877ed`
+Validated commit: `32f742baf7cec7e95468c535e6baf3b6875877ed` before the five DOCX article conversions
 
-Validated implementation commit: `32f742baf7cec7e95468c535e6baf3b6875877ed` for the Task 005A knowledge normalization contract
+Validated implementation commit: pending validation and commit of the five DOCX article conversions
 
 This file is a short current-state snapshot. It is not a canonical product, technical, architecture, or roadmap source.
 
@@ -65,7 +65,7 @@ The following capabilities have been implemented and validated:
 - asset catalog schema with mandatory source-ID evidence links;
 - offline knowledge validation for structure, metadata, IDs, statuses, evidence links, and local references.
 - documented separation of static reviewed knowledge, first-party editorial corpus, and dynamic analytical evidence, with distinct future authority and read contracts.
-- 12 canonical Ethplorer Markdown articles inventoried in place with stable IDs and `ethplorer_article` source type, without capability extraction.
+- 17 canonical Ethplorer Markdown articles inventoried with stable IDs and `ethplorer_article` source type, including five verified DOCX conversions and 11 deduplicated local image assets, without capability extraction.
 
 ## 4. Current Data Flow
 
@@ -82,7 +82,7 @@ X API
 
 The X API, collector, and PostgreSQL portion exists. Runtime relevance filtering, Signals, Opportunity Gate evaluation, Opportunity creation, draft generation, and the human review workflow are not implemented. Publication remains outside the application and must be performed manually.
 
-The Git-backed static knowledge architecture and 12-article Ethplorer source inventory exist, but Task 005B has not extracted reviewed capabilities or asset rows. A future first-party X corpus may inform style, reaction patterns, and prior public positioning only. Future dynamic analytics must be queried from their upstream source with temporal scope and provenance. Neither adapter exists yet.
+The Git-backed static knowledge architecture and 17-article Ethplorer source inventory exist, but Task 005B has not extracted reviewed capabilities or asset rows. A future first-party X corpus may inform style, reaction patterns, and prior public positioning only. Future dynamic analytics must be queried from their upstream source with temporal scope and provenance. Neither adapter exists yet.
 
 ## 5. Architecture Snapshot
 
@@ -112,7 +112,7 @@ The Git-backed static knowledge architecture and 12-article Ethplorer source inv
 - [`knowledge/source_documents.md`](knowledge/source_documents.md) - current source inventory and provenance index.
 - [`knowledge/terminology/`](knowledge/terminology/) - separate shared analytics and project terminology.
 - [`knowledge/sources/`](knowledge/sources/) - public or approved evidence documents with stable identity and provenance, plus the import template.
-- [`knowledge/sources/posts/`](knowledge/sources/posts/) - canonical location for the 12 preserved Ethplorer Markdown articles.
+- [`knowledge/sources/posts/`](knowledge/sources/posts/) - canonical location for the 17 Ethplorer Markdown articles; shared local images use the flat `assets/` child directory.
 - [`knowledge/assets_catalog.csv`](knowledge/assets_catalog.csv) - compact evidence-linked asset and capability catalog.
 - [`src/x_signal_finder/knowledge.py`](src/x_signal_finder/knowledge.py) - offline knowledge validator.
 - [`src/x_signal_finder/collector.py`](src/x_signal_finder/collector.py) - X Post mapping, bounded fetching, refresh behavior, and persistence orchestration.
@@ -206,8 +206,8 @@ These commands read required values from local environment configuration. Never 
 - Across the two Task 004C guarded runs and the final cheap validation, estimated usage was 331 distinct Post resources and $1.655. Developer Console billing remains unreconciled.
 - Latest database check found 214 Post rows, 214 distinct `post_id` values, and zero duplicate groups. The home checkpoint is the accepted baseline `2085449523904778414`.
 - PostgreSQL 17.6 was healthy with migrations 1 and 2 current, no pending migrations, and operational-table RLS intact.
-- Latest default suite: 105 passed with 4 external tests skipped. Explicit PostgreSQL integration suite: 2 passed during the unchanged Stage 3 database validation.
-- Task 005A inventory found two terminology documents, 12 canonical Ethplorer articles, and zero asset or capability rows. All articles were read in full and have unique H1 titles, substantial coherent bodies, distinct content, and stable pending metadata. The source contract allows meaning-preserving structural normalization while preserving identity, provenance, claims, historical facts, and meaning. The validator checks machine usability rather than byte identity and uses no network requests, database access, or model calls.
+- Latest default suite: 108 passed with 4 external tests skipped. Explicit PostgreSQL integration suite: 2 passed during the unchanged Stage 3 database validation.
+- The knowledge inventory contains two terminology documents, 17 canonical Ethplorer articles, and zero capability rows. Five DOCX inputs were rendered across 33 pages, structurally inspected, converted to Markdown, checked at 99.7-100% source-token coverage, and represented with 11 deduplicated local images directly under `knowledge/sources/posts/assets/` before the DOCX staging directory was removed. All articles have unique H1 titles, substantial bodies, distinct content, and stable pending metadata. The validator checks machine usability and managed image references without network requests, database access, or model calls.
 - The 2026-08-10 Task 005A amendment documents three knowledge source classes and future import/read contracts only. It adds no X corpus data, importer, analytics adapter, metric retrieval, capability, database change, or runtime integration.
 - The 2026-08-11 first-party X inventory made exactly two `GET /2/users/by/username/{username}` requests for Ethplorer and Binplorer with only `created_at` and `public_metrics` requested. It retrieved no Posts, timelines, search results, expansions, or raw response storage. The estimated standard User Read cost was $0.020 total; Owned Read pricing does not apply to User Lookup. Developer Console billing remains unreconciled.
 
@@ -220,7 +220,7 @@ These are validation estimates and observations, not a Developer Console billing
 - X Developer Console billing remains unreconciled; stored cost values are estimates.
 - No LLM calls or runtime relevance filter exist.
 - The knowledge base is not integrated into runtime processing.
-- The 12 canonical Ethplorer articles are inventoried but remain pending substantive review; no evidence-backed capability row exists yet.
+- The 17 canonical Ethplorer articles are inventoried but remain pending substantive review; no evidence-backed capability row exists yet.
 - PostgreSQL, embeddings, vector search, crawling, and semantic retrieval are not part of the knowledge architecture.
 - The first-party Ethplorer/Binplorer X editorial corpus importer and compliant corpus storage are not implemented.
 - The dynamic analytics adapter is not implemented; `ethereum-top-addresses-pipeline` remains separate and no snapshot is copied into this repository.
@@ -235,7 +235,7 @@ These are validation estimates and observations, not a Developer Console billing
 
 ## 11. Next Intended Work
 
-The next intended work is Task 005B - Ethplorer Knowledge Import. Its completion criterion is substantive review of the 12 inventoried articles and extraction of only the capabilities, limitations, topics, products, networks, and asset links directly supported by those source IDs.
+The next intended work is Task 005B - Ethplorer Knowledge Import. Its completion criterion is substantive review of the 17 inventoried articles and extraction of only the capabilities, limitations, topics, products, networks, and asset links directly supported by those source IDs.
 
 Private or licensed source text, unsupported capabilities, crawling, database or vector storage, runtime knowledge integration, LLM calls, Task 006 relevance filtering, Signals, Opportunities, delivery automation, and publication are outside Task 005B unless its explicit specification says otherwise within canonical project boundaries.
 

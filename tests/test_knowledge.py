@@ -132,7 +132,7 @@ def test_repository_knowledge_structure_is_valid() -> None:
     result = validate_knowledge()
 
     assert result.valid
-    assert result.source_count == 12
+    assert result.source_count == 17
     assert result.asset_count == 0
 
 
@@ -184,6 +184,23 @@ def test_invalid_review_status_is_rejected(tmp_path: Path) -> None:
     result = validate_knowledge(root)
 
     assert any("review_status must be pending, reviewed, or deprecated" in error for error in result.errors)
+
+
+def test_invalid_optional_source_file_sha256_is_rejected(tmp_path: Path) -> None:
+    root = _knowledge_root(tmp_path)
+    _add_source(root)
+    source = root / "sources/ethplorer/synthetic.md"
+    source.write_text(
+        source.read_text(encoding="utf-8").replace(
+            'review_status = "pending"',
+            'source_file_sha256 = "not-a-sha256"\nreview_status = "pending"',
+        ),
+        encoding="utf-8",
+    )
+
+    result = validate_knowledge(root)
+
+    assert any("source_file_sha256 must be 64 lowercase hex" in error for error in result.errors)
 
 
 def test_unknown_asset_source_is_rejected(tmp_path: Path) -> None:
@@ -285,5 +302,32 @@ def test_source_site_routes_and_article_image_references_are_preserved(
     root = _knowledge_root(tmp_path)
     body = ("Article content. " * 35) + "\n\n[Part 2](/posts/part-2)\n\n![](image.png)"
     _add_article(root, body=body)
+
+    assert validate_knowledge(root).valid
+
+
+def test_missing_managed_article_image_asset_is_rejected(tmp_path: Path) -> None:
+    root = _knowledge_root(tmp_path)
+    body = (
+        ("Article content. " * 35)
+        + "\n\n![Chart](assets/chart.jpg)"
+    )
+    _add_article(root, body=body)
+
+    result = validate_knowledge(root)
+
+    assert any("broken local image asset" in error for error in result.errors)
+
+
+def test_present_managed_article_image_asset_passes(tmp_path: Path) -> None:
+    root = _knowledge_root(tmp_path)
+    body = (
+        ("Article content. " * 35)
+        + "\n\n![Chart](assets/chart.jpg)"
+    )
+    _add_article(root, body=body)
+    asset = root / "sources/posts/assets/chart.jpg"
+    asset.parent.mkdir(parents=True)
+    asset.write_bytes(b"synthetic-image")
 
     assert validate_knowledge(root).valid

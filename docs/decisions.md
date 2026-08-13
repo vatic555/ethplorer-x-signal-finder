@@ -175,3 +175,13 @@ The Git knowledge corpus is a reliable machine-readable evidence layer, not a fo
 Meaning-preserving normalization may remove trailing whitespace, redundant blank lines, and export artifacts; repair broken Markdown, headings, lists, tables, image references, captions, and unambiguous internal links; or add section structure without changing meaning. It may not restyle claims, silently update facts, prices, limits, dates, or capabilities, add absent information, change substantive meaning, or present inference as a source claim.
 
 The validator checks metadata and semantic or structural usability rather than byte identity. Duplicate comparison may normalize whitespace. The 12 articles are not bulk-reformatted by this correction; Task 005B may normalize only where machine readability improves or an actual artifact is repaired.
+
+## 2026-08-13 - Verified DOCX-to-Markdown article imports
+
+Status: Accepted
+
+Five user-provided DOCX articles are converted into separate `ethplorer_article` Markdown sources in the canonical `knowledge/sources/posts/` directory. The conversion preserves the original filename and SHA-256 digest as provenance metadata, normalizes damaged heading hierarchy and tables, retains hyperlinks and meaningful images, and removes only unambiguous export artifacts. Source claims, historical figures, dates, and capabilities are not updated or promoted during conversion.
+
+Meaningful repeated images are deduplicated into a flat managed namespace directly under `knowledge/sources/posts/assets/`; article references use `assets/<filename>` without dated import subdirectories. A repeated two-pixel Q&A divider is excluded as decoration. Offline validation requires managed `assets/` image references to resolve to non-empty files.
+
+The input DOCX files and their temporary `Delete/` staging directory are removed after visual, structural, source-token coverage, knowledge-validator, and default-test checks pass. Capability extraction remains Task 005B work, and the converted sources retain `pending` status.
