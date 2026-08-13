@@ -2,11 +2,11 @@
 
 Last updated: 2026-08-13
 
-Repository HEAD: `09b3c7b60e981e68fecb8174b0689ef22e7b82f5`; the Task 005A article inventory is local until final validation and commit
+Repository HEAD: `29db23781fb5dca3373198477b19ea43303124b3` at article-inventory validation; a HANDOFF-only metadata commit follows it
 
-Validated commit: `3e37ee6e52524f458e6023100c5af0398b40a04c` before the Task 005A article inventory
+Validated commit: `29db23781fb5dca3373198477b19ea43303124b3`
 
-Validated implementation commit: pending commit of the locally validated Task 005A article inventory
+Validated implementation commit: `29db23781fb5dca3373198477b19ea43303124b3` for the Task 005A canonical article inventory
 
 This file is a short current-state snapshot. It is not a canonical product, technical, architecture, or roadmap source.
 

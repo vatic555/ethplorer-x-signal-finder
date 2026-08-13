@@ -309,7 +309,7 @@ Create the minimum reviewed knowledge required for credible Opportunity decision
 - Article validator: canonical location, source type, title-to-H1 match, body completeness guard, fenced-block closure, and duplicate content checks are offline; source-site routes and media references are preserved
 - Article inventory validation: 12 sources and 0 assets validated with 0 errors, 0 network requests, and 0 LLM calls; the full default suite passed with 105 tests and 4 external tests skipped
 - Deferred to Task 005B: capability, limitation, topic, product, network, and `assets_catalog.csv` extraction
-- Article inventory amendment commit: pending
+- Article inventory amendment commit: `29db23781fb5dca3373198477b19ea43303124b3`
 - Stage boundary: Stage 4 remains In Progress; Task 005B is next and Task 006 has not started
 
 ### Completion Record
