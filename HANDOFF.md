@@ -2,9 +2,9 @@
 
 Last updated: 2026-08-14
 
-Repository HEAD: `1475479b9a2336c25d5f5b42ea22b6aa02b19444` at DOCX-import validation; a HANDOFF-only metadata commit follows it
+Repository HEAD: `c7ebc2fa49dcb84039aef336b9fe4c720dde8110` at Task 004D documentation validation; a HANDOFF-only metadata commit follows it
 
-Validated commit: `1475479b9a2336c25d5f5b42ea22b6aa02b19444`
+Validated commit: `c7ebc2fa49dcb84039aef336b9fe4c720dde8110`
 
 Validated implementation commit: `1475479b9a2336c25d5f5b42ea22b6aa02b19444` for the five DOCX article conversions and flat image assets
 
