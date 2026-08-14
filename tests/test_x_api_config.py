@@ -1,4 +1,5 @@
 from pathlib import Path
+from decimal import Decimal
 
 import pytest
 
@@ -33,6 +34,9 @@ def test_missing_credentials_fail_before_any_request(tmp_path: Path) -> None:
         config.token_for("home")
     with pytest.raises(XApiConfigurationError, match="X_BEARER_TOKEN"):
         config.token_for("mentions")
+    assert config.post_read_unit_cost_usd == Decimal("0.005")
+    assert config.user_read_unit_cost_usd == Decimal("0.010")
+    assert config.media_read_unit_cost_usd == Decimal("0.005")
 
 
 def test_user_ids_must_be_numeric(tmp_path: Path) -> None:

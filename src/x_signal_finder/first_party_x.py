@@ -97,9 +97,11 @@ class FetchedFirstPartySource:
     timeline_requests_count: int
     reference_lookup_requests_count: int
     primary_posts_received: int
+    primary_post_resources_received: int
     expanded_posts_received: int
     reference_completion_posts_received: int
     distinct_post_resources_received: int
+    user_resources_received: int
     media_resources_received: int
     records: tuple[dict[str, Any], ...]
     newest_post_id: str | None
@@ -112,7 +114,12 @@ class FetchedFirstPartySource:
     completion_state: str
     inventory_tweet_count: int | None
     inventory_reference: int
-    unit_cost_usd: Decimal
+    post_unit_cost_usd: Decimal
+    user_unit_cost_usd: Decimal
+    media_unit_cost_usd: Decimal
+    estimated_post_cost_usd: Decimal
+    estimated_user_cost_usd: Decimal
+    estimated_media_cost_usd: Decimal
     estimated_cost_usd: Decimal
     warnings: tuple[str, ...]
     terminal_error_category: str | None = None
@@ -146,6 +153,11 @@ class FirstPartySyncSummary:
     timeline_requests_count: int
     reference_lookup_requests_count: int
     primary_posts_received: int
+    primary_post_resources_received: int
+    expanded_posts_received: int
+    reference_completion_posts_received: int
+    distinct_post_resources_received: int
+    user_resources_received: int
     posts_saved: int
     new_posts: int
     existing_posts_updated: int
@@ -167,7 +179,12 @@ class FirstPartySyncSummary:
     checkpoint_before: str | None
     checkpoint_after: str | None
     completion_state: str
-    unit_cost_usd: Decimal
+    post_unit_cost_usd: Decimal
+    user_unit_cost_usd: Decimal
+    media_unit_cost_usd: Decimal
+    estimated_post_cost_usd: Decimal
+    estimated_user_cost_usd: Decimal
+    estimated_media_cost_usd: Decimal
     estimated_cost_usd: Decimal
     warnings: tuple[str, ...]
 
@@ -185,6 +202,13 @@ class FirstPartySyncSummary:
             "timeline_requests_count": self.timeline_requests_count,
             "reference_lookup_requests_count": self.reference_lookup_requests_count,
             "primary_posts_received": self.primary_posts_received,
+            "primary_post_resources_received": self.primary_post_resources_received,
+            "expanded_posts_received": self.expanded_posts_received,
+            "reference_completion_posts_received": (
+                self.reference_completion_posts_received
+            ),
+            "distinct_post_resources_received": self.distinct_post_resources_received,
+            "user_resources_received": self.user_resources_received,
             "posts_saved": self.posts_saved,
             "new_posts": self.new_posts,
             "existing_posts_updated": self.existing_posts_updated,
@@ -210,8 +234,13 @@ class FirstPartySyncSummary:
             "checkpoint_before": self.checkpoint_before,
             "checkpoint_after": self.checkpoint_after,
             "completion_state": self.completion_state,
-            "unit_cost_usd": format(self.unit_cost_usd, "f"),
-            "estimated_x_cost_usd": format(self.estimated_cost_usd, "f"),
+            "post_unit_cost_usd": format(self.post_unit_cost_usd, "f"),
+            "user_unit_cost_usd": format(self.user_unit_cost_usd, "f"),
+            "media_unit_cost_usd": format(self.media_unit_cost_usd, "f"),
+            "estimated_post_cost_usd": format(self.estimated_post_cost_usd, "f"),
+            "estimated_user_cost_usd": format(self.estimated_user_cost_usd, "f"),
+            "estimated_media_cost_usd": format(self.estimated_media_cost_usd, "f"),
+            "estimated_total_cost_usd": format(self.estimated_cost_usd, "f"),
             "warnings": list(self.warnings),
             "errors": [],
         }
@@ -331,6 +360,7 @@ def map_first_party_x_post(
     users_by_id: Mapping[str, Mapping[str, Any]],
     expanded_posts_by_id: Mapping[str, Mapping[str, Any]],
     media_by_key: Mapping[str, Mapping[str, Any]],
+    unavailable_reference_reasons: Mapping[str, str] | None = None,
     run_id: UUID,
     collected_at: datetime,
 ) -> dict[str, Any]:
@@ -348,6 +378,7 @@ def map_first_party_x_post(
         raise FirstPartyXError("Expanded X User contains invalid username data.")
     author_username = raw_username or source
     main_media = _media_for(post, media_by_key)
+    unavailable_reasons = unavailable_reference_reasons or {}
 
     relationship_records: list[dict[str, Any]] = []
     expanded_relationships: list[dict[str, Any]] = []
@@ -366,6 +397,10 @@ def map_first_party_x_post(
             "relationship": dict(relationship),
             "context_state": context_state,
         }
+        if expanded_post is None:
+            unavailable_reason = unavailable_reasons.get(referenced_id, "unknown")
+            reference_record["unavailable_reason"] = unavailable_reason
+            expanded_context["unavailable_reason"] = unavailable_reason
         if expanded_post is not None:
             if not isinstance(expanded_post, Mapping):
                 raise FirstPartyXError("X Post contains invalid expanded Post data.")
@@ -492,6 +527,21 @@ def _chunks(values: list[str], size: int = 100):
         yield values[start : start + size]
 
 
+def _resource_costs(
+    *,
+    post_ids: set[str],
+    user_ids: set[str],
+    media_keys: set[str],
+    post_unit_cost_usd: Decimal,
+    user_unit_cost_usd: Decimal,
+    media_unit_cost_usd: Decimal,
+) -> tuple[Decimal, Decimal, Decimal, Decimal]:
+    post_cost = post_unit_cost_usd * len(post_ids)
+    user_cost = user_unit_cost_usd * len(user_ids)
+    media_cost = media_unit_cost_usd * len(media_keys)
+    return post_cost, user_cost, media_cost, post_cost + user_cost + media_cost
+
+
 def fetch_first_party_source(
     *,
     client: XApiClient,
@@ -502,7 +552,9 @@ def fetch_first_party_source(
     max_pages: int,
     max_estimated_cost_usd: Decimal,
     estimated_cost_before_usd: Decimal = Decimal("0"),
-    unit_cost_usd: Decimal = Decimal("0.005"),
+    post_unit_cost_usd: Decimal = Decimal("0.005"),
+    user_unit_cost_usd: Decimal = Decimal("0.010"),
+    media_unit_cost_usd: Decimal = Decimal("0.005"),
     inventory_tweet_count: int | None = None,
     max_attempts: int = 3,
     max_retry_wait_seconds: float = 60,
@@ -512,7 +564,14 @@ def fetch_first_party_source(
     """Fetch a complete historical or incremental source within explicit guards."""
     if max_pages < 1:
         raise ValueError("max_pages must be at least 1")
-    if max_estimated_cost_usd <= 0 or unit_cost_usd <= 0:
+    if max_estimated_cost_usd <= 0 or any(
+        cost <= 0
+        for cost in (
+            post_unit_cost_usd,
+            user_unit_cost_usd,
+            media_unit_cost_usd,
+        )
+    ):
         raise ValueError("cost limits and unit cost must be positive")
     if estimated_cost_before_usd >= max_estimated_cost_usd:
         raise FirstPartyXError("Estimated-cost guard prevents the first request.")
@@ -530,6 +589,7 @@ def fetch_first_party_source(
     users_by_id: dict[str, Mapping[str, Any]] = {}
     expanded_posts_by_id: dict[str, Mapping[str, Any]] = {}
     media_by_key: dict[str, Mapping[str, Any]] = {}
+    resource_error_categories_by_id: dict[str, str] = {}
     primary_ids: set[str] = set()
     expanded_ids: set[str] = set()
     completion_ids: set[str] = set()
@@ -566,6 +626,9 @@ def fetch_first_party_source(
         users_by_id.update(page.users_by_id)
         expanded_posts_by_id.update(page.expanded_posts_by_id)
         media_by_key.update(page.media_by_key)
+        resource_error_categories_by_id.update(
+            page.resource_error_categories_by_id
+        )
         primary_ids.update(str(post["id"]) for post in page.posts)
         expanded_ids.update(page.expanded_posts_by_id)
         pagination_token = page.next_token
@@ -576,7 +639,14 @@ def fetch_first_party_source(
             break
         if not pagination_token:
             break
-        current_cost = unit_cost_usd * len(primary_ids | expanded_ids)
+        _, _, _, current_cost = _resource_costs(
+            post_ids=primary_ids | expanded_ids | completion_ids,
+            user_ids=set(users_by_id),
+            media_keys=set(media_by_key),
+            post_unit_cost_usd=post_unit_cost_usd,
+            user_unit_cost_usd=user_unit_cost_usd,
+            media_unit_cost_usd=media_unit_cost_usd,
+        )
         if estimated_cost_before_usd + current_cost >= max_estimated_cost_usd:
             warnings.add("cost_guard_reached")
             break
@@ -604,7 +674,14 @@ def fetch_first_party_source(
     missing_reference_ids = sorted(direct_reference_ids - set(expanded_posts_by_id))
     lookup_endpoint = "/tweets"
     for batch in _chunks(missing_reference_ids):
-        current_cost = unit_cost_usd * len(primary_ids | expanded_ids | completion_ids)
+        _, _, _, current_cost = _resource_costs(
+            post_ids=primary_ids | expanded_ids | completion_ids,
+            user_ids=set(users_by_id),
+            media_keys=set(media_by_key),
+            post_unit_cost_usd=post_unit_cost_usd,
+            user_unit_cost_usd=user_unit_cost_usd,
+            media_unit_cost_usd=media_unit_cost_usd,
+        )
         if estimated_cost_before_usd + current_cost >= max_estimated_cost_usd:
             warnings.add("reference_completion_cost_guard_reached")
             break
@@ -632,10 +709,13 @@ def fetch_first_party_source(
         reference_requests += result.attempts
         users_by_id.update(page.users_by_id)
         media_by_key.update(page.media_by_key)
+        resource_error_categories_by_id.update(
+            page.resource_error_categories_by_id
+        )
         expanded_posts_by_id.update({str(post["id"]): post for post in page.posts})
         expanded_posts_by_id.update(page.expanded_posts_by_id)
         completion_ids.update(str(post["id"]) for post in page.posts)
-        completion_ids.update(page.expanded_posts_by_id)
+        expanded_ids.update(page.expanded_posts_by_id)
         if page.partial_error_count:
             warnings.add("reference_completion_partial_errors")
 
@@ -649,6 +729,7 @@ def fetch_first_party_source(
                     users_by_id=users_by_id,
                     expanded_posts_by_id=expanded_posts_by_id,
                     media_by_key=media_by_key,
+                    unavailable_reference_reasons=resource_error_categories_by_id,
                     run_id=run_id,
                     collected_at=collected_at,
                 )
@@ -662,6 +743,14 @@ def fetch_first_party_source(
     last_page = pages[-1]
     created_times = [record["created_at"] for record in records]
     all_resource_ids = primary_ids | expanded_ids | completion_ids
+    post_cost, user_cost, media_cost, total_cost = _resource_costs(
+        post_ids=all_resource_ids,
+        user_ids=set(users_by_id),
+        media_keys=set(media_by_key),
+        post_unit_cost_usd=post_unit_cost_usd,
+        user_unit_cost_usd=user_unit_cost_usd,
+        media_unit_cost_usd=media_unit_cost_usd,
+    )
     return FetchedFirstPartySource(
         source=source,
         source_key=source_key_for(source),
@@ -670,9 +759,11 @@ def fetch_first_party_source(
         timeline_requests_count=timeline_requests,
         reference_lookup_requests_count=reference_requests,
         primary_posts_received=len(raw_posts),
+        primary_post_resources_received=len(primary_ids),
         expanded_posts_received=len(expanded_ids),
         reference_completion_posts_received=len(completion_ids),
         distinct_post_resources_received=len(all_resource_ids),
+        user_resources_received=len(users_by_id),
         media_resources_received=len(media_by_key),
         records=tuple(records),
         newest_post_id=first_page.newest_id,
@@ -685,8 +776,13 @@ def fetch_first_party_source(
         completion_state=completion_state,
         inventory_tweet_count=inventory_tweet_count,
         inventory_reference=ACCOUNTS[source].inventory_reference,
-        unit_cost_usd=unit_cost_usd,
-        estimated_cost_usd=unit_cost_usd * len(all_resource_ids),
+        post_unit_cost_usd=post_unit_cost_usd,
+        user_unit_cost_usd=user_unit_cost_usd,
+        media_unit_cost_usd=media_unit_cost_usd,
+        estimated_post_cost_usd=post_cost,
+        estimated_user_cost_usd=user_cost,
+        estimated_media_cost_usd=media_cost,
+        estimated_cost_usd=total_cost,
         warnings=tuple(sorted(warnings)),
         terminal_error_category=(terminal_error.category if terminal_error else None),
         terminal_http_status=(terminal_error.status if terminal_error else None),
@@ -742,13 +838,24 @@ def save_first_party_source(
         "timeline_requests_count": fetched.timeline_requests_count,
         "reference_lookup_requests_count": fetched.reference_lookup_requests_count,
         "primary_posts_received": fetched.primary_posts_received,
+        "primary_post_resources_received": fetched.primary_post_resources_received,
+        "expanded_post_resources_received": fetched.expanded_posts_received,
+        "reference_completion_post_resources_received": (
+            fetched.reference_completion_posts_received
+        ),
+        "distinct_post_resources_received": fetched.distinct_post_resources_received,
+        "user_resources_received": fetched.user_resources_received,
+        "media_resources_received": fetched.media_resources_received,
         "posts_saved": len(post_ids),
         "inventory_tweet_count": preserved_inventory_count,
         "previous_inventory_reference": fetched.inventory_reference,
         "completion_state": fetched.completion_state,
         "newest_post_id": fetched.newest_post_id,
         "oldest_post_id": fetched.oldest_post_id,
-        "estimated_x_cost_usd": format(fetched.estimated_cost_usd, "f"),
+        "estimated_post_cost_usd": format(fetched.estimated_post_cost_usd, "f"),
+        "estimated_user_cost_usd": format(fetched.estimated_user_cost_usd, "f"),
+        "estimated_media_cost_usd": format(fetched.estimated_media_cost_usd, "f"),
+        "estimated_total_cost_usd": format(fetched.estimated_cost_usd, "f"),
         "warnings": list(fetched.warnings),
     }
     repository.update_sync_state(
@@ -778,6 +885,13 @@ def save_first_party_source(
         timeline_requests_count=fetched.timeline_requests_count,
         reference_lookup_requests_count=fetched.reference_lookup_requests_count,
         primary_posts_received=fetched.primary_posts_received,
+        primary_post_resources_received=fetched.primary_post_resources_received,
+        expanded_posts_received=fetched.expanded_posts_received,
+        reference_completion_posts_received=(
+            fetched.reference_completion_posts_received
+        ),
+        distinct_post_resources_received=fetched.distinct_post_resources_received,
+        user_resources_received=fetched.user_resources_received,
         posts_saved=len(post_ids),
         new_posts=len(post_ids) - len(existing_ids),
         existing_posts_updated=len(existing_ids),
@@ -805,7 +919,12 @@ def save_first_party_source(
         checkpoint_before=fetched.checkpoint_before,
         checkpoint_after=checkpoint_after,
         completion_state=fetched.completion_state,
-        unit_cost_usd=fetched.unit_cost_usd,
+        post_unit_cost_usd=fetched.post_unit_cost_usd,
+        user_unit_cost_usd=fetched.user_unit_cost_usd,
+        media_unit_cost_usd=fetched.media_unit_cost_usd,
+        estimated_post_cost_usd=fetched.estimated_post_cost_usd,
+        estimated_user_cost_usd=fetched.estimated_user_cost_usd,
+        estimated_media_cost_usd=fetched.estimated_media_cost_usd,
         estimated_cost_usd=fetched.estimated_cost_usd,
         warnings=fetched.warnings,
     )
@@ -835,17 +954,31 @@ def record_first_party_usage(
                 "source": fetched.source,
                 "source_key": fetched.source_key,
                 "source_run_id": str(run_id),
-                "primary_post_resources": fetched.primary_posts_received,
+                "primary_posts_returned": fetched.primary_posts_received,
+                "primary_post_resources": fetched.primary_post_resources_received,
                 "expanded_post_resources": fetched.expanded_posts_received,
                 "reference_completion_post_resources": (
                     fetched.reference_completion_posts_received
                 ),
                 "distinct_post_resources": fetched.distinct_post_resources_received,
+                "user_resources": fetched.user_resources_received,
                 "media_resources": fetched.media_resources_received,
                 "timeline_requests": fetched.timeline_requests_count,
                 "reference_lookup_requests": fetched.reference_lookup_requests_count,
-                "pricing_basis": "estimated_distinct_post_resources",
-                "unit_cost_usd": format(fetched.unit_cost_usd, "f"),
+                "pricing_basis": "estimated_distinct_returned_resources_by_class",
+                "post_unit_cost_usd": format(fetched.post_unit_cost_usd, "f"),
+                "user_unit_cost_usd": format(fetched.user_unit_cost_usd, "f"),
+                "media_unit_cost_usd": format(fetched.media_unit_cost_usd, "f"),
+                "estimated_post_cost_usd": format(
+                    fetched.estimated_post_cost_usd, "f"
+                ),
+                "estimated_user_cost_usd": format(
+                    fetched.estimated_user_cost_usd, "f"
+                ),
+                "estimated_media_cost_usd": format(
+                    fetched.estimated_media_cost_usd, "f"
+                ),
+                "estimated_total_cost_usd": format(fetched.estimated_cost_usd, "f"),
                 "completion_state": fetched.completion_state,
                 "warnings": list(fetched.warnings),
             },

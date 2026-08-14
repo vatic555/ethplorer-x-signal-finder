@@ -37,7 +37,7 @@ The five DOCX conversions preserve original filenames and SHA-256 digests in fro
 
 ## Other Knowledge Classes
 
-- First-party editorial corpus - not imported; a future task may ingest historical Ethplorer and Binplorer X Posts and replies for style, reaction patterns, and prior public positioning only.
+- First-party editorial corpus - implemented separately in PostgreSQL by Task 005C for historical and future Ethplorer and Binplorer X Posts; it may support style, reaction patterns, and prior public positioning only and is intentionally outside this static source inventory.
 - Dynamic analytical evidence - not copied here; a future adapter may query dated, scoped, provenance-rich snapshots or comparisons from `ethereum-top-addresses-pipeline` on demand.
 
 Neither class can silently establish a product capability. Capability records continue to require reviewed supporting static `source_id` values.

@@ -985,13 +985,24 @@ def _run_first_party_x_sync(args: argparse.Namespace) -> int:
     failures: list[dict[str, object]] = []
     reports: list[dict[str, object]] = []
     run_estimated_cost = Decimal("0")
+    run_estimated_post_cost = Decimal("0")
+    run_estimated_user_cost = Decimal("0")
+    run_estimated_media_cost = Decimal("0")
     run_requests = 0
+    run_primary_post_resources = 0
+    run_expanded_post_resources = 0
+    run_reference_completion_post_resources = 0
+    run_distinct_post_resources = 0
+    run_expansion_user_resources = 0
+    run_inventory_user_resources = 0
+    run_media_resources = 0
     inventory_counts: dict[str, int | None] = {}
     inventory_report: dict[str, object] = {
         "requested": False,
         "request_count": 0,
         "user_resources": 0,
         "estimated_x_cost_usd": "0",
+        "estimated_user_cost_usd": "0",
         "reported_cost_usd": None,
         "warnings": [],
     }
@@ -1061,11 +1072,14 @@ def _run_first_party_x_sync(args: argparse.Namespace) -> int:
                         },
                     )
                 run_estimated_cost += inventory_cost
+                run_estimated_user_cost += inventory_cost
+                run_inventory_user_resources += len(inventory_page.users_by_id)
                 inventory_report.update(
                     {
                         "request_count": 1,
                         "user_resources": len(inventory_page.users_by_id),
                         "estimated_x_cost_usd": format(inventory_cost, "f"),
+                        "estimated_user_cost_usd": format(inventory_cost, "f"),
                         "counts": {
                             source: inventory_counts.get(source)
                             for source in initial_sources
@@ -1117,7 +1131,9 @@ def _run_first_party_x_sync(args: argparse.Namespace) -> int:
                     max_pages=args.max_pages,
                     max_estimated_cost_usd=args.max_estimated_cost_usd,
                     estimated_cost_before_usd=run_estimated_cost,
-                    unit_cost_usd=x_config.post_read_unit_cost_usd,
+                    post_unit_cost_usd=x_config.post_read_unit_cost_usd,
+                    user_unit_cost_usd=x_config.user_read_unit_cost_usd,
+                    media_unit_cost_usd=x_config.media_read_unit_cost_usd,
                     inventory_tweet_count=inventory_counts.get(source),
                     max_attempts=args.max_attempts,
                     max_retry_wait_seconds=args.max_retry_wait_seconds,
@@ -1180,6 +1196,17 @@ def _run_first_party_x_sync(args: argparse.Namespace) -> int:
 
             run_requests += fetched.requests_count
             run_estimated_cost += fetched.estimated_cost_usd
+            run_estimated_post_cost += fetched.estimated_post_cost_usd
+            run_estimated_user_cost += fetched.estimated_user_cost_usd
+            run_estimated_media_cost += fetched.estimated_media_cost_usd
+            run_primary_post_resources += fetched.primary_post_resources_received
+            run_expanded_post_resources += fetched.expanded_posts_received
+            run_reference_completion_post_resources += (
+                fetched.reference_completion_posts_received
+            )
+            run_distinct_post_resources += fetched.distinct_post_resources_received
+            run_expansion_user_resources += fetched.user_resources_received
+            run_media_resources += fetched.media_resources_received
             usage_recorded = False
             try:
                 with connection.transaction():
@@ -1280,7 +1307,25 @@ def _run_first_party_x_sync(args: argparse.Namespace) -> int:
                 "sources": reports,
                 "usage": {
                     "requests_count": run_requests,
-                    "estimated_x_cost_usd": format(run_estimated_cost, "f"),
+                    "primary_post_resources": run_primary_post_resources,
+                    "expanded_post_resources": run_expanded_post_resources,
+                    "reference_completion_post_resources": (
+                        run_reference_completion_post_resources
+                    ),
+                    "distinct_post_resources": run_distinct_post_resources,
+                    "expansion_user_resources": run_expansion_user_resources,
+                    "inventory_user_resources": run_inventory_user_resources,
+                    "media_resources": run_media_resources,
+                    "estimated_post_cost_usd": format(
+                        run_estimated_post_cost, "f"
+                    ),
+                    "estimated_user_cost_usd": format(
+                        run_estimated_user_cost, "f"
+                    ),
+                    "estimated_media_cost_usd": format(
+                        run_estimated_media_cost, "f"
+                    ),
+                    "estimated_total_cost_usd": format(run_estimated_cost, "f"),
                     "reported_cost_usd": None,
                 },
                 "errors": failures,

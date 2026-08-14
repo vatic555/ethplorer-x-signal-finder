@@ -14,7 +14,7 @@ Static evidence uses the source-document contract below. Structured assets and c
 
 ### 2. First-Party Editorial Corpus
 
-This future class consists of historical Ethplorer and Binplorer X Posts and replies. It may later support style guidance, reaction-pattern analysis, and evidence of prior public positioning.
+This implemented class consists of historical and continuously synchronized Ethplorer and Binplorer X Posts, including replies, quotes, and reposts. It may later support style guidance, reaction-pattern analysis, and evidence of prior public positioning.
 
 The corpus was not imported by Task 005A and does not belong in the static evidence layer merely because it is first-party content. Task 005C now stores it separately in PostgreSQL with X Post identity and URL, account, publication and retrieval dates, direct relationship context and availability, media metadata, and source provenance. Future readers must preserve the intended editorial use and must not promote corpus content into capability evidence.
 
@@ -34,7 +34,7 @@ A future analytics adapter must query the latest appropriate snapshot or compari
 
 Dynamic evidence may support a time-bound analytical statement. It does not by itself establish that Ethplorer has a product capability. Missing dates, scope, or provenance make the analytical claim unresolved.
 
-Task 005A documents these future contracts only. It does not implement the X corpus importer, corpus storage, analytics adapter, snapshot query, or runtime integration.
+Task 005A documented these class contracts. Task 005C subsequently implemented first-party X corpus import and storage in PostgreSQL. The analytics adapter, snapshot query, and runtime knowledge integration remain unimplemented.
 
 ## Evidence and Capability Layers
 
@@ -63,7 +63,7 @@ knowledge/
   README.md
 ```
 
-Current inventory: two terminology documents, 17 complete Ethplorer Markdown articles under `sources/posts/`, 11 deduplicated local article images directly under `sources/posts/assets/`, zero editorial corpus items, zero dynamic analytical records, and zero asset or capability rows. The articles are inventoried as pending static sources, but their capabilities, limitations, topics, and capability-catalog links are intentionally deferred to Task 005B.
+Current Git static-knowledge inventory: two terminology documents, 17 complete Ethplorer Markdown articles under `sources/posts/`, 11 deduplicated local article images directly under `sources/posts/assets/`, zero dynamic analytical records, and zero asset or capability rows. The separate PostgreSQL editorial corpus contains 378 operational first-party rows and is intentionally not counted or read by this Git inventory. The articles are inventoried as pending static sources, but their capabilities, limitations, topics, and capability-catalog links are intentionally deferred to Task 005B.
 
 ## Source Document Contract
 
@@ -172,4 +172,4 @@ For `sources/posts/`, it also requires `source_type = ethplorer_article`, one H1
 
 Validation targets metadata integrity and semantic or structural usability. It does not enforce byte identity with an imported Markdown file. Duplicate detection may fold whitespace and case for comparison without changing stored content.
 
-The validator does not access or validate the future editorial corpus or dynamic analytical evidence. Those classes require separate task-specific adapters and tests before runtime use.
+The validator intentionally does not access or validate the implemented PostgreSQL editorial corpus or dynamic analytical evidence. Those non-static classes use separate task-specific storage, readers, and tests; offline Git validation must remain independent of PostgreSQL.

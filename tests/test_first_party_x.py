@@ -60,6 +60,7 @@ def _page(
     next_token=None,
     meta_present=True,
     partial_errors=0,
+    resource_errors=None,
 ):
     users = {
         ACCOUNTS["ethplorer"].user_id: {
@@ -74,6 +75,7 @@ def _page(
         users_by_id=users,
         expanded_posts_by_id={str(post["id"]): post for post in expanded},
         media_by_key={str(item["media_key"]): item for item in media},
+        resource_error_categories_by_id=dict(resource_errors or {}),
         next_token=next_token,
         newest_id=str(posts[0]["id"]) if posts else None,
         oldest_id=str(posts[-1]["id"]) if posts else None,
@@ -199,7 +201,29 @@ def test_missing_reference_expansion_is_explicitly_unavailable() -> None:
 
     assert record["referenced_context_state"] == "unavailable"
     assert record["references"][0]["context_state"] == "unavailable"
+    assert record["references"][0]["unavailable_reason"] == "unknown"
     assert "referenced_text" not in record["references"][0]
+
+
+def test_resource_specific_unavailable_reference_reason_is_retained() -> None:
+    post = _post("1052", references=[{"type": "quoted", "id": "905"}])
+    record = map_first_party_x_post(
+        post,
+        source="ethplorer",
+        users_by_id={},
+        expanded_posts_by_id={},
+        media_by_key={},
+        unavailable_reference_reasons={"905": "protected_or_inaccessible"},
+        run_id=RUN_ID,
+        collected_at=NOW,
+    )
+
+    assert record["references"][0]["unavailable_reason"] == (
+        "protected_or_inaccessible"
+    )
+    assert record["raw_json"]["_expanded"]["relationships"][0][
+        "unavailable_reason"
+    ] == "protected_or_inaccessible"
 
 
 def test_referenced_post_uses_its_own_note_tweet_full_text() -> None:
@@ -345,6 +369,31 @@ def test_partial_unavailable_resources_are_warned_without_losing_window_checkpoi
     assert fetched.completion_state == "complete"
     assert fetched.checkpoint_can_advance is True
     assert "partial_resources_unavailable" in fetched.warnings
+
+
+def test_resource_reason_from_page_is_attached_to_unavailable_reference() -> None:
+    fetched = fetch_first_party_source(
+        client=FakeClient(
+            [
+                _page(
+                    [_post("1122", references=[{"type": "quoted", "id": "906"}])],
+                    partial_errors=1,
+                    resource_errors={"906": "not_found"},
+                ),
+                _page([], partial_errors=1, resource_errors={"906": "not_found"}),
+            ]
+        ),  # type: ignore[arg-type]
+        source="ethplorer",
+        run_id=RUN_ID,
+        collected_at=NOW,
+        checkpoint_before=None,
+        max_pages=1,
+        max_estimated_cost_usd=Decimal("1"),
+        sleep=lambda _: None,
+        now_timestamp=lambda: 0,
+    )
+
+    assert fetched.records[0]["references"][0]["unavailable_reason"] == "not_found"
 
 
 def test_cost_guard_stops_before_another_timeline_page() -> None:
@@ -571,6 +620,43 @@ def test_usage_is_separate_and_reports_resource_categories() -> None:
     assert "expanded_post_resources" in event["metadata"]
     assert "reference_completion_post_resources" in event["metadata"]
     assert "media_resources" in event["metadata"]
+    assert event["metadata"]["user_resources"] == 2
+    assert event["metadata"]["estimated_post_cost_usd"] == "0.005"
+    assert event["metadata"]["estimated_user_cost_usd"] == "0.020"
+    assert event["metadata"]["estimated_media_cost_usd"] == "0.000"
+    assert event["metadata"]["estimated_total_cost_usd"] == "0.025"
+    assert event["estimated_cost"] == Decimal("0.025")
+
+
+def test_cost_guard_uses_post_user_and_media_resource_costs() -> None:
+    media = {"media_key": "m-cost", "type": "photo"}
+    client = FakeClient(
+        [
+            _page(
+                [_post("1211", attachments={"media_keys": ["m-cost"]})],
+                media=[media],
+                next_token="older",
+            )
+        ]
+    )
+    fetched = fetch_first_party_source(
+        client=client,  # type: ignore[arg-type]
+        source="ethplorer",
+        run_id=RUN_ID,
+        collected_at=NOW,
+        checkpoint_before="100",
+        max_pages=5,
+        max_estimated_cost_usd=Decimal("0.030"),
+        sleep=lambda _: None,
+        now_timestamp=lambda: 0,
+    )
+
+    assert len(client.calls) == 1
+    assert fetched.estimated_post_cost_usd == Decimal("0.005")
+    assert fetched.estimated_user_cost_usd == Decimal("0.020")
+    assert fetched.estimated_media_cost_usd == Decimal("0.005")
+    assert fetched.estimated_cost_usd == Decimal("0.030")
+    assert "cost_guard_reached" in fetched.warnings
 
 
 def test_safe_representations_and_diagnostics_never_include_post_text() -> None:

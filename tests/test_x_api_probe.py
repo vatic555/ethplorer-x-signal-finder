@@ -96,6 +96,46 @@ def test_content_parser_keeps_expanded_maps_and_has_content_safe_repr() -> None:
     assert "media_count=1" in rendered
 
 
+@pytest.mark.parametrize(
+    ("error", "expected"),
+    [
+        (
+            {
+                "resource_id": "404",
+                "title": "Not Found Error",
+                "detail": "sensitive response detail",
+            },
+            "not_found",
+        ),
+        (
+            {
+                "resource_id": "403",
+                "title": "Authorization Error",
+                "detail": "This resource is protected",
+            },
+            "protected_or_inaccessible",
+        ),
+        (
+            {"resource_id": "500", "status": 503, "detail": "sensitive"},
+            "api_unavailable",
+        ),
+        ({"resource_id": "0", "detail": "sensitive"}, "unknown"),
+    ],
+)
+def test_content_parser_reduces_resource_errors_without_retaining_body(
+    error, expected
+) -> None:
+    body = json.dumps({"data": [], "includes": {}, "meta": {}, "errors": [error]}).encode()
+    page = parse_content_page(
+        HttpResponse(status=200, headers={}, body=body),
+        endpoint="/synthetic",
+        elapsed=0.0,
+    )
+
+    assert page.resource_error_categories_by_id[error["resource_id"]] == expected
+    assert "sensitive" not in repr(page)
+
+
 def test_pagination_checkpoint_and_duplicates_are_reported() -> None:
     client = XApiClient(
         token="synthetic-secret-token",

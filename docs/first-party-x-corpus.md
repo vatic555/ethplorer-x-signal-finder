@@ -1,6 +1,6 @@
 # First-Party X Editorial Corpus
 
-Status: Task 005C complete; Stage 4 remains In Progress
+Status: Tasks 005C and 005C.1 complete; Stage 4 remains In Progress
 
 Live validation date: 2026-08-14
 
@@ -56,13 +56,27 @@ Both tables have Row Level Security enabled with the same protected-connection m
 
 `publication_origin` defaults to `unknown`. The optional values `manual` and `pipeline_assisted` are set only from known provenance. Task 005C performs no text-similarity or fuzzy Opportunity matching. `opportunity_id` remains nullable.
 
-Long-form text prefers `note_tweet.text` and otherwise uses `text`. Original X fields remain in `raw_json`. The mapper stores returned main media metadata and every direct relationship, including its type, referenced ID, returned full text, author identity, creation time, entities, and media metadata. Each relationship has `available` or `unavailable` context state. A Post without a relationship uses `not_applicable` at Post level. Missing context is never guessed.
+`first_party_x_posts.text` is the canonical field for downstream first-party corpus analysis. It contains `note_tweet.text` when X returned it and normal `text` only as fallback. `raw_json.text` may be truncated and must not be the default analysis field. Original X fields remain in `raw_json`, and Task 005C.1 does not rewrite any stored authoritative text.
+
+The mapper stores returned main media metadata and every direct relationship, including its type, referenced ID, returned full text, author identity, creation time, entities, and media metadata. Each relationship has `available` or `unavailable` context state. When X returns a resource-specific error for an unavailable referenced ID, the relationship may retain only a compact category: `not_found`, `protected_or_inaccessible`, `api_unavailable`, or `unknown`. Raw error response bodies are neither stored nor printed. Existing unavailable relationships are not re-fetched merely to classify them and may therefore remain `unknown`. A Post without a relationship uses `not_applicable` at Post level. Missing context is never guessed and never treated as irrelevant.
 
 No image, video, GIF, audio, preview, subtitle, or other media blob is downloaded.
 
 ## Direct reference completion
 
 After primary pagination, the synchronizer deduplicates direct referenced Post IDs that were not returned through expansions. It may query those IDs in bounded batches through the read-only Post Lookup endpoint while sharing the same cost guard. It does not recursively request references of referenced Posts and does not crawl unrelated thread history. A failed or partial completion lookup leaves the direct context explicitly `unavailable`.
+
+## Deterministic URL reads
+
+Authoritative text remains unchanged and may contain `t.co` links. Downstream readers use the stored X entity fields without an HTTP redirect crawl or another X request. For every stored URL entity the reusable read contract selects:
+
+```text
+unwound_url
+else expanded_url
+else url
+```
+
+The helper reads both the stored main `entities` object and `raw_json.note_tweet.entities` when present, removes duplicate representations within one Post, and returns the original and resolved values plus the selected source. It performs no network I/O.
 
 ## Usage and safe diagnostics
 
@@ -72,7 +86,7 @@ The synchronizer reuses `runs`, `usage_events`, and `sync_state`. Operations are
 - `first_party_x_sync_ethplorer`;
 - `first_party_x_sync_binplorer`.
 
-The configured estimates default to `$0.005` per distinct returned Post resource and `$0.010` per returned User resource. These are planning estimates, not Developer Console billing statements. Primary, expanded, reference-completion, media, User, and request counts remain distinct in metadata. Post IDs are deduplicated across Post-resource response sections for the source run. `reported_cost` remains NULL until reconciled externally.
+The configured standard estimates default to `$0.005` per returned Post resource, `$0.010` per returned User resource, and `$0.005` per returned Media resource. These are planning estimates, not Developer Console billing statements. Each source usage event retains distinct primary, expanded, reference-completion, total Post, expansion or lookup User, Media, and request counts, with separate Post, User, Media, and total estimated costs. Inventory User resources remain in their own usage event. Post IDs are deduplicated across Post-resource response sections for the source run. The cost guard uses the conservative full estimated total across all applicable resource classes. `reported_cost` remains NULL until reconciled externally.
 
 CLI output contains counts, timestamps, IDs, checkpoints, estimated cost, warning codes, and safe error categories only. It never contains Post text, raw response bodies, authorization headers, or tokens.
 
@@ -85,9 +99,13 @@ The successful historical validation refreshed account-level inventory values of
 
 The 13-Post difference between the Ethplorer inventory count and retrievable corpus is recorded as a retrieval difference, not asserted data loss or an implementation error. Binplorer's inventory and retrievable count were equal.
 
-The successful historical run made eight requests and recorded a `$2.650` estimate, including one batched User Lookup. A preceding validation attempt made five requests and recorded `$0.905`; it exposed an overly strict treatment of resource-level partial errors, saved its 132 returned Posts, and advanced no checkpoint. The corrected successful run upserted those rows without duplicates. The repeat incremental validation then made two timeline requests, received zero Posts, recorded `$0.000` estimated Post-resource cost, and left both checkpoints unchanged.
+The successful historical run made eight requests and recorded a `$2.650` estimate, including one batched User Lookup. A preceding validation attempt made five requests and recorded `$0.905`; it exposed an overly strict treatment of resource-level partial errors, saved its 132 returned Posts, and advanced no checkpoint. The corrected successful run upserted those rows without duplicates. The repeat incremental validation then made two timeline requests, received zero Posts, recorded `$0.000` estimated Post-resource cost, and left both checkpoints unchanged. These historical values were produced by the previous accounting implementation and are not retroactively presented as corrected Post, User, and Media totals.
+
+On 2026-08-14 the observed X Developer Console remaining balance was USD 5.12. It is a forward reconciliation baseline only: no reliable immediately-before balance exists, so it must not be used to infer Task 005C actual cost. For a future explicitly approved live X validation, where practical record `balance_before`, run identity, `balance_after`, and `observed_delta`. Actual observed billing remains separate from internal estimated usage.
 
 PostgreSQL ended with 378 corpus rows, 378 distinct Post IDs, and zero duplicate groups. The separate incoming `posts` table remained at 214 rows and 214 distinct IDs. Migration 003 is current, no migrations are pending, and all operational tables retain RLS.
+
+Task 005C.1 validated deterministic URL reads against the unchanged 378-row corpus without an X request. The corpus contains 232 Posts with URL entities and 348 deduplicated URL entities: 343 include `expanded_url`, 62 include `unwound_url`, and 4 remain `t.co`-only after deterministic resolution. Resolved destinations include 81 Ethplorer and 22 Binplorer site URLs. PostgreSQL integration tests passed, both first-party checkpoints remained unchanged, and the separate incoming table remained at 214 rows.
 
 ## Boundaries
 

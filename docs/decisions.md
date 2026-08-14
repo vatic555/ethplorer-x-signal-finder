@@ -213,3 +213,13 @@ All original, reply, quote, and repost Posts are retained. Long text uses `note_
 The implementation reuses read-only OAuth, `runs`, `usage_events`, and `sync_state`. Ethplorer and Binplorer checkpoints advance independently only after their primary timeline pagination reaches an X-provided end without a blocking guard or persistence failure. Resource-level partial errors remain warnings and preserve explicit unavailable context; they do not make an exhausted primary timeline window incomplete. Estimated Post and User Read prices remain configurable, and `reported_cost` stays NULL until external reconciliation.
 
 Migration 003 creates `first_party_x_posts` and `first_party_x_post_references`, enables RLS on both, and leaves old applied migrations unchanged. Raw corpus content remains operational PostgreSQL data and must not be committed to the public repository. Task 005C adds no keywords, LLM processing, style extraction, dynamic analytics adapter, X write access, scheduling, or publication.
+
+## 2026-08-14 - First-party X corpus accounting and downstream read correction
+
+Status: Accepted
+
+First-party usage accounting distinguishes distinct primary, expanded, reference-completion, and total Post resources, expansion or lookup User resources, inventory User resources, Media resources, and request count. Configurable standard estimates cover Post, User, and Media Reads separately. The first-party cost guard uses their conservative estimated total. Existing Task 005C records are not retroactively reconstructed because the earlier implementation did not persist every class needed for a reliable correction; `reported_cost` remains NULL until external reconciliation.
+
+`first_party_x_posts.text` is the canonical downstream editorial-analysis field and continues to prefer `note_tweet.text` over normal `text`. Original text and raw JSON are not rewritten. Downstream URL reads resolve already stored entities as `unwound_url`, then `expanded_url`, then `url`, without redirect crawling or another X request. Unavailable direct context remains unavailable rather than irrelevant and may retain only a safe resource-specific category, never a raw error body.
+
+The X Developer Console balance of USD 5.12 observed on 2026-08-14 is a forward reconciliation baseline only. It does not establish Task 005C actual cost because no reliable immediately-before balance was recorded. Future explicitly approved live validations should keep before and after balances and observed delta separate from internal estimates.

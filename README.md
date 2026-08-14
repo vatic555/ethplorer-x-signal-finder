@@ -27,7 +27,7 @@ The repository remains public during the MVP. Public visibility does not change 
 - Stage 2 - X API Access Spike - Completed
 - Stage 3 - X Collection Pipeline - Completed
 - Stage 4 - Minimum Knowledge Base - In Progress
-- Last completed task - Task 005C - First-Party X Corpus Import + Continuous Sync
+- Last completed task - Task 005C.1 - First-Party X Corpus Corrections
 - Next task - Task 005B - Ethplorer Knowledge Import - Planned, awaiting its explicit task specification
 
 See the canonical [implementation roadmap](docs/roadmap.md), [product and technical specification](docs/project-spec.md), and [architecture decision log](docs/decisions.md).
@@ -138,7 +138,7 @@ python -m x_signal_finder first-party-x sync --source binplorer
 python -m x_signal_finder first-party-x sync --source both
 ```
 
-The same tables contain historical and future Ethplorer/Binplorer Posts. Initial sync paginates the retrievable User Posts window; later runs use independent `since_id` checkpoints. Replies, quotes, and reposts are retained. Direct referenced context is completed in bounded deduplicated batches when needed, and missing context remains explicitly unavailable. Only returned media metadata is stored. No media is downloaded, no X write scope is requested, and diagnostics contain no Post text. See [the first-party corpus operating guide](docs/first-party-x-corpus.md).
+The same tables contain historical and future Ethplorer/Binplorer Posts. Initial sync paginates the retrievable User Posts window; later runs use independent `since_id` checkpoints. Replies, quotes, and reposts are retained. Direct referenced context is completed in bounded deduplicated batches when needed, and missing context remains explicitly unavailable with a safe reason when X provides one. `first_party_x_posts.text` is the canonical analysis field: it uses `note_tweet.text` when available and normal text only as fallback. Stored URL entities expose deterministic destinations without redirect crawling. Returned Post, User, and Media resource classes are counted and costed separately, and the guard uses their conservative estimated total. No media is downloaded, no X write scope is requested, and diagnostics contain no Post text. See [the first-party corpus operating guide](docs/first-party-x-corpus.md).
 
 Database commands:
 
@@ -172,7 +172,7 @@ python -m pytest -m integration
 ## Current Limitations
 
 - No automatic historical backfill or production missed-window recovery
-- X Developer Console billing remains unreconciled; stored cost values are estimates
+- X Developer Console billing remains unreconciled; the USD 5.12 balance observed on 2026-08-14 is only a forward reconciliation baseline, and stored cost values remain estimates
 - Mentions pagination was not observed live because the validated response was empty
 - No LLM calls or prompt execution
 - The 17 Ethplorer articles are inventoried but not yet reviewed for capabilities, limitations, topics, products, networks, or asset links

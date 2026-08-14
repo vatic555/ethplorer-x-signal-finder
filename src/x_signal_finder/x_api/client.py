@@ -74,6 +74,7 @@ class XApiContentPage:
     users_by_id: Mapping[str, Mapping[str, Any]]
     expanded_posts_by_id: Mapping[str, Mapping[str, Any]]
     media_by_key: Mapping[str, Mapping[str, Any]]
+    resource_error_categories_by_id: Mapping[str, str]
     next_token: str | None
     newest_id: str | None
     oldest_id: str | None
@@ -89,11 +90,53 @@ class XApiContentPage:
             f"user_count={len(self.users_by_id)}, "
             f"expanded_post_count={len(self.expanded_posts_by_id)}, "
             f"media_count={len(self.media_by_key)}, "
+            "resource_error_count="
+            f"{len(self.resource_error_categories_by_id)}, "
             f"next_token_present={bool(self.next_token)}, "
             f"partial_error_count={self.partial_error_count})"
         )
 
     __str__ = __repr__
+
+
+def _resource_error_category(error: Mapping[str, Any]) -> str:
+    """Reduce one X resource error to a stable category without retaining its body."""
+    status = error.get("status")
+    rendered = " ".join(
+        str(error.get(key, "")).lower()
+        for key in ("type", "title", "detail")
+    )
+    if status == 404 or "not found" in rendered or "resource-not-found" in rendered:
+        return "not_found"
+    if status in {401, 403} or any(
+        marker in rendered
+        for marker in ("protected", "forbidden", "not authorized", "unauthorized")
+    ):
+        return "protected_or_inaccessible"
+    if (
+        isinstance(status, int)
+        and status >= 500
+        or any(
+            marker in rendered
+            for marker in ("service unavailable", "server error", "temporarily unavailable")
+        )
+    ):
+        return "api_unavailable"
+    return "unknown"
+
+
+def _resource_error_categories(errors: list[object]) -> dict[str, str]:
+    categories: dict[str, str] = {}
+    for error in errors:
+        if not isinstance(error, Mapping):
+            continue
+        resource_id = error.get("resource_id")
+        if not isinstance(resource_id, str) or not resource_id:
+            value = error.get("value")
+            resource_id = value if isinstance(value, str) and value else None
+        if resource_id is not None:
+            categories[resource_id] = _resource_error_category(error)
+    return categories
 
 
 @dataclass(frozen=True)
@@ -403,6 +446,7 @@ def parse_content_page(
         users_by_id=users_by_id,
         expanded_posts_by_id=expanded_posts_by_id,
         media_by_key=media_by_key,
+        resource_error_categories_by_id=_resource_error_categories(errors),
         next_token=next_token,
         newest_id=str(newest_id) if newest_id is not None else None,
         oldest_id=str(oldest_id) if oldest_id is not None else None,
