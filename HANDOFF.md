@@ -2,11 +2,11 @@
 
 Last updated: 2026-08-14
 
-Repository HEAD before the HANDOFF metadata update: `44aec27c13d951f6d934ef60f3038152920e91f4`
+Repository HEAD before the HANDOFF metadata update: `f222ac55c97002fb134ed3a4b1b6196ad8925866`
 
-Validated commit: `44aec27c13d951f6d934ef60f3038152920e91f4`
+Validated commit: `f222ac55c97002fb134ed3a4b1b6196ad8925866`
 
-Validated implementation commit: `44aec27c13d951f6d934ef60f3038152920e91f4` for Task 005C
+Validated implementation commit: `f222ac55c97002fb134ed3a4b1b6196ad8925866` for Task 005C.1
 
 This file is a short current-state snapshot. It is not a canonical product, technical, architecture, or roadmap source.
 
@@ -28,7 +28,7 @@ The project is building an AI-assisted X intelligence pipeline for Ethplorer. It
 
 - Current stage: Stage 4 - Minimum Knowledge Base - In Progress.
 - Current task: Task 005B - Ethplorer Knowledge Import - Planned, awaiting its explicit task specification.
-- Last completed task: Task 005C - First-Party X Corpus Import + Continuous Sync.
+- Last completed task: Task 005C.1 - First-Party X Corpus Corrections.
 - Next implementation action: continue Task 005B after its explicit task specification is available.
 - Roadmap status: Stages 0 through 3 are Completed; Stage 4 is In Progress; Stages 5 through 7 are Planned; Stage 8 automation is Deferred.
 - Task 004D - Pluggable X Data Providers + Provider Quality Spike is a Deferred optimization. It does not reopen Stage 3 or displace Task 005B.
@@ -51,7 +51,7 @@ The following capabilities have been implemented and validated:
 - independent source checkpoints and safe non-advancement on known incomplete conditions;
 - global primary-Post and estimated-cost guards across home then mentions;
 - bounded transient-error retries with mockable sleep;
-- distinct primary and expanded Post-resource cost accounting;
+- separate primary, expanded, reference-completion, total Post, User, and Media resource accounting with a conservative total-cost guard;
 - best-effort usage persistence before Post upsert;
 - home missed-window and mentions truncation-risk warnings;
 - `post_id` upsert deduplication;
@@ -72,6 +72,9 @@ The following capabilities have been implemented and validated:
 - one shared historical/future first-party corpus lifecycle with independent incremental checkpoints;
 - original, reply, quote, and repost retention, full long-form text, lossless direct relationship sets, explicit unavailable context, and media metadata without downloads;
 - bounded deduplicated completion of direct referenced Post context and content-safe corpus diagnostics.
+- compact safe reasons for unavailable referenced context when X supplies a resource-specific error;
+- deterministic destination URLs from stored X entities without redirect crawling or another X request;
+- `first_party_x_posts.text` as the canonical downstream analysis text, with full `note_tweet.text` preferred over normal `text`.
 
 ## 4. Current Data Flow
 
@@ -134,6 +137,7 @@ The Git-backed static knowledge architecture and 17-article Ethplorer source inv
 - [`src/x_signal_finder/knowledge.py`](src/x_signal_finder/knowledge.py) - offline knowledge validator.
 - [`src/x_signal_finder/collector.py`](src/x_signal_finder/collector.py) - X Post mapping, bounded fetching, refresh behavior, and persistence orchestration.
 - [`src/x_signal_finder/first_party_x.py`](src/x_signal_finder/first_party_x.py) - first-party corpus mapping, pagination, reference completion, usage, and checkpoint behavior.
+- [`src/x_signal_finder/x_content.py`](src/x_signal_finder/x_content.py) - safe downstream helpers for deterministic URL resolution and unavailable-reference reasons.
 - [`src/x_signal_finder/x_api/`](src/x_signal_finder/x_api/) - read-only X API client, OAuth, configuration, and probe code.
 - [`src/x_signal_finder/db/`](src/x_signal_finder/db/) - PostgreSQL connection, migration, checks, and repository code.
 - [`migrations/`](migrations/) - ordered, checksum-tracked PostgreSQL schema migrations.
@@ -240,7 +244,11 @@ These commands read required values from local environment configuration. Never 
 - The successful historical run made 8 requests and recorded a `$2.650` estimate. An earlier safe validation attempt made 5 requests and recorded `$0.905` while exposing overly strict partial-resource classification; it advanced no checkpoint and its saved rows were deduplicated by the corrected run. Total Task 005C live validation therefore recorded 15 requests and `$3.555` estimated cost including the final repeat.
 - The repeat incremental run made 2 timeline requests, returned zero Posts, recorded `$0.000` estimated Post-resource cost, and preserved checkpoints `2080369149331558445` for Ethplorer and `2077741562402939325` for Binplorer.
 - PostgreSQL 17.6 is healthy with migrations 1 through 3 current, no pending migrations, and RLS intact. The separate incoming table remains 214 rows with 214 distinct IDs.
-- Latest default suite: 133 passed with 4 external tests skipped. Knowledge validation remains valid for 17 sources and 0 assets with no network or model calls.
+- Task 005C.1 corrected estimated usage accounting across Post, User, and Media resources and changed the first-party cost guard to use their conservative total. Historical estimates were not retroactively reconstructed.
+- Task 005C.1 validated deterministic URLs against stored entities only: 232 Posts contain 348 deduplicated URL entities, 343 have `expanded_url`, 62 have `unwound_url`, 4 remain `t.co`-only, and 103 resolve to Ethplorer or Binplorer sites.
+- Task 005C.1 preserved 378 distinct first-party rows, 214 distinct incoming rows, both first-party checkpoints, migrations 1 through 3, and RLS. It made no X request.
+- The X Developer Console balance observed on 2026-08-14 was USD 5.12. This is a forward reconciliation baseline only, not evidence of Task 005C actual cost; future approved live validation should record balance before and after the run where practical.
+- Latest committed default suite: 147 passed with 4 external tests skipped. Explicit PostgreSQL integration suite: 2 passed. Knowledge validation remains valid for 17 sources and 0 assets with no network or model calls.
 
 These are validation estimates and observations, not a Developer Console billing statement. No raw Post text or raw X response belongs in this file.
 
@@ -248,7 +256,7 @@ These are validation estimates and observations, not a Developer Console billing
 
 - The collector is manually invoked and bounded by explicit page and cost guards.
 - Full historical backfill and automatic missed-window recovery are not implemented.
-- X Developer Console billing remains unreconciled; stored cost values are estimates.
+- X Developer Console billing remains unreconciled; stored cost values are estimates, and the USD 5.12 balance observed on 2026-08-14 is only a forward baseline.
 - No LLM calls or runtime relevance filter exist.
 - The knowledge base is not integrated into runtime processing.
 - The 17 canonical Ethplorer articles are inventoried but remain pending substantive review; no evidence-backed capability row exists yet.

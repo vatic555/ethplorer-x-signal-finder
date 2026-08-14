@@ -10,7 +10,7 @@ Status: Canonical implementation sequence and progress record
 - Stage 3 - X Collection Pipeline - Completed
 - Stage 4 - Minimum Knowledge Base - In Progress
 - Current task - Task 005B - Ethplorer Knowledge Import - Planned, awaiting its explicit task specification
-- Last completed task - Task 005C - First-Party X Corpus Import + Continuous Sync
+- Last completed task - Task 005C.1 - First-Party X Corpus Corrections
 - Local PostgreSQL implementation is ready
 - Real Supabase migration and database validation are complete
 - Task 003 documentation review, diagnostic probe, live OAuth, endpoint, pagination, refresh, and checkpoint validation are complete
@@ -21,6 +21,7 @@ Status: Canonical implementation sequence and progress record
 - Task 004D provider abstraction and quality spike are Deferred until the Opportunity pipeline proves useful in the MVP/pilot
 - Task 005A knowledge inventory, Git-backed source contract, catalog evidence linkage, and offline validation are complete
 - Task 005C first-party Ethplorer/Binplorer X corpus, migration 003, historical import, and incremental lifecycle validation are complete
+- Task 005C.1 corrected first-party resource accounting and downstream read contracts without another X request or schema change
 
 Stage 1 must not be marked Completed until the real Supabase database has been created, migrations have been applied, and database validation has passed.
 
@@ -64,7 +65,7 @@ Post-MVP work may cover:
 | 1 | Durable Storage Foundation | Completed | Task 002 | Yes |
 | 2 | X API Access Spike | Completed | Task 003 | Yes |
 | 3 | X Collection Pipeline | Completed | Tasks 004A through 004C.1 complete; Task 004D deferred | Yes |
-| 4 | Minimum Knowledge Base | In Progress | Tasks 005A and 005C complete; Task 005B next | Yes |
+| 4 | Minimum Knowledge Base | In Progress | Tasks 005A, 005C, and 005C.1 complete; Task 005B next | Yes |
 | 5 | Relevance Filtering and Signal Clustering | Planned | Task 006 | Yes |
 | 6 | Opportunity Gate and Context Enrichment | Planned | Task 007 | Yes |
 | 7 | Drafts, Human Review and Pilot | Planned | Task 008 | Yes |
@@ -338,6 +339,7 @@ Create the minimum reviewed knowledge required for credible Opportunity decision
 - Task 005 - Minimum Knowledge Base - In Progress
 - Task 005A - Knowledge Architecture + Import Contract - Completed
 - Task 005C - First-Party X Corpus Import + Continuous Sync - Completed by explicit owner decision before final unified vocabulary work
+- Task 005C.1 - First-Party X Corpus Corrections - Completed
 - Task 005B - Ethplorer Knowledge Import - Planned and next
 
 ### Task 005A Validation Record
@@ -391,6 +393,20 @@ Create the minimum reviewed knowledge required for credible Opportunity decision
 - Database health: PostgreSQL 17.6 healthy; migrations 1 through 3 current; no pending migrations; RLS intact on all operational tables
 - Tests: 133 passed with 4 external tests skipped before final documentation validation; no default test made an X or PostgreSQL request
 - Scope boundary: no keyword extraction, LLM analysis, style guide, relevance filter, Signals, Opportunities, analytics adapter, media download, X write access, scheduling, or publication was added
+
+### Task 005C.1 Validation Record
+
+- Completion date: 2026-08-14
+- Accounting: first-party source usage now separates distinct primary, expanded, reference-completion, and total Post resources, expansion or lookup User resources, inventory User resources, Media resources, request count, and estimated Post, User, Media, and total cost; the guard uses the conservative total
+- Pricing basis: configurable standard estimates are `$0.005` per Post Read, `$0.010` per User Read, and `$0.005` per Media Read, re-checked against current official X pricing documentation
+- Context diagnostics: unavailable referenced Posts remain unavailable and can retain a compact safe resource-specific reason without raw error bodies; the existing 17 contexts were not re-fetched and may remain `unknown`
+- Downstream reads: stored main and `note_tweet` URL entities resolve deterministically as `unwound_url`, then `expanded_url`, then `url`, with no redirect crawl or X request; authoritative Post text is unchanged
+- Canonical analysis text: `first_party_x_posts.text` remains the full `note_tweet.text` when available and normal text only as fallback; `raw_json.text` is audit data and may be truncated
+- Billing reconciliation: the USD 5.12 Developer Console balance observed on 2026-08-14 is recorded only as a forward baseline; historical Task 005C estimates from the prior accounting implementation were not retroactively reconstructed
+- URL validation: 232 Posts contain 348 deduplicated URL entities; 343 have `expanded_url`, 62 have `unwound_url`, 4 remain `t.co`-only, and 103 resolve to Ethplorer or Binplorer sites
+- Validation: 147 default tests passed with 4 external tests skipped; 2 PostgreSQL integration tests passed; knowledge validation passed for 17 sources and 0 assets; PostgreSQL validation preserved 378 first-party rows, 214 incoming rows, both first-party checkpoints, migrations 1 through 3, and RLS without an X request
+- Scope boundary: no migration, historical backfill, keyword or knowledge extraction, LLM processing, Task 006, analytics adapter, provider adapter, media download, or X write operation was added
+- Final implementation commit: `f222ac55c97002fb134ed3a4b1b6196ad8925866`
 
 ### Completion Record
 
