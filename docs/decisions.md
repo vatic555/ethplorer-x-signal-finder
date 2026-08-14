@@ -185,3 +185,17 @@ Five user-provided DOCX articles are converted into separate `ethplorer_article`
 Meaningful repeated images are deduplicated into a flat managed namespace directly under `knowledge/sources/posts/assets/`; article references use `assets/<filename>` without dated import subdirectories. A repeated two-pixel Q&A divider is excluded as decoration. Offline validation requires managed `assets/` image references to resolve to non-empty files.
 
 The input DOCX files and their temporary `Delete/` staging directory are removed after visual, structural, source-token coverage, knowledge-validator, and default-test checks pass. Capability extraction remains Task 005B work, and the converted sources retain `pending` status.
+
+## 2026-08-14 - Deferred provider-independent X ingestion boundary
+
+Status: Accepted
+
+Task 004D records a future ingestion-cost optimization and does not authorize implementation. Task 005B, Task 006 and its LLM relevance work, the Opportunity pipeline, and a working MVP/pilot remain higher priority. Stage 3 stays Completed, and Official X remains the production source until an explicit later task changes that decision.
+
+Future X providers must terminate behind provider adapters that emit a stable internal Normalized Post contract. Preliminary provider identifiers are `official_x`, `twitterapi_io`, and `socialdata`, selected manually through `X_DATA_PROVIDER`. Automatic cheapest-provider selection is rejected. Hidden fallback to paid Official X is also rejected; any Official X benchmark, enrichment, or fallback must be explicitly requested and cost-controlled.
+
+The current `x_home_timeline` and future `x_followset` are distinct logical sources. Deduplication must use canonical X `post_id`. Provider-specific cursors may supplement progress tracking but cannot be the only portable checkpoint or leak into downstream relevance, Signal, or Opportunity contracts.
+
+The first future evaluation must be a same-period shadow run of approximately 24 hours across Official X, TwitterAPI.io, and SocialData, not a retrospective benchmark. Official X remains production during the test, and third-party reads must not affect operational checkpoints. Evaluation covers Post-ID recall, missing and extra Posts, complete and long text, Post types, referenced context, author and timestamp integrity, media metadata, duplicates, pagination gaps, latency, and actual cost. Initial acceptance may tolerate approximately 90-95% aggregate recall only when losses are not systematic, while requiring complete text for every received Post, stable canonical IDs, no systematic loss of long Posts, quotes, or replies, and materially lower cost. Relevant-Post recall becomes the more important criterion after Task 006 supplies real relevance decisions.
+
+No adapter, provider purchase, shadow run, scheduling, collector change, fallback, or checkpoint migration is part of this decision record.

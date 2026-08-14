@@ -9,8 +9,8 @@ Status: Canonical implementation sequence and progress record
 - Stage 2 - X API Access Spike - Completed
 - Stage 3 - X Collection Pipeline - Completed
 - Stage 4 - Minimum Knowledge Base - In Progress
-- Current task - Task 005A - Knowledge Architecture + Import Contract - Completed
-- Next task - Task 005B - Ethplorer Knowledge Import - Planned, awaiting its explicit task specification
+- Current task - Task 005B - Ethplorer Knowledge Import - Planned, awaiting its explicit task specification
+- Last completed task - Task 005A - Knowledge Architecture + Import Contract
 - Local PostgreSQL implementation is ready
 - Real Supabase migration and database validation are complete
 - Task 003 documentation review, diagnostic probe, live OAuth, endpoint, pagination, refresh, and checkpoint validation are complete
@@ -18,6 +18,7 @@ Status: Canonical implementation sequence and progress record
 - Task 004A implementation, synthetic validation, and bounded live X-to-Supabase validation are complete
 - Task 004B implementation, migration 002, synthetic validation, and bounded live validation are complete
 - Task 004C and Task 004C.1 implementation, synthetic validation, explicit baseline acceptance, and bounded incremental live validation are complete
+- Task 004D provider abstraction and quality spike are Deferred until the Opportunity pipeline proves useful in the MVP/pilot
 - Task 005A knowledge inventory, Git-backed source contract, catalog evidence linkage, and offline validation are complete
 
 Stage 1 must not be marked Completed until the real Supabase database has been created, migrations have been applied, and database validation has passed.
@@ -61,7 +62,7 @@ Post-MVP work may cover:
 | 0 | Repository Bootstrap | Completed | Task 001 | Yes |
 | 1 | Durable Storage Foundation | Completed | Task 002 | Yes |
 | 2 | X API Access Spike | Completed | Task 003 | Yes |
-| 3 | X Collection Pipeline | Completed | Tasks 004A through 004C.1 | Yes |
+| 3 | X Collection Pipeline | Completed | Tasks 004A through 004C.1 complete; Task 004D deferred | Yes |
 | 4 | Minimum Knowledge Base | In Progress | Task 005A complete; Task 005B next | Yes |
 | 5 | Relevance Filtering and Signal Clustering | Planned | Task 006 | Yes |
 | 6 | Opportunity Gate and Context Enrichment | Planned | Task 007 | Yes |
@@ -214,6 +215,7 @@ Current state:
 - Task 004B - Content Completeness and Review Views - Completed
 - Task 004C - Complete Incremental Collection and Cost Guardrails - Completed
 - Task 004C.1 - Explicit Baseline Acceptance - Completed
+- Task 004D - Pluggable X Data Providers + Provider Quality Spike - Deferred optimization
 
 ### Task 004A Validation Record
 
@@ -265,6 +267,52 @@ Current state:
 - Final implementation commit: `098a163cfd40859ff3088d192462c0c37c923746`
 - Validation summary: guarded pagination, incomplete-checkpoint safety, explicit no-request baseline acceptance, and one cheap incremental run from the accepted checkpoint passed; PostgreSQL ended with 214 unique Posts and no duplicate IDs
 - Remaining limitations: no historical backfill or automatic missed-window recovery; Developer Console billing was not reconciled; mentions pagination was not observed beyond an empty live response
+
+### Task 004D - Pluggable X Data Providers + Provider Quality Spike
+
+Status: Deferred optimization
+
+Task 004D must not begin before Task 005B, Task 006 and the LLM relevance work, the Opportunity pipeline, and a working MVP/pilot have demonstrated that the intellectual pipeline produces useful Opportunities. It does not reopen Stage 3, change its Completed status, or block the current Task 005B priority.
+
+The future goal is provider-independent X ingestion with an explicit manual configuration switch among preliminary providers:
+
+```text
+X_DATA_PROVIDER=official_x
+X_DATA_PROVIDER=twitterapi_io
+X_DATA_PROVIDER=socialdata
+```
+
+There must be no automatic cheapest-provider selection and no hidden fallback to paid Official X. Any Official X benchmark, selective enrichment, or fallback request must remain explicit and cost-controlled.
+
+The future boundary is:
+
+```text
+Provider
+  -> Provider Adapter
+  -> Normalized Post
+  -> existing collector/storage
+  -> relevance / Signals / Opportunities
+```
+
+Provider-specific response formats must terminate at the adapter. Downstream processing must use a stable internal Post contract and canonical X `post_id` deduplication. `x_home_timeline` and the future `x_followset` are separate logical sources. A provider cursor may be retained for that provider, but it must not become the only portable checkpoint.
+
+For third-party discovery, the initial hypothesis is periodic public-Post collection from the account's current follow-set, estimated at approximately 370 accounts when this task was defined, with several manual or scheduled passes per day to be evaluated later. No provider purchase, adapter, scheduling, or collection is approved by this task.
+
+The first future provider-quality test must be a shadow run over the same approximately 24-hour period for Official X, TwitterAPI.io, and SocialData, not a retrospective benchmark. Official X remains the production source during the test, and third-party results must not change operational checkpoints. The shadow run must compare:
+
+- canonical Post ID coverage, missing Posts, and extra Posts;
+- complete text and long Posts;
+- original Posts, replies, and quote Posts;
+- referenced Post context;
+- author and timestamp integrity;
+- media metadata;
+- duplicates and pagination gaps;
+- latency;
+- actual provider cost.
+
+The initial quality hypothesis for a cheaper provider is approximately 90-95% overall Post recall, provided missing Posts are not systematic; 100% full text for every received Post; no systematic loss of long Posts, quotes, or replies; stable canonical `post_id`; and materially lower cost than Official X. Relevant-Post recall must be evaluated separately after Task 006 produces real AI relevance decisions and is more important than aggregate raw recall.
+
+A possible later operating model is broad collection through a cheaper provider with Official X retained for explicit benchmarks, selective enrichment, or controlled fallback. Task 004D currently records this hypothesis only; it implements no adapter, provider account, shadow run, collector change, or checkpoint change.
 
 ## Stage 4 - Minimum Knowledge Base
 

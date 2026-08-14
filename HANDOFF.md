@@ -1,6 +1,6 @@
 # Ethplorer X Signal Finder - Handoff
 
-Last updated: 2026-08-13
+Last updated: 2026-08-14
 
 Repository HEAD: `1475479b9a2336c25d5f5b42ea22b6aa02b19444` at DOCX-import validation; a HANDOFF-only metadata commit follows it
 
@@ -27,10 +27,11 @@ The project is building an AI-assisted X intelligence pipeline for Ethplorer. It
 ## 2. Current Status
 
 - Current stage: Stage 4 - Minimum Knowledge Base - In Progress.
-- Current task: Task 005A - Knowledge Architecture + Import Contract - Completed after validation.
+- Current task: Task 005B - Ethplorer Knowledge Import - Planned, awaiting its explicit task specification.
 - Last completed task: Task 005A - Knowledge Architecture + Import Contract.
-- Next task: Task 005B - Ethplorer Knowledge Import. It is Planned and must wait for its explicit task specification.
+- Next implementation action: continue Task 005B after its explicit task specification is available.
 - Roadmap status: Stages 0 through 3 are Completed; Stage 4 is In Progress; Stages 5 through 7 are Planned; Stage 8 automation is Deferred.
+- Task 004D - Pluggable X Data Providers + Provider Quality Spike is a Deferred optimization. It does not reopen Stage 3 or displace Task 005B.
 - Task 006B - Author Quality Monitoring and Follow-list Hygiene is Planned after Task 006 produces real AI relevance decisions. It is not current work.
 
 ## 3. What Works Now
@@ -210,6 +211,7 @@ These commands read required values from local environment configuration. Never 
 - The knowledge inventory contains two terminology documents, 17 canonical Ethplorer articles, and zero capability rows. Five DOCX inputs were rendered across 33 pages, structurally inspected, converted to Markdown, checked at 99.7-100% source-token coverage, and represented with 11 deduplicated local images directly under `knowledge/sources/posts/assets/` before the DOCX staging directory was removed. All articles have unique H1 titles, substantial bodies, distinct content, and stable pending metadata. The validator checks machine usability and managed image references without network requests, database access, or model calls.
 - The 2026-08-10 Task 005A amendment documents three knowledge source classes and future import/read contracts only. It adds no X corpus data, importer, analytics adapter, metric retrieval, capability, database change, or runtime integration.
 - The 2026-08-11 first-party X inventory made exactly two `GET /2/users/by/username/{username}` requests for Ethplorer and Binplorer with only `created_at` and `public_metrics` requested. It retrieved no Posts, timelines, search results, expansions, or raw response storage. The estimated standard User Read cost was $0.020 total; Owned Read pricing does not apply to User Lookup. Developer Console billing remains unreconciled.
+- Task 004D was recorded on 2026-08-14 as documentation-only Deferred optimization. Knowledge validation passed for 17 sources and 0 assets with no network or model calls; the default suite passed with 108 tests and 4 external tests skipped. No adapter, provider purchase, X request, shadow run, collector change, database change, or checkpoint change occurred.
 
 These are validation estimates and observations, not a Developer Console billing statement. No raw Post text or raw X response belongs in this file.
 
@@ -222,6 +224,7 @@ These are validation estimates and observations, not a Developer Console billing
 - The knowledge base is not integrated into runtime processing.
 - The 17 canonical Ethplorer articles are inventoried but remain pending substantive review; no evidence-backed capability row exists yet.
 - PostgreSQL, embeddings, vector search, crawling, and semantic retrieval are not part of the knowledge architecture.
+- Provider-independent X ingestion is not implemented. Official X remains the production source; Task 004D defers adapters, provider purchases, shadow testing, and any provider switch until the Opportunity pipeline proves useful in the MVP/pilot.
 - The first-party Ethplorer/Binplorer X editorial corpus importer and compliant corpus storage are not implemented.
 - The dynamic analytics adapter is not implemented; `ethereum-top-addresses-pipeline` remains separate and no snapshot is copied into this repository.
 - Signals and Opportunities have schema placeholders but no runtime creation pipeline.
@@ -242,6 +245,7 @@ Private or licensed source text, unsupported capabilities, crawling, database or
 ## 12. Deferred and Planned Work
 
 - Historical backfill and automatic missed-window recovery.
+- Task 004D - a manually selected provider adapter boundary for `official_x`, `twitterapi_io`, and `socialdata`, followed first by a same-period shadow run that cannot affect operational checkpoints. No automatic cheapest-provider choice or hidden paid Official X fallback is allowed.
 - A first-party Ethplorer/Binplorer X editorial corpus importer and compliant read contract implementation.
 - An on-demand adapter for dated, scoped, provenance-rich dynamic evidence from `ethereum-top-addresses-pipeline` and other approved analytical sources.
 - Task 006B - Author Quality Monitoring and Follow-list Hygiene, after Task 006 produces real AI relevance decisions. It must combine main and referenced context, keep separate main, referenced, and combined metrics, and produce a manual review queue only.
