@@ -16,7 +16,7 @@ Static evidence uses the source-document contract below. Structured assets and c
 
 This future class consists of historical Ethplorer and Binplorer X Posts and replies. It may later support style guidance, reaction-pattern analysis, and evidence of prior public positioning.
 
-The corpus is not imported by Task 005A and does not belong in the static evidence layer merely because it is first-party content. Its future importer and compliant storage must preserve at least the X Post ID and URL, account, publication and retrieval dates, conversation or reply context when available, and source provenance. The future reader must expose why a corpus item was selected and its intended editorial use.
+The corpus was not imported by Task 005A and does not belong in the static evidence layer merely because it is first-party content. Task 005C now stores it separately in PostgreSQL with X Post identity and URL, account, publication and retrieval dates, direct relationship context and availability, media metadata, and source provenance. Future readers must preserve the intended editorial use and must not promote corpus content into capability evidence.
 
 An editorial item can show what Ethplorer or Binplorer previously said. It must not silently establish a product capability, limitation, current fact, or supported network. Any such capability claim still requires reviewed supporting evidence from the static knowledge class.
 
@@ -69,7 +69,7 @@ Current inventory: two terminology documents, 17 complete Ethplorer Markdown art
 
 Every imported static source is one Markdown file below `sources/`. Filenames and existing canonical locations are stable. Each file starts with TOML front matter between `+++` delimiters, followed by source content.
 
-`knowledge/sources/posts/` is the canonical location for the 17 current Ethplorer articles. Do not move or rename these files merely to match product-oriented directory suggestions. Their `source_type` must be `ethplorer_article`, which distinguishes them from the future first-party X editorial corpus.
+`knowledge/sources/posts/` is the canonical location for the 17 current Ethplorer articles. Do not move or rename these files merely to match product-oriented directory suggestions. Their `source_type` must be `ethplorer_article`, which distinguishes them from the PostgreSQL first-party X editorial corpus.
 
 Required metadata:
 

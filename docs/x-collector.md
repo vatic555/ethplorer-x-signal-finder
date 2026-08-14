@@ -2,6 +2,8 @@
 
 Status: Tasks 004A through 004C.1 complete; Stage 3 Completed
 
+Task 005C adds a separate first-party Ethplorer/Binplorer editorial corpus. It does not change this incoming home/mentions collector or its checkpoints. See [`first-party-x-corpus.md`](first-party-x-corpus.md) for the separate User Posts synchronization lifecycle.
+
 Live validation date: 2026-08-07
 
 Live validation fetched 21 home Posts across the required baseline and repeated runs, excluded 4 simple reposts, and saved 17 unique home rows. The stored rows included 13 original Posts, 2 replies, and 2 quote Posts. The repeated run reused and advanced the home checkpoint, and PostgreSQL contained 17 rows with 17 distinct Post IDs. The mentions request succeeded with an empty result and recorded an independent successful sync state. No Post text or raw response was printed or exported during validation.

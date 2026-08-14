@@ -199,3 +199,17 @@ The current `x_home_timeline` and future `x_followset` are distinct logical sour
 The first future evaluation must be a same-period shadow run of approximately 24 hours across Official X, TwitterAPI.io, and SocialData, not a retrospective benchmark. Official X remains production during the test, and third-party reads must not affect operational checkpoints. Evaluation covers Post-ID recall, missing and extra Posts, complete and long text, Post types, referenced context, author and timestamp integrity, media metadata, duplicates, pagination gaps, latency, and actual cost. Initial acceptance may tolerate approximately 90-95% aggregate recall only when losses are not systematic, while requiring complete text for every received Post, stable canonical IDs, no systematic loss of long Posts, quotes, or replies, and materially lower cost. Relevant-Post recall becomes the more important criterion after Task 006 supplies real relevance decisions.
 
 No adapter, provider purchase, shadow run, scheduling, collector change, fallback, or checkpoint migration is part of this decision record.
+
+## 2026-08-14 - Permanent first-party X editorial corpus
+
+Status: Accepted
+
+By explicit owner decision, Task 005C is performed during Stage 4 before final unified vocabulary or prefilter work. Task 005B static capability review remains separate, Stage 4 remains In Progress, and Task 006 does not begin.
+
+Actual Ethplorer and Binplorer Posts retrieved from X form one continuously updated first-party editorial corpus in PostgreSQL. Historical and future Posts use the same `first_party_x_posts` table and source-specific incremental checkpoints. The corpus is separate from incoming `posts`, Git-backed static evidence, generated drafts, and dynamic analytical evidence. Actual X text is authoritative. The corpus may later inform vocabulary, style, reaction patterns, topic interest, and prior public positioning, but it cannot establish a current capability, supported network, price, API limit, limitation, analytical metric, or numerical fact.
+
+All original, reply, quote, and repost Posts are retained. Long text uses `note_tweet.text` when available. An ordered child table preserves every direct referenced relationship and explicitly distinguishes available from unavailable context. A bounded, deduplicated Post Lookup pass may complete only directly referenced IDs and never recursively crawls thread history. Returned media metadata is retained without downloading media.
+
+The implementation reuses read-only OAuth, `runs`, `usage_events`, and `sync_state`. Ethplorer and Binplorer checkpoints advance independently only after their primary timeline pagination reaches an X-provided end without a blocking guard or persistence failure. Resource-level partial errors remain warnings and preserve explicit unavailable context; they do not make an exhausted primary timeline window incomplete. Estimated Post and User Read prices remain configurable, and `reported_cost` stays NULL until external reconciliation.
+
+Migration 003 creates `first_party_x_posts` and `first_party_x_post_references`, enables RLS on both, and leaves old applied migrations unchanged. Raw corpus content remains operational PostgreSQL data and must not be committed to the public repository. Task 005C adds no keywords, LLM processing, style extraction, dynamic analytics adapter, X write access, scheduling, or publication.

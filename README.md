@@ -10,7 +10,7 @@ It is not a generic crypto-news aggregator, an automatic publishing bot, or a me
 
 The durable PostgreSQL storage foundation is implemented and validated against the real Supabase database. PostgreSQL is the operational source of truth, with Supabase selected as the initial managed provider. Application code uses the standard PostgreSQL protocol through `psycopg` and does not use the Supabase Python SDK.
 
-Stage 2 is complete with a `constrained-go` decision, and Stage 3 collection is complete. Stage 4 is In Progress. Task 005A defines a Git-backed static knowledge source of truth, provenance-preserving and normalization-aware source-document contract, evidence-linked asset catalog, and offline validator. It also separates static reviewed knowledge from a future first-party Ethplorer/Binplorer X editorial corpus and dynamic analytical evidence such as `ethereum-top-addresses-pipeline`. Editorial history may guide style and prior positioning but cannot prove capabilities. Dynamic metrics remain upstream and must later be queried with dates, scope, metric identity, and provenance. Neither future adapter is implemented.
+Stage 2 is complete with a `constrained-go` decision, and Stage 3 collection is complete. Stage 4 is In Progress. Task 005A defines a Git-backed static knowledge source of truth, provenance-preserving and normalization-aware source-document contract, evidence-linked asset catalog, and offline validator. It also separates static reviewed knowledge from the first-party Ethplorer/Binplorer X editorial corpus and dynamic analytical evidence such as `ethereum-top-addresses-pipeline`. Task 005C implements the first-party corpus in PostgreSQL as a permanent, continuously updated record of actual public Posts. Editorial history may guide style and prior positioning but cannot prove capabilities. Dynamic metrics remain upstream and must later be queried with dates, scope, metric identity, and provenance. The dynamic analytics adapter is not implemented.
 
 The existing knowledge inventory contains two separate terminology documents and 17 complete Ethplorer Markdown articles in their canonical `knowledge/sources/posts/` location. Five user-provided DOCX sources were converted to normalized Markdown with 11 deduplicated local image assets, then removed after structural, visual, and text-completeness checks. All articles have stable source metadata and remain pending substantive review. No capability rows exist. Task 005B will extract only evidence-supported capabilities, limitations, topics, and asset links under a separate explicit specification.
 
@@ -27,7 +27,7 @@ The repository remains public during the MVP. Public visibility does not change 
 - Stage 2 - X API Access Spike - Completed
 - Stage 3 - X Collection Pipeline - Completed
 - Stage 4 - Minimum Knowledge Base - In Progress
-- Current task - Task 005A - Knowledge Architecture + Import Contract - Completed
+- Last completed task - Task 005C - First-Party X Corpus Import + Continuous Sync
 - Next task - Task 005B - Ethplorer Knowledge Import - Planned, awaiting its explicit task specification
 
 See the canonical [implementation roadmap](docs/roadmap.md), [product and technical specification](docs/project-spec.md), and [architecture decision log](docs/decisions.md).
@@ -130,6 +130,16 @@ python -m x_signal_finder collect accept-baseline --source home --run-id RUN_ID 
 
 `oauth-setup` stores only the refresh token in the ignored local `.env`. Every collector run refreshes the access token in memory and safely replaces a rotated refresh token in `.env`. Collector defaults are `--max-pages 5`, `--max-results 100`, `--max-estimated-cost-usd 1.00`, no total primary-Post limit, `--max-attempts 3`, and `--max-retry-wait-seconds 60`. A total primary limit applies to home then mentions across the whole run. Expanded Posts count toward the estimate, and the cost guard can overshoot by one completed page and its expansions. Collector output contains counts, checkpoints, IDs, estimated X cost, and warnings only. It never prints Post text, raw JSON, or credentials. `--refresh-existing` is explicit and bounded: it omits `since_id`, anchors the window at the stored checkpoint with `until_id`, refreshes returned rows, and does not alter the operational checkpoint. `accept-baseline` is also explicit: without the confirmation flag it prints a safe summary and refuses to mutate state; with confirmation it updates only the selected source checkpoint and audit metadata, making no X request and creating no Posts. See [the Stage 3 collector guide](docs/x-collector.md) for checkpoint behavior and Supabase review views.
 
+First-party editorial corpus synchronization:
+
+```sh
+python -m x_signal_finder first-party-x sync --source ethplorer
+python -m x_signal_finder first-party-x sync --source binplorer
+python -m x_signal_finder first-party-x sync --source both
+```
+
+The same tables contain historical and future Ethplorer/Binplorer Posts. Initial sync paginates the retrievable User Posts window; later runs use independent `since_id` checkpoints. Replies, quotes, and reposts are retained. Direct referenced context is completed in bounded deduplicated batches when needed, and missing context remains explicitly unavailable. Only returned media metadata is stored. No media is downloaded, no X write scope is requested, and diagnostics contain no Post text. See [the first-party corpus operating guide](docs/first-party-x-corpus.md).
+
 Database commands:
 
 ```sh
@@ -167,7 +177,8 @@ python -m pytest -m integration
 - No LLM calls or prompt execution
 - The 17 Ethplorer articles are inventoried but not yet reviewed for capabilities, limitations, topics, products, networks, or asset links
 - No knowledge database, embeddings, vector search, crawler, or runtime knowledge integration
-- No first-party X editorial corpus importer or analytics adapter; `ethereum-top-addresses-pipeline` remains in its own repository
+- The first-party X editorial corpus is collected, but no vocabulary, style, or LLM analysis is derived from it yet
+- No dynamic analytics adapter; `ethereum-top-addresses-pipeline` remains in its own repository
 - No context enrichment from external sources
 - No Telegram delivery
 - No automatic image generation

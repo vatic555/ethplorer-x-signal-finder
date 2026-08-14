@@ -10,7 +10,7 @@ Status: Canonical implementation sequence and progress record
 - Stage 3 - X Collection Pipeline - Completed
 - Stage 4 - Minimum Knowledge Base - In Progress
 - Current task - Task 005B - Ethplorer Knowledge Import - Planned, awaiting its explicit task specification
-- Last completed task - Task 005A - Knowledge Architecture + Import Contract
+- Last completed task - Task 005C - First-Party X Corpus Import + Continuous Sync
 - Local PostgreSQL implementation is ready
 - Real Supabase migration and database validation are complete
 - Task 003 documentation review, diagnostic probe, live OAuth, endpoint, pagination, refresh, and checkpoint validation are complete
@@ -20,6 +20,7 @@ Status: Canonical implementation sequence and progress record
 - Task 004C and Task 004C.1 implementation, synthetic validation, explicit baseline acceptance, and bounded incremental live validation are complete
 - Task 004D provider abstraction and quality spike are Deferred until the Opportunity pipeline proves useful in the MVP/pilot
 - Task 005A knowledge inventory, Git-backed source contract, catalog evidence linkage, and offline validation are complete
+- Task 005C first-party Ethplorer/Binplorer X corpus, migration 003, historical import, and incremental lifecycle validation are complete
 
 Stage 1 must not be marked Completed until the real Supabase database has been created, migrations have been applied, and database validation has passed.
 
@@ -63,7 +64,7 @@ Post-MVP work may cover:
 | 1 | Durable Storage Foundation | Completed | Task 002 | Yes |
 | 2 | X API Access Spike | Completed | Task 003 | Yes |
 | 3 | X Collection Pipeline | Completed | Tasks 004A through 004C.1 complete; Task 004D deferred | Yes |
-| 4 | Minimum Knowledge Base | In Progress | Task 005A complete; Task 005B next | Yes |
+| 4 | Minimum Knowledge Base | In Progress | Tasks 005A and 005C complete; Task 005B next | Yes |
 | 5 | Relevance Filtering and Signal Clustering | Planned | Task 006 | Yes |
 | 6 | Opportunity Gate and Context Enrichment | Planned | Task 007 | Yes |
 | 7 | Drafts, Human Review and Pilot | Planned | Task 008 | Yes |
@@ -336,6 +337,7 @@ Create the minimum reviewed knowledge required for credible Opportunity decision
 
 - Task 005 - Minimum Knowledge Base - In Progress
 - Task 005A - Knowledge Architecture + Import Contract - Completed
+- Task 005C - First-Party X Corpus Import + Continuous Sync - Completed by explicit owner decision before final unified vocabulary work
 - Task 005B - Ethplorer Knowledge Import - Planned and next
 
 ### Task 005A Validation Record
@@ -368,11 +370,33 @@ Create the minimum reviewed knowledge required for credible Opportunity decision
 - Article inventory amendment commit: `29db23781fb5dca3373198477b19ea43303124b3`
 - Stage boundary: Stage 4 remains In Progress; Task 005B is next and Task 006 has not started
 
+### Task 005C Validation Record
+
+- Completion date: 2026-08-14
+- Final implementation commit: `PENDING_TASK_005C_COMMIT`
+- Owner sequencing decision: first-party corpus collection was performed before final unified vocabulary work; Task 005B remains the next separate static capability-review task
+- Schema: migration 003 creates RLS-enabled `first_party_x_posts` and `first_party_x_post_references`, separate from incoming `posts`; no old migration was changed
+- Corpus lifecycle: historical and future Ethplorer/Binplorer Posts share one permanent table; source checkpoints are `first_party_x_ethplorer` and `first_party_x_binplorer`; repeat sync uses `since_id`
+- Content: original, reply, quote, and repost Posts are retained; long text prefers `note_tweet.text`; all direct relationships are ordered and lossless; context is explicitly available, unavailable, or not applicable; returned media metadata is stored without downloading media
+- Inventory snapshot: Ethplorer 352 account-level Posts and Binplorer 39, treated only as reference counts
+- Successful historical retrieval: Ethplorer 339 Posts and Binplorer 39; the Ethplorer difference of 13 is recorded as a retrieval difference, not asserted data loss
+- Types: Ethplorer 156 originals, 121 replies, 24 quotes, and 38 reposts; Binplorer 14 originals, 11 replies, 2 quotes, and 12 reposts
+- Context and media: 187 available and 17 unavailable direct relationship contexts across the stored corpus; successful run returned 198 unique media resources across its two source scopes
+- Range: Ethplorer 2017-05-21 through 2026-07-23; Binplorer 2022-10-13 through 2026-07-16
+- Historical run: 8 requests and `$2.650` estimated cost, including one batched two-User inventory lookup; resource-level partial errors were preserved as warnings
+- Earlier bounded validation attempt: 5 requests and `$0.905` estimated cost exposed overly strict partial-resource classification, saved 132 rows, and advanced no checkpoint; the corrected run safely upserted those rows
+- Repeat incremental validation: 2 timeline requests, 0 primary Posts, 0 new rows, `$0.000` estimated Post-resource cost, and unchanged checkpoints
+- Final database: 378 corpus rows, 378 distinct Post IDs, zero duplicate groups; incoming `posts` remained 214 rows and 214 distinct IDs
+- Checkpoints: Ethplorer `2080369149331558445`; Binplorer `2077741562402939325`
+- Database health: PostgreSQL 17.6 healthy; migrations 1 through 3 current; no pending migrations; RLS intact on all operational tables
+- Tests: 133 passed with 4 external tests skipped before final documentation validation; no default test made an X or PostgreSQL request
+- Scope boundary: no keyword extraction, LLM analysis, style guide, relevance filter, Signals, Opportunities, analytics adapter, media download, X write access, scheduling, or publication was added
+
 ### Completion Record
 
 - Completion date:
 - Final commit:
-- Validation summary: Pending Task 005B and Stage 4 completion.
+- Validation summary: Tasks 005A and 005C complete; Task 005B and Stage 4 completion remain pending.
 - Remaining limitations: The 17 Ethplorer articles remain pending substantive review; no evidence-backed capability rows have been extracted yet.
 
 ## Stage 5 - Relevance Filtering and Signal Clustering

@@ -20,6 +20,8 @@ REQUIRED_TABLES = frozenset(
         "human_reviews",
         "usage_events",
         "sync_state",
+        "first_party_x_posts",
+        "first_party_x_post_references",
     }
 )
 OPERATIONAL_TABLES = REQUIRED_TABLES - {"schema_migrations"}

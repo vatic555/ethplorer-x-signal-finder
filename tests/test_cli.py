@@ -28,7 +28,8 @@ def test_project_status_does_not_require_database(capsys) -> None:
     assert "PostgreSQL storage foundation is implemented" in output
     assert "access spike is complete with a constrained-go decision" in output
     assert "Stage 3 collection is complete" in output
-    assert "Task 005A Git-backed knowledge architecture is implemented" in output
+    assert "Task 005A Git-backed knowledge architecture" in output
+    assert "Task 005C first-party X corpus sync are implemented" in output
 
 
 def test_knowledge_validate_is_offline_and_valid(capsys) -> None:

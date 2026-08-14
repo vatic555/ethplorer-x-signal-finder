@@ -96,6 +96,33 @@ class XApiContentPage:
     __str__ = __repr__
 
 
+@dataclass(frozen=True)
+class XApiUserInventory:
+    user_id: str
+    username: str | None
+    tweet_count: int | None
+
+
+@dataclass(frozen=True, repr=False)
+class XApiUserInventoryPage:
+    """Content-safe User Lookup result used only for inventory counts."""
+
+    status: int
+    users_by_id: Mapping[str, XApiUserInventory]
+    rate_limits: Mapping[str, str]
+    partial_error_count: int
+    elapsed_seconds: float
+
+    def __repr__(self) -> str:
+        return (
+            "XApiUserInventoryPage(status="
+            f"{self.status}, user_count={len(self.users_by_id)}, "
+            f"partial_error_count={self.partial_error_count})"
+        )
+
+    __str__ = __repr__
+
+
 class XApiRequestError(RuntimeError):
     """Safe X API failure without response bodies or credentials."""
 
@@ -386,6 +413,76 @@ def parse_content_page(
     )
 
 
+def parse_user_inventory_page(
+    response: HttpResponse,
+    *,
+    endpoint: str,
+    elapsed: float,
+) -> XApiUserInventoryPage:
+    """Parse only stable User identity and account-level Post count."""
+    payload, rate_limits = _decode_payload(response, endpoint=endpoint)
+    data = payload.get("data", [])
+    errors = payload.get("errors", [])
+    if not isinstance(data, list) or not isinstance(errors, list):
+        raise XApiRequestError(
+            status=response.status,
+            category="unexpected_response_shape",
+            endpoint=endpoint,
+            rate_limits=rate_limits,
+        )
+    users: dict[str, XApiUserInventory] = {}
+    for item in data:
+        if not isinstance(item, dict) or not isinstance(item.get("id"), str):
+            raise XApiRequestError(
+                status=response.status,
+                category="unexpected_response_shape",
+                endpoint=endpoint,
+                rate_limits=rate_limits,
+            )
+        username = item.get("username")
+        metrics = item.get("public_metrics")
+        if username is not None and not isinstance(username, str):
+            raise XApiRequestError(
+                status=response.status,
+                category="unexpected_response_shape",
+                endpoint=endpoint,
+                rate_limits=rate_limits,
+            )
+        tweet_count = None
+        if metrics is not None:
+            if not isinstance(metrics, dict):
+                raise XApiRequestError(
+                    status=response.status,
+                    category="unexpected_response_shape",
+                    endpoint=endpoint,
+                    rate_limits=rate_limits,
+                )
+            raw_count = metrics.get("tweet_count")
+            if raw_count is not None and (
+                not isinstance(raw_count, int) or isinstance(raw_count, bool)
+            ):
+                raise XApiRequestError(
+                    status=response.status,
+                    category="unexpected_response_shape",
+                    endpoint=endpoint,
+                    rate_limits=rate_limits,
+                )
+            tweet_count = raw_count
+        user_id = str(item["id"])
+        users[user_id] = XApiUserInventory(
+            user_id=user_id,
+            username=username,
+            tweet_count=tweet_count,
+        )
+    return XApiUserInventoryPage(
+        status=response.status,
+        users_by_id=users,
+        rate_limits=rate_limits,
+        partial_error_count=len(errors),
+        elapsed_seconds=elapsed,
+    )
+
+
 class XApiClient:
     """Read-only X client with explicit diagnostic and collector result paths."""
 
@@ -415,6 +512,25 @@ class XApiClient:
     ) -> XApiContentPage:
         response, elapsed = self._get(endpoint, params)
         return parse_content_page(response, endpoint=endpoint, elapsed=elapsed)
+
+    def get_user_inventory(
+        self,
+        user_ids: tuple[str, ...],
+    ) -> XApiUserInventoryPage:
+        if not user_ids:
+            raise ValueError("At least one X user ID is required.")
+        response, elapsed = self._get(
+            "/users",
+            {
+                "ids": ",".join(user_ids),
+                "user.fields": "public_metrics,username",
+            },
+        )
+        return parse_user_inventory_page(
+            response,
+            endpoint="/users",
+            elapsed=elapsed,
+        )
 
     def _get(
         self,

@@ -196,6 +196,136 @@ class StorageRepository:
         ).fetchall()
         return frozenset(str(row[0]) for row in rows)
 
+    def get_existing_first_party_x_post_ids(
+        self,
+        post_ids: Iterable[str],
+    ) -> frozenset[str]:
+        values = sorted(set(post_ids))
+        if not values:
+            return frozenset()
+        rows = self._connection.execute(
+            """
+            SELECT post_id
+            FROM first_party_x_posts
+            WHERE post_id = ANY(%s)
+            """,
+            (values,),
+        ).fetchall()
+        return frozenset(str(row[0]) for row in rows)
+
+    def upsert_first_party_x_posts(self, posts: Iterable[JsonObject]) -> None:
+        """Upsert X corpus rows while preserving first-seen and manual provenance."""
+        post_statement = """
+            INSERT INTO first_party_x_posts (
+                post_id, source_account, source_user_id, author_id,
+                author_username, post_url, created_at, conversation_id,
+                in_reply_to_user_id, post_type, text, lang, entities,
+                public_metrics, media_metadata, referenced_relationships,
+                referenced_context_state, raw_json, publication_origin,
+                opportunity_id, first_seen_run_id, last_seen_run_id,
+                first_collected_at, last_collected_at
+            )
+            VALUES (
+                %s, %s, %s, %s, %s, %s, %s, %s,
+                %s, %s, %s, %s, %s, %s, %s, %s,
+                %s, %s, %s, %s, %s, %s, %s, %s
+            )
+            ON CONFLICT (post_id) DO UPDATE SET
+                source_account = EXCLUDED.source_account,
+                source_user_id = EXCLUDED.source_user_id,
+                author_id = EXCLUDED.author_id,
+                author_username = EXCLUDED.author_username,
+                post_url = EXCLUDED.post_url,
+                created_at = EXCLUDED.created_at,
+                conversation_id = EXCLUDED.conversation_id,
+                in_reply_to_user_id = EXCLUDED.in_reply_to_user_id,
+                post_type = EXCLUDED.post_type,
+                text = EXCLUDED.text,
+                lang = EXCLUDED.lang,
+                entities = EXCLUDED.entities,
+                public_metrics = EXCLUDED.public_metrics,
+                media_metadata = EXCLUDED.media_metadata,
+                referenced_relationships = EXCLUDED.referenced_relationships,
+                referenced_context_state = EXCLUDED.referenced_context_state,
+                raw_json = EXCLUDED.raw_json,
+                last_seen_run_id = EXCLUDED.last_seen_run_id,
+                last_collected_at = EXCLUDED.last_collected_at
+        """
+        reference_statement = """
+            INSERT INTO first_party_x_post_references (
+                source_post_id, relationship_index, relationship_type,
+                referenced_post_id, context_state, referenced_text,
+                referenced_author_id, referenced_author_username,
+                referenced_created_at, referenced_entities,
+                referenced_media_metadata, raw_relationship,
+                expanded_raw_json
+            )
+            VALUES (
+                %s, %s, %s, %s, %s, %s, %s, %s,
+                %s, %s, %s, %s, %s
+            )
+        """
+        for post in posts:
+            self._connection.execute(
+                post_statement,
+                (
+                    post["post_id"],
+                    post["source_account"],
+                    post["source_user_id"],
+                    post.get("author_id"),
+                    post.get("author_username"),
+                    post["post_url"],
+                    post["created_at"],
+                    post.get("conversation_id"),
+                    post.get("in_reply_to_user_id"),
+                    post["post_type"],
+                    post["text"],
+                    post.get("lang"),
+                    Jsonb(dict(post.get("entities", {}))),
+                    Jsonb(dict(post.get("public_metrics", {}))),
+                    Jsonb(list(post.get("media_metadata", []))),
+                    Jsonb(list(post.get("referenced_relationships", []))),
+                    post["referenced_context_state"],
+                    Jsonb(dict(post["raw_json"])),
+                    post.get("publication_origin", "unknown"),
+                    post.get("opportunity_id"),
+                    post["first_seen_run_id"],
+                    post["last_seen_run_id"],
+                    post["first_collected_at"],
+                    post["last_collected_at"],
+                ),
+            )
+            self._connection.execute(
+                "DELETE FROM first_party_x_post_references WHERE source_post_id = %s",
+                (post["post_id"],),
+            )
+            references = post.get("references", [])
+            if references:
+                parameters = [
+                    (
+                        post["post_id"],
+                        reference["relationship_index"],
+                        reference["relationship_type"],
+                        reference["referenced_post_id"],
+                        reference["context_state"],
+                        reference.get("referenced_text"),
+                        reference.get("referenced_author_id"),
+                        reference.get("referenced_author_username"),
+                        reference.get("referenced_created_at"),
+                        Jsonb(dict(reference.get("referenced_entities", {}))),
+                        Jsonb(list(reference.get("referenced_media_metadata", []))),
+                        Jsonb(dict(reference["raw_relationship"])),
+                        (
+                            Jsonb(dict(reference["expanded_raw_json"]))
+                            if reference.get("expanded_raw_json") is not None
+                            else None
+                        ),
+                    )
+                    for reference in references
+                ]
+                with self._connection.cursor() as cursor:
+                    cursor.executemany(reference_statement, parameters)
+
     def get_sync_state(self, source_key: str) -> dict[str, Any] | None:
         row = self._connection.execute(
             """

@@ -33,6 +33,7 @@ class XApiConfig:
     home_user_id: str = ""
     ethplorer_user_id: str = ""
     post_read_unit_cost_usd: Decimal = Decimal("0.005")
+    user_read_unit_cost_usd: Decimal = Decimal("0.010")
     base_url: str = X_API_BASE_URL
 
     def __repr__(self) -> str:
@@ -103,15 +104,17 @@ def load_x_api_config(
         return str(raw or "").strip()
 
     raw_unit_cost = value("X_POST_READ_UNIT_COST_USD", "0.005") or "0.005"
+    raw_user_unit_cost = value("X_USER_READ_UNIT_COST_USD", "0.010") or "0.010"
     try:
         unit_cost = Decimal(raw_unit_cost)
+        user_unit_cost = Decimal(raw_user_unit_cost)
     except InvalidOperation as error:
         raise XApiConfigurationError(
-            "X_POST_READ_UNIT_COST_USD must be a decimal number."
+            "X read unit costs must be decimal numbers."
         ) from error
-    if unit_cost <= 0:
+    if unit_cost <= 0 or user_unit_cost <= 0:
         raise XApiConfigurationError(
-            "X_POST_READ_UNIT_COST_USD must be positive."
+            "X read unit costs must be positive."
         )
 
     return XApiConfig(
@@ -124,6 +127,7 @@ def load_x_api_config(
         home_user_id=value("X_HOME_USER_ID"),
         ethplorer_user_id=value("X_ETHPLORER_USER_ID"),
         post_read_unit_cost_usd=unit_cost,
+        user_read_unit_cost_usd=user_unit_cost,
     )
 
 

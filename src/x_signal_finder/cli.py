@@ -42,6 +42,15 @@ from x_signal_finder.db.migrations import (
     discover_migrations,
 )
 from x_signal_finder.db.repository import StorageRepository
+from x_signal_finder.first_party_x import (
+    ACCOUNTS as FIRST_PARTY_ACCOUNTS,
+    FirstPartyXError,
+    fetch_first_party_source,
+    record_first_party_usage,
+    record_inventory_usage,
+    save_first_party_source,
+    source_key_for as first_party_source_key_for,
+)
 from x_signal_finder.knowledge import validate_knowledge
 from x_signal_finder.x_api.client import XApiClient, XApiRequestError
 from x_signal_finder.x_api.config import (
@@ -61,7 +70,8 @@ STATUS_MESSAGE = (
     "Durable PostgreSQL storage foundation is implemented. "
     "The X API access spike is complete with a constrained-go decision. "
     "Stage 3 collection is complete. "
-    "Task 005A Git-backed knowledge architecture is implemented; "
+    "Task 005A Git-backed knowledge architecture and Task 005C first-party "
+    "X corpus sync are implemented; "
     "LLM integration is not implemented."
 )
 
@@ -196,6 +206,33 @@ def build_parser() -> argparse.ArgumentParser:
             "omit since_id, and refresh Post content without changing the "
             "operational checkpoint."
         ),
+    )
+    first_party = subparsers.add_parser(
+        "first-party-x",
+        help="Synchronize the PostgreSQL first-party Ethplorer/Binplorer X corpus.",
+    )
+    first_party_subparsers = first_party.add_subparsers(dest="first_party_command")
+    first_party_sync = first_party_subparsers.add_parser(
+        "sync",
+        help="Run a complete historical or incremental read-only corpus sync.",
+    )
+    first_party_sync.add_argument(
+        "--source",
+        choices=("ethplorer", "binplorer", "both"),
+        default="both",
+    )
+    first_party_sync.add_argument("--max-pages", type=int, default=5)
+    first_party_sync.add_argument(
+        "--max-estimated-cost-usd",
+        type=Decimal,
+        default=Decimal("1.00"),
+        help="Stop before another request once estimated run cost reaches this guard.",
+    )
+    first_party_sync.add_argument("--max-attempts", type=int, default=3)
+    first_party_sync.add_argument(
+        "--max-retry-wait-seconds",
+        type=float,
+        default=60,
     )
     return parser
 
@@ -881,6 +918,380 @@ def _run_collect(args: argparse.Namespace) -> int:
     return 1 if failures or blocking_warning else 0
 
 
+def _run_first_party_x_sync(args: argparse.Namespace) -> int:
+    if args.max_pages < 1:
+        raise ValueError("max_pages must be at least 1")
+    if args.max_estimated_cost_usd <= 0:
+        raise ValueError("max_estimated_cost_usd must be positive")
+    if args.max_attempts < 1:
+        raise ValueError("max_attempts must be at least 1")
+    if args.max_retry_wait_seconds < 0:
+        raise ValueError("max_retry_wait_seconds must not be negative")
+
+    database_config = load_database_config()
+    x_config = load_x_api_config()
+    x_config.require_collector_setup()
+
+    requested_sources = (
+        ("ethplorer", "binplorer")
+        if args.source == "both"
+        else (args.source,)
+    )
+    inventory_reference_total = sum(
+        FIRST_PARTY_ACCOUNTS[source].inventory_reference
+        for source in requested_sources
+    )
+    print(
+        json.dumps(
+            {
+                "preflight": {
+                    "source": args.source,
+                    "sources": list(requested_sources),
+                    "previous_inventory_primary_posts": inventory_reference_total,
+                    "inventory_primary_post_cost_estimate_usd": format(
+                        inventory_reference_total
+                        * x_config.post_read_unit_cost_usd,
+                        "f",
+                    ),
+                    "max_pages_per_source": args.max_pages,
+                    "max_estimated_cost_usd": format(
+                        args.max_estimated_cost_usd,
+                        "f",
+                    ),
+                    "note": (
+                        "Inventory counts are references, not a completeness promise; "
+                        "direct reference completion may add Post resources."
+                    ),
+                }
+            },
+            indent=2,
+            sort_keys=True,
+        )
+    )
+
+    refreshed = refresh_access_token(
+        client_id=x_config.client_id,
+        refresh_token=x_config.refresh_token,
+    )
+    persist_refresh_token(refreshed.refresh_token)
+    client = XApiClient(
+        token=refreshed.access_token,
+        base_url=x_config.base_url,
+    )
+
+    run_id = uuid4()
+    started_at = datetime.now(timezone.utc)
+    summaries = []
+    failures: list[dict[str, object]] = []
+    reports: list[dict[str, object]] = []
+    run_estimated_cost = Decimal("0")
+    run_requests = 0
+    inventory_counts: dict[str, int | None] = {}
+    inventory_report: dict[str, object] = {
+        "requested": False,
+        "request_count": 0,
+        "user_resources": 0,
+        "estimated_x_cost_usd": "0",
+        "reported_cost_usd": None,
+        "warnings": [],
+    }
+
+    with connect_database(database_config) as connection:
+        repository = StorageRepository(connection)
+        with connection.transaction():
+            repository.create_run(
+                run_id=run_id,
+                started_at=started_at,
+                trigger_type="manual_first_party_x_sync",
+                application_version=__version__,
+                metadata={
+                    "source": args.source,
+                    "max_pages": args.max_pages,
+                    "max_estimated_cost_usd": format(
+                        args.max_estimated_cost_usd,
+                        "f",
+                    ),
+                    "max_attempts": args.max_attempts,
+                    "max_retry_wait_seconds": args.max_retry_wait_seconds,
+                    "task": "005C",
+                },
+            )
+
+        states: dict[str, dict[str, object] | None] = {}
+        for source in requested_sources:
+            with connection.transaction():
+                states[source] = repository.get_sync_state(
+                    first_party_source_key_for(source)
+                )
+
+        initial_sources = tuple(
+            source
+            for source in requested_sources
+            if not states[source]
+            or states[source].get("checkpoint_value") is None
+        )
+        inventory_user_cost = x_config.user_read_unit_cost_usd * len(initial_sources)
+        if initial_sources and inventory_user_cost < args.max_estimated_cost_usd:
+            inventory_report["requested"] = True
+            try:
+                inventory_page = client.get_user_inventory(
+                    tuple(FIRST_PARTY_ACCOUNTS[source].user_id for source in initial_sources)
+                )
+                run_requests += 1
+                for source in initial_sources:
+                    user_id = FIRST_PARTY_ACCOUNTS[source].user_id
+                    snapshot = inventory_page.users_by_id.get(user_id)
+                    inventory_counts[source] = (
+                        snapshot.tweet_count if snapshot is not None else None
+                    )
+                if inventory_page.partial_error_count:
+                    inventory_report["warnings"] = ["inventory_partial_errors_present"]
+                with connection.transaction():
+                    inventory_cost = record_inventory_usage(
+                        repository=repository,
+                        run_id=run_id,
+                        usage_event_id=uuid4(),
+                        collected_at=datetime.now(timezone.utc),
+                        request_count=1,
+                        user_count=len(inventory_page.users_by_id),
+                        unit_cost_usd=x_config.user_read_unit_cost_usd,
+                        inventory_counts={
+                            source: inventory_counts.get(source)
+                            for source in initial_sources
+                        },
+                    )
+                run_estimated_cost += inventory_cost
+                inventory_report.update(
+                    {
+                        "request_count": 1,
+                        "user_resources": len(inventory_page.users_by_id),
+                        "estimated_x_cost_usd": format(inventory_cost, "f"),
+                        "counts": {
+                            source: inventory_counts.get(source)
+                            for source in initial_sources
+                        },
+                    }
+                )
+            except XApiRequestError as error:
+                run_requests += 1
+                inventory_report.update(
+                    {
+                        "request_count": 1,
+                        "warnings": ["inventory_lookup_failed"],
+                        "error": error.safe_diagnostic(),
+                    }
+                )
+        elif initial_sources:
+            inventory_report["warnings"] = ["inventory_lookup_skipped_by_cost_guard"]
+
+        for source in requested_sources:
+            previous_state = states[source]
+            checkpoint_before = (
+                str(previous_state["checkpoint_value"])
+                if previous_state
+                and previous_state.get("checkpoint_value") is not None
+                else None
+            )
+            if run_estimated_cost >= args.max_estimated_cost_usd:
+                failure = {
+                    "source": source,
+                    "source_key": first_party_source_key_for(source),
+                    "completion_state": "incomplete",
+                    "checkpoint_before": checkpoint_before,
+                    "checkpoint_after": checkpoint_before,
+                    "error_category": "not_requested_due_to_cost_guard",
+                    "warnings": ["cost_guard_reached"],
+                }
+                failures.append(failure)
+                reports.append(failure)
+                continue
+
+            collected_at = datetime.now(timezone.utc)
+            try:
+                fetched = fetch_first_party_source(
+                    client=client,
+                    source=source,
+                    run_id=run_id,
+                    collected_at=collected_at,
+                    checkpoint_before=checkpoint_before,
+                    max_pages=args.max_pages,
+                    max_estimated_cost_usd=args.max_estimated_cost_usd,
+                    estimated_cost_before_usd=run_estimated_cost,
+                    unit_cost_usd=x_config.post_read_unit_cost_usd,
+                    inventory_tweet_count=inventory_counts.get(source),
+                    max_attempts=args.max_attempts,
+                    max_retry_wait_seconds=args.max_retry_wait_seconds,
+                )
+            except XApiRequestError as error:
+                failure = {
+                    "source": source,
+                    "source_key": first_party_source_key_for(source),
+                    "completion_state": "incomplete",
+                    "checkpoint_before": checkpoint_before,
+                    "checkpoint_after": checkpoint_before,
+                    "error_category": error.category,
+                    "http_result": error.status,
+                    "rate_limits": error.rate_limits,
+                    "warnings": ["request_failed"],
+                }
+                metadata = dict(
+                    previous_state.get("checkpoint_metadata") or {}
+                ) if previous_state else {}
+                metadata["last_attempt_status"] = "failed"
+                metadata["last_attempt_error_category"] = error.category
+                try:
+                    with connection.transaction():
+                        repository.update_sync_state(
+                            source_key=first_party_source_key_for(source),
+                            checkpoint_value=checkpoint_before,
+                            checkpoint_metadata=metadata,
+                            last_attempt_at=collected_at,
+                            last_successful_at=(
+                                previous_state.get("last_successful_at")
+                                if previous_state
+                                else None
+                            ),
+                            last_successful_run_id=(
+                                previous_state.get("last_successful_run_id")
+                                if previous_state
+                                else None
+                            ),
+                            last_warning_code=error.category,
+                            updated_at=collected_at,
+                        )
+                except Exception:
+                    failure["sync_failure_recorded"] = False
+                failures.append(failure)
+                reports.append(failure)
+                continue
+            except FirstPartyXError as error:
+                failure = {
+                    "source": source,
+                    "source_key": first_party_source_key_for(source),
+                    "completion_state": "incomplete",
+                    "checkpoint_before": checkpoint_before,
+                    "checkpoint_after": checkpoint_before,
+                    "error_category": "first_party_content_error",
+                    "warnings": [str(error)],
+                }
+                failures.append(failure)
+                reports.append(failure)
+                continue
+
+            run_requests += fetched.requests_count
+            run_estimated_cost += fetched.estimated_cost_usd
+            usage_recorded = False
+            try:
+                with connection.transaction():
+                    record_first_party_usage(
+                        repository=repository,
+                        fetched=fetched,
+                        run_id=run_id,
+                        usage_event_id=uuid4(),
+                        collected_at=collected_at,
+                    )
+                usage_recorded = True
+            except Exception:
+                fetched = fetched.with_warning("usage_recording_failed")
+
+            try:
+                with connection.transaction():
+                    summary = save_first_party_source(
+                        repository=repository,
+                        fetched=fetched,
+                        previous_state=previous_state,
+                        run_id=run_id,
+                        collected_at=collected_at,
+                        max_pages=args.max_pages,
+                    )
+            except Exception:
+                failure = {
+                    "source": source,
+                    "source_key": first_party_source_key_for(source),
+                    "completion_state": "incomplete",
+                    "checkpoint_before": checkpoint_before,
+                    "checkpoint_after": checkpoint_before,
+                    "error_category": "database_write_failed",
+                    "usage_recorded": usage_recorded,
+                    "primary_posts_received": fetched.primary_posts_received,
+                    "estimated_x_cost_usd": format(fetched.estimated_cost_usd, "f"),
+                    "warnings": ["database_write_failed"],
+                }
+                failures.append(failure)
+                reports.append(failure)
+                continue
+            summaries.append(summary)
+            diagnostic = summary.safe_diagnostic()
+            diagnostic["usage_recorded"] = usage_recorded
+            if fetched.terminal_error_category:
+                diagnostic["errors"] = [
+                    {
+                        "error_category": fetched.terminal_error_category,
+                        "http_result": fetched.terminal_http_status,
+                    }
+                ]
+            reports.append(diagnostic)
+
+        warning_count = (
+            sum(len(summary.warnings) for summary in summaries)
+            + len(failures)
+            + len(inventory_report.get("warnings", []))
+        )
+        incomplete = bool(failures) or any(
+            summary.has_blocking_warning for summary in summaries
+        )
+        finished_at = datetime.now(timezone.utc)
+        if failures and not summaries:
+            run_status = "failed"
+            with connection.transaction():
+                repository.fail_run(
+                    run_id=run_id,
+                    finished_at=finished_at,
+                    error_summary=f"{len(failures)} first-party source sync(s) failed",
+                    warning_count=warning_count,
+                )
+        else:
+            run_status = "incomplete" if incomplete else (
+                "completed_with_warnings" if warning_count else "completed"
+            )
+            with connection.transaction():
+                repository.complete_run(
+                    run_id=run_id,
+                    finished_at=finished_at,
+                    completed_with_warnings=incomplete or bool(warning_count),
+                    fetched_posts_count=sum(
+                        summary.primary_posts_received for summary in summaries
+                    ),
+                    new_posts_count=sum(summary.new_posts for summary in summaries),
+                    warning_count=warning_count,
+                    error_summary=(
+                        f"{len(failures)} first-party source sync(s) failed"
+                        if failures
+                        else None
+                    ),
+                )
+
+    print(
+        json.dumps(
+            {
+                "run_id": str(run_id),
+                "status": run_status,
+                "inventory": inventory_report,
+                "sources": reports,
+                "usage": {
+                    "requests_count": run_requests,
+                    "estimated_x_cost_usd": format(run_estimated_cost, "f"),
+                    "reported_cost_usd": None,
+                },
+                "errors": failures,
+            },
+            indent=2,
+            sort_keys=True,
+        )
+    )
+    return 1 if incomplete else 0
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     """Run the command-line interface and return a process exit code."""
     parser = build_parser()
@@ -966,6 +1377,36 @@ def main(argv: Sequence[str] | None = None) -> int:
             safe_error = redact_secrets(error)
             print(
                 f"Collection failed: {type(error).__name__}: {safe_error}",
+                file=sys.stderr,
+            )
+            return 1
+    if args.command == "first-party-x":
+        if args.first_party_command is None:
+            parser.parse_args(["first-party-x", "--help"])
+            return 0
+        try:
+            return _run_first_party_x_sync(args)
+        except (
+            ConfigurationError,
+            XApiConfigurationError,
+            OAuthFlowError,
+            FirstPartyXError,
+            ValueError,
+        ) as error:
+            safe_error = redact_secrets(str(error))
+            print(f"First-party X sync failed: {safe_error}", file=sys.stderr)
+            return 2
+        except psycopg.OperationalError:
+            print(
+                "First-party X sync failed: PostgreSQL connection unavailable. "
+                "Check DATABASE_URL, network access, and SSL settings.",
+                file=sys.stderr,
+            )
+            return 1
+        except Exception as error:
+            safe_error = redact_secrets(error)
+            print(
+                f"First-party X sync failed: {type(error).__name__}: {safe_error}",
                 file=sys.stderr,
             )
             return 1
