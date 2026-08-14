@@ -28,10 +28,11 @@ The project is building an AI-assisted X intelligence pipeline for Ethplorer. It
 
 - Current stage: Stage 4 - Minimum Knowledge Base - In Progress.
 - Current task: Task 005B - Ethplorer Knowledge Import - Planned, awaiting its explicit task specification.
-- Last completed task: Task 005C.1 - First-Party X Corpus Corrections.
+- Last completed task: Task 004D - X Provider Shadow Quality Spike.
+- Completed bounded exception: Task 004D accepted no third-party provider and made no production change.
 - Next implementation action: continue Task 005B after its explicit task specification is available.
 - Roadmap status: Stages 0 through 3 are Completed; Stage 4 is In Progress; Stages 5 through 7 are Planned; Stage 8 automation is Deferred.
-- Task 004D - Pluggable X Data Providers + Provider Quality Spike is a Deferred optimization. It does not reopen Stage 3 or displace Task 005B.
+- Task 004D is an owner-authorized non-production shadow spike. It does not reopen Stage 3, change the production collector, or change Task 005B and Task 006 as the next MVP work.
 - Task 006B - Author Quality Monitoring and Follow-list Hygiene is Planned after Task 006 produces real AI relevance decisions. It is not current work.
 
 ## 3. What Works Now
@@ -75,6 +76,7 @@ The following capabilities have been implemented and validated:
 - compact safe reasons for unavailable referenced context when X supplies a resource-specific error;
 - deterministic destination URLs from stored X entities without redirect crawling or another X request;
 - `first_party_x_posts.text` as the canonical downstream analysis text, with full `note_tweet.text` preferred over normal `text`.
+- completed Task 004D read-only provider comparison with canonical ID, content, context, media, pagination, and spend reporting; neither trial was accepted and Official X remains production.
 
 ## 4. Current Data Flow
 
@@ -128,6 +130,7 @@ The Git-backed static knowledge architecture and 17-article Ethplorer source inv
 - [`docs/x-api-access-spike.md`](docs/x-api-access-spike.md) - Task 003 evidence, constraints, pricing, and compliance analysis.
 - [`docs/x-collector.md`](docs/x-collector.md) - Stage 3 collector behavior and operating guide.
 - [`docs/first-party-x-corpus.md`](docs/first-party-x-corpus.md) - Task 005C corpus authority, schema, sync, guards, and validation record.
+- [`docs/x-provider-shadow-spike.md`](docs/x-provider-shadow-spike.md) - Task 004D provider contracts, cost guards, comparison semantics, and live report.
 - [`knowledge/README.md`](knowledge/README.md) - Task 005A source-document, capability, import, and validation contracts.
 - [`knowledge/source_documents.md`](knowledge/source_documents.md) - current source inventory and provenance index.
 - [`knowledge/terminology/`](knowledge/terminology/) - separate shared analytics and project terminology.
@@ -138,6 +141,7 @@ The Git-backed static knowledge architecture and 17-article Ethplorer source inv
 - [`src/x_signal_finder/collector.py`](src/x_signal_finder/collector.py) - X Post mapping, bounded fetching, refresh behavior, and persistence orchestration.
 - [`src/x_signal_finder/first_party_x.py`](src/x_signal_finder/first_party_x.py) - first-party corpus mapping, pagination, reference completion, usage, and checkpoint behavior.
 - [`src/x_signal_finder/x_content.py`](src/x_signal_finder/x_content.py) - safe downstream helpers for deterministic URL resolution and unavailable-reference reasons.
+- [`src/x_signal_finder/x_provider_shadow.py`](src/x_signal_finder/x_provider_shadow.py) - isolated provider adapters, Normalized Post contract, cost guards, and shadow comparison.
 - [`src/x_signal_finder/x_api/`](src/x_signal_finder/x_api/) - read-only X API client, OAuth, configuration, and probe code.
 - [`src/x_signal_finder/db/`](src/x_signal_finder/db/) - PostgreSQL connection, migration, checks, and repository code.
 - [`migrations/`](migrations/) - ordered, checksum-tracked PostgreSQL schema migrations.
@@ -248,7 +252,9 @@ These commands read required values from local environment configuration. Never 
 - Task 005C.1 validated deterministic URLs against stored entities only: 232 Posts contain 348 deduplicated URL entities, 343 have `expanded_url`, 62 have `unwound_url`, 4 remain `t.co`-only, and 103 resolve to Ethplorer or Binplorer sites.
 - Task 005C.1 preserved 378 distinct first-party rows, 214 distinct incoming rows, both first-party checkpoints, migrations 1 through 3, and RLS. It made no X request.
 - The X Developer Console balance observed on 2026-08-14 was USD 5.12. This is a forward reconciliation baseline only, not evidence of Task 005C actual cost; future approved live validation should record balance before and after the run where practical.
-- Latest committed default suite: 147 passed with 4 external tests skipped. Explicit PostgreSQL integration suite: 2 passed. Knowledge validation remains valid for 17 sources and 0 assets with no network or model calls.
+- Task 004D reused a stored 192-Post Official X benchmark after a fresh request returned HTTP 402. TwitterAPI.io matched 25 IDs at 13.02% recall and 96.0% exact matched text for $0.09975 actual spend; SocialData matched 11 IDs at 5.73% recall and 100% exact matched text for a conservative $0.0966 estimate. Both runs were incomplete, neither provider was accepted, and raw responses remained ignored locally.
+- Task 004D DB verification preserved 214 `posts`, 378 `first_party_x_posts`, four `sync_state` rows, and the exact pre-run `sync_state` fingerprint.
+- Latest local default suite: 156 passed with 4 external tests skipped. Explicit PostgreSQL integration suite: 2 passed previously. Knowledge validation remains valid for 17 sources and 0 assets with no network or model calls.
 
 These are validation estimates and observations, not a Developer Console billing statement. No raw Post text or raw X response belongs in this file.
 
@@ -261,7 +267,8 @@ These are validation estimates and observations, not a Developer Console billing
 - The knowledge base is not integrated into runtime processing.
 - The 17 canonical Ethplorer articles are inventoried but remain pending substantive review; no evidence-backed capability row exists yet.
 - PostgreSQL, embeddings, vector search, crawling, and semantic retrieval are not part of the knowledge architecture.
-- Provider-independent X ingestion is not implemented. Official X remains the production source; Task 004D defers adapters, provider purchases, shadow testing, and any provider switch until the Opportunity pipeline proves useful in the MVP/pilot.
+- Production provider-independent X ingestion is not implemented. Official X remains the production source. Task 004D implements only an isolated local shadow comparison and no provider switch, fallback, scheduler, monitor, webhook, or checkpoint integration.
+- Task 004D did not produce a qualifying third-party provider. Its historical stored benchmark and incomplete trial runs limit provider-quality conclusions; Official X remains production.
 - The first-party corpus is stored and synchronized, but no vocabulary, style, keyword, or LLM analysis is derived from it yet.
 - The dynamic analytics adapter is not implemented; `ethereum-top-addresses-pipeline` remains separate and no snapshot is copied into this repository.
 - Signals and Opportunities have schema placeholders but no runtime creation pipeline.
@@ -282,7 +289,7 @@ Private or licensed source text, unsupported capabilities, crawling, database or
 ## 12. Deferred and Planned Work
 
 - Historical backfill and automatic missed-window recovery.
-- Task 004D - a manually selected provider adapter boundary for `official_x`, `twitterapi_io`, and `socialdata`, followed first by a same-period shadow run that cannot affect operational checkpoints. No automatic cheapest-provider choice or hidden paid Official X fallback is allowed.
+- A separate future SocialData experiment may evaluate grouped Search Query Monitors feeding webhook events into the Normalized Post boundary, but Task 004D evidence does not promote it. It must not create approximately 370 User Monitors or use keyword pre-filtering in place of project relevance logic.
 - Future integration of the implemented first-party incremental sync into the eventual normal pipeline orchestration.
 - An on-demand adapter for dated, scoped, provenance-rich dynamic evidence from `ethereum-top-addresses-pipeline` and other approved analytical sources.
 - Task 006B - Author Quality Monitoring and Follow-list Hygiene, after Task 006 produces real AI relevance decisions. It must combine main and referenced context, keep separate main, referenced, and combined metrics, and produce a manual review queue only.

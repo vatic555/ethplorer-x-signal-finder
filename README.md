@@ -16,7 +16,7 @@ The existing knowledge inventory contains two separate terminology documents and
 
 The manually started collector uses OAuth refresh, fetches home or `@Ethplorer` mentions, excludes simple reposts from home, and upserts Posts plus independent source checkpoints into PostgreSQL. It preserves long-form `note_tweet.text`, returned referenced Post context, and returned media metadata without downloading media. It follows incremental pagination until completion or an explicit page, primary-Post, cost, partial-response, or error guard. Incomplete work saves available Posts and estimated usage but does not advance its source checkpoint. An explicit confirmation-gated baseline action can accept the newest first-page ID from a validated incomplete run without making another X request.
 
-LLM integration, Telegram, and publication are not implemented. All publication remains a mandatory human action.
+Task 004D provides a separate read-only shadow CLI for one bounded Official X, TwitterAPI.io, and SocialData quality and cost comparison. It uses an internal Normalized Post comparison contract, writes raw responses only under ignored local runtime storage, enforces a maximum $0.10 spend per third-party provider, and never writes PostgreSQL or changes the production collector. LLM integration, Telegram, and publication are not implemented. All publication remains a mandatory human action.
 
 The repository remains public during the MVP. Public visibility does not change the existing prohibition on committing credentials, local `.env` files, raw operational X content, runtime database data or dumps, private or licensed exports, or confidential internal documents.
 
@@ -27,7 +27,8 @@ The repository remains public during the MVP. Public visibility does not change 
 - Stage 2 - X API Access Spike - Completed
 - Stage 3 - X Collection Pipeline - Completed
 - Stage 4 - Minimum Knowledge Base - In Progress
-- Last completed task - Task 005C.1 - First-Party X Corpus Corrections
+- Completed bounded exception - Task 004D - X Provider Shadow Quality Spike
+- Last completed task - Task 004D - X Provider Shadow Quality Spike
 - Next task - Task 005B - Ethplorer Knowledge Import - Planned, awaiting its explicit task specification
 
 See the canonical [implementation roadmap](docs/roadmap.md), [product and technical specification](docs/project-spec.md), and [architecture decision log](docs/decisions.md).
@@ -140,6 +141,14 @@ python -m x_signal_finder first-party-x sync --source both
 
 The same tables contain historical and future Ethplorer/Binplorer Posts. Initial sync paginates the retrievable User Posts window; later runs use independent `since_id` checkpoints. Replies, quotes, and reposts are retained. Direct referenced context is completed in bounded deduplicated batches when needed, and missing context remains explicitly unavailable with a safe reason when X provides one. `first_party_x_posts.text` is the canonical analysis field: it uses `note_tweet.text` when available and normal text only as fallback. Stored URL entities expose deterministic destinations without redirect crawling. Returned Post, User, and Media resource classes are counted and costed separately, and the guard uses their conservative estimated total. No media is downloaded, no X write scope is requested, and diagnostics contain no Post text. See [the first-party corpus operating guide](docs/first-party-x-corpus.md).
 
+Task 004D provider shadow spike:
+
+```sh
+python -m x_signal_finder x-provider-shadow run --hours 24 --max-provider-spend-usd 0.10
+```
+
+The command requires local provider keys, benchmarks one fixed home-timeline window, searches only authors active in that benchmark, compares canonical X Post IDs and normalized content quality, and stores raw responses only under ignored `data/runtime/`. It never writes PostgreSQL or production checkpoints. The completed trial accepted neither provider: TwitterAPI.io reached 13.02% recall with 96.0% exact matched text at $0.09975 actual spend, while SocialData reached 5.73% recall with 100% exact matched text at $0.0966 estimated spend. Both runs were incomplete, so the low recall is not a definitive quality failure. Official X remains production. See [the Task 004D operating and report document](docs/x-provider-shadow-spike.md).
+
 Database commands:
 
 ```sh
@@ -173,6 +182,7 @@ python -m pytest -m integration
 
 - No automatic historical backfill or production missed-window recovery
 - X Developer Console billing remains unreconciled; the USD 5.12 balance observed on 2026-08-14 is only a forward reconciliation baseline, and stored cost values remain estimates
+- Task 004D accepted no third-party provider; Official X remains production and the incomplete trials do not establish definitive third-party quality
 - Mentions pagination was not observed live because the validated response was empty
 - No LLM calls or prompt execution
 - The 17 Ethplorer articles are inventoried but not yet reviewed for capabilities, limitations, topics, products, networks, or asset links

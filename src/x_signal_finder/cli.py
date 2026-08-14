@@ -64,6 +64,10 @@ from x_signal_finder.x_api.oauth import (
     refresh_access_token,
 )
 from x_signal_finder.x_api.probe import run_probe
+from x_signal_finder.x_provider_shadow import (
+    ShadowSpikeError,
+    run_shadow_spike,
+)
 
 
 STATUS_MESSAGE = (
@@ -233,6 +237,51 @@ def build_parser() -> argparse.ArgumentParser:
         "--max-retry-wait-seconds",
         type=float,
         default=60,
+    )
+    shadow = subparsers.add_parser(
+        "x-provider-shadow",
+        help=(
+            "Run the isolated read-only Task 004D Official X and third-party "
+            "quality comparison without database writes."
+        ),
+    )
+    shadow_subparsers = shadow.add_subparsers(dest="shadow_command")
+    shadow_run = shadow_subparsers.add_parser(
+        "run",
+        help="Run one approximately 24-hour provider shadow comparison.",
+    )
+    shadow_run.add_argument("--hours", type=int, default=24)
+    shadow_run.add_argument(
+        "--max-provider-spend-usd",
+        type=Decimal,
+        default=Decimal("0.10"),
+        help="Hard ceiling per third-party provider; cannot exceed $0.10.",
+    )
+    shadow_run.add_argument("--max-official-pages", type=int, default=20)
+    shadow_run.add_argument(
+        "--output-root",
+        default="data/runtime/x-provider-shadow",
+        help="Ignored local directory for raw temporary responses and safe summary.",
+    )
+    shadow_run.add_argument(
+        "--window-end",
+        help="Optional fixed ISO-8601 UTC end time for a reproducible window.",
+    )
+    shadow_run.add_argument(
+        "--official-benchmark-source",
+        choices=("api", "stored"),
+        default="api",
+        help=(
+            "Use a fresh Official X API window or the latest already-collected "
+            "x_home_timeline window in PostgreSQL (read-only)."
+        ),
+    )
+    shadow_run.add_argument(
+        "--provider",
+        action="append",
+        choices=("twitterapi_io", "socialdata"),
+        dest="shadow_providers",
+        help="Limit a run to one provider; repeat to select both.",
     )
     return parser
 
@@ -1452,6 +1501,45 @@ def main(argv: Sequence[str] | None = None) -> int:
             safe_error = redact_secrets(error)
             print(
                 f"First-party X sync failed: {type(error).__name__}: {safe_error}",
+                file=sys.stderr,
+            )
+            return 1
+    if args.command == "x-provider-shadow":
+        if args.shadow_command is None:
+            parser.parse_args(["x-provider-shadow", "--help"])
+            return 0
+        try:
+            summary = run_shadow_spike(
+                hours=args.hours,
+                max_provider_spend_usd=args.max_provider_spend_usd,
+                max_official_pages=args.max_official_pages,
+                output_root=args.output_root,
+                window_end=args.window_end,
+                official_benchmark_source=args.official_benchmark_source,
+                provider_names=(
+                    tuple(args.shadow_providers)
+                    if args.shadow_providers
+                    else ("twitterapi_io", "socialdata")
+                ),
+            )
+            print(json.dumps(summary, indent=2, sort_keys=True))
+            return 0 if all(
+                provider["status"] == "complete"
+                for provider in summary["providers"]
+            ) else 1
+        except (
+            ShadowSpikeError,
+            XApiConfigurationError,
+            OAuthFlowError,
+            ValueError,
+        ) as error:
+            safe_error = redact_secrets(str(error))
+            print(f"X provider shadow spike failed: {safe_error}", file=sys.stderr)
+            return 2
+        except Exception as error:
+            safe_error = redact_secrets(error)
+            print(
+                f"X provider shadow spike failed: {type(error).__name__}: {safe_error}",
                 file=sys.stderr,
             )
             return 1

@@ -223,3 +223,25 @@ First-party usage accounting distinguishes distinct primary, expanded, reference
 `first_party_x_posts.text` is the canonical downstream editorial-analysis field and continues to prefer `note_tweet.text` over normal `text`. Original text and raw JSON are not rewritten. Downstream URL reads resolve already stored entities as `unwound_url`, then `expanded_url`, then `url`, without redirect crawling or another X request. Unavailable direct context remains unavailable rather than irrelevant and may retain only a safe resource-specific category, never a raw error body.
 
 The X Developer Console balance of USD 5.12 observed on 2026-08-14 is a forward reconciliation baseline only. It does not establish Task 005C actual cost because no reliable immediately-before balance was recorded. Future explicitly approved live validations should keep before and after balances and observed delta separate from internal estimates.
+
+## 2026-08-14 - Owner-authorized early Task 004D shadow spike
+
+Status: Accepted
+
+The owner explicitly authorizes the bounded Task 004D provider quality and cost spike now, before Task 005B and Task 006. This supersedes only the activation timing in the earlier deferred-provider decision. The work must reach an evidence-backed result without reopening Stage 3, changing the Official X production collector, or establishing a production provider choice. Task 005B and then Task 006 remain the next MVP work after the spike.
+
+The spike may add an isolated read-only provider contract and local CLI for `official_x`, `twitterapi_io`, and `socialdata`. It may read one approximately 24-hour Official X home-timeline benchmark and search only the benchmark's active authors through the two third-party providers. Third-party results and raw responses remain under ignored local runtime storage. The spike must not write `posts`, `sync_state`, the first-party corpus, usage tables, or any other database state.
+
+Each third-party provider has a hard trial-spend ceiling of $0.10. Credit exhaustion produces `incomplete_due_to_credit` and is not automatically a quality failure. Results are compared by canonical X `post_id`, normalized fields, recall, content fidelity, context and media coverage, pagination risk, requests, and spend. Provider-specific cursors remain diagnostic only and cannot become canonical checkpoints.
+
+SocialData grouped Search Query Monitors followed by webhook delivery into the future Normalized Post boundary are recorded only as a later optimization experiment if the shadow result supports it. No monitor, webhook, scheduler, polling replacement, keyword pre-filter, or per-account monitor fleet is implemented now. A future monitor experiment must group followed authors and preserve broad collection so the project's own relevance model, not provider keywords, makes relevance decisions.
+
+## 2026-08-14 - Task 004D accepts no production provider
+
+Status: Accepted
+
+A fresh Official X benchmark request returned HTTP 402, so the bounded spike reused the latest already-collected 24-hour `x_home_timeline` window read-only. This is a documented deviation from the preferred fresh shadow and limits the conclusion. PostgreSQL counts and the `sync_state` fingerprint were identical before and after.
+
+TwitterAPI.io ended `incomplete_due_to_credit` after $0.09975 actual spend and SocialData ended `incomplete_due_to_budget` after a conservative $0.0966 estimate. Neither run met the 90-95% recall and 100% full-text acceptance conditions. Because both runs were incomplete and exposed large pagination gaps, the result does not establish that either provider is intrinsically low quality.
+
+No third-party provider is accepted for production. Official X remains the explicit production source. Provider switching, fallback, scheduling, monitoring, and webhooks remain unimplemented. The SocialData grouped Search Query Monitor idea remains deferred and is not promoted by this evidence. Current MVP work returns to Task 005B and then Task 006.

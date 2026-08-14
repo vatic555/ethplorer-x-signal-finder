@@ -1,0 +1,152 @@
+# Task 004D - X Provider Shadow Quality Spike
+
+Status: Completed with incomplete provider runs
+
+## Purpose
+
+Task 004D compares TwitterAPI.io and SocialData with one approximately 24-hour Official X home-timeline benchmark. It is a read-only quality and cost spike, not production provider integration.
+
+Official X remains the production source. The shadow command does not import third-party content into PostgreSQL, write `posts`, update `sync_state`, change the existing collector, create provider fallback, or schedule collection.
+
+## Provider and Pricing References
+
+- Official X reverse chronological home timeline: <https://docs.x.com/x-api/users/get-timeline>
+- Official X pay-per-use pricing: <https://docs.x.com/x-api/getting-started/pricing>
+- TwitterAPI.io Advanced Search: <https://docs.twitterapi.io/api-reference/endpoint/tweet_advanced_search>
+- TwitterAPI.io account credit balance: <https://docs.twitterapi.io/api-reference/endpoint/get_my_info>
+- SocialData Search API: <https://docs.socialdata.tools/reference/get-search-results/>
+- SocialData pricing: <https://docs.socialdata.tools/getting-started/pricing/>
+
+The spike uses the documented estimates current on 2026-08-14:
+
+- Official X - $0.005 per distinct Post or Media resource and $0.010 per User resource returned for the benchmark estimate; Developer Console and daily resource deduplication remain authoritative.
+- TwitterAPI.io Advanced Search - $0.00015 per returned Post, with a documented $0.00015 minimum charge per request.
+- SocialData Search - $0.0002 per returned Post; empty requests above the documented fair-use allowance may also cost $0.0002.
+
+The hard Task 004D ceiling is $0.10 for each third-party provider. The CLI rejects a higher configured limit. TwitterAPI.io reported balance is checked before and after its search run when available. SocialData has no documented balance endpoint in the reviewed API reference, so its spend is estimated conservatively from returned Posts and empty requests. HTTP 402 becomes `incomplete_due_to_credit` and does not automatically fail provider quality.
+
+## Mandatory Cost Preflight for Any Future Run
+
+The completed live result does not authorize another provider request. Before any future usage-based call, prepare a zero-cost preflight that shows the provider and endpoint, purpose, expected requests and billable resources, unit price, expected cost, conservative maximum cost, and the technical hard guard that prevents spending above that maximum. Stop and wait for explicit approval of that exact ceiling. Unknown pricing requires separate approval of an experiment with a technically enforced hard dollar cap.
+
+Do not purchase a fresh Official X benchmark when suitable data already exists locally. Inspect the 214 incoming Official X Posts in PostgreSQL and ignored approved runtime artifacts first. Third-party validation must begin with approximately 20 to 50 Posts or the smallest useful window needed to test schema, full text, quotes and replies, and pagination. A larger comparison requires a new preflight and approval. Pages, time window, Posts, retries, and provider calls may not expand beyond the approved ceiling.
+
+After an approved paid run, report the planned maximum, actual requests and resources, estimated or known spend, variance from plan, and whether the run produced enough evidence.
+
+## Local Configuration
+
+Only local `.env` or process environment values may contain credentials:
+
+```dotenv
+TWITTERAPI_IO_API_KEY=
+SOCIALDATA_API_KEY=
+```
+
+`.env.example` contains empty placeholders only. The command checks the selected provider keys before making a provider request.
+
+## Command
+
+These commands are operating references only. Do not execute them until the mandatory preflight above has been approved.
+
+```sh
+python -m x_signal_finder x-provider-shadow run \
+  --hours 24 \
+  --max-provider-spend-usd 0.10
+```
+
+When a fresh Official X request is unavailable, an already-collected benchmark can be reused read-only:
+
+```sh
+python -m x_signal_finder x-provider-shadow run \
+  --hours 24 \
+  --official-benchmark-source stored
+```
+
+Raw responses and the local safe summary are written under `data/runtime/x-provider-shadow/<run-id>/`. That tree is ignored by Git. CLI output and committed documentation contain aggregate metrics and never contain Post text, raw provider payloads, or credentials.
+
+## Normalized Comparison Contract
+
+Every adapter terminates in the same local shadow-only contract:
+
+- canonical X `post_id`;
+- author and optional author ID;
+- UTC `created_at`;
+- full text;
+- `original`, `reply`, `quote`, or `repost`;
+- `conversation_id`;
+- direct `referenced_post_id`;
+- direct referenced Post author, timestamp, text, and media when returned;
+- main Post media metadata;
+- provider identifier: `official_x`, `twitterapi_io`, or `socialdata`.
+
+This contract is not wired into production collection. The future `x_followset` is a separate logical source from `x_home_timeline`. Canonical deduplication uses X `post_id`; provider cursors remain local diagnostics and cannot become the only portable checkpoint.
+
+## Search Strategy
+
+The Official X benchmark defines the exact UTC window and the authors who actually appeared in that home timeline. Third-party Advanced Search requests are restricted to those active authors and the same timestamps.
+
+Each search task contains one active benchmark author. Lower-volume benchmark authors run first so a bounded trial samples the follow-set broadly instead of spending its balance recursively splitting one prolific account. A provider page signal is recorded as a pagination gap and is not used as a production checkpoint. The spend guard reserves the documented maximum 20-result page cost before each request.
+
+## Comparison
+
+For each third-party provider, the safe report records:
+
+- raw and unique Posts returned;
+- matched, missing, and extra canonical IDs;
+- overall recall;
+- exact full-text match rate;
+- long-Post recall and truncation or mismatch count;
+- type accuracy and recall by original, reply, quote, and repost;
+- referenced-ID correctness and referenced-context text coverage;
+- media coverage for matched benchmark Posts;
+- author, timestamp, conversation, and reference field loss;
+- duplicate rows and pagination-gap signals;
+- request count;
+- estimated and provider-reported spend when available;
+- explicit systematic-loss flags.
+
+Extra Posts are reported but do not count against recall because author search may return public Posts that did not appear in the personalized Official X home timeline.
+
+The initial acceptance hypothesis is 90-95% overall recall, 100% exact full text among matched Posts, stable canonical IDs, no systematic long-Post, reply, or quote loss, and materially lower spend than Official X. Relevant-Post recall remains a separate and more important later test after Task 006 produces real relevance decisions.
+
+## Live Result
+
+Completed on 2026-08-14 against the same stored Official X `x_home_timeline` window from `2026-08-06T12:01:06Z` through `2026-08-07T12:01:06Z`. A fresh Official X benchmark request returned HTTP 402, so the spike reused the already-collected window read-only. The benchmark contained 192 Posts from 71 active authors: 112 original Posts, 40 replies, 40 quotes, 33 long Posts, 80 Posts with a direct reference, and 85 with media. Incremental Official X spend was $0; historical retrieval spend is unknown.
+
+| Metric | TwitterAPI.io | SocialData |
+|---|---:|---:|
+| Status | `incomplete_due_to_credit` | `incomplete_due_to_budget` |
+| Requests | 180 across bounded attempts | 247 |
+| Raw / unique Posts | 537 / 249 | 404 / 68 |
+| Matched benchmark IDs | 25 | 11 |
+| Missing / extra IDs | 167 / 224 | 181 / 57 |
+| Recall | 13.02% | 5.73% |
+| Exact full text on matches | 24/25 - 96.0% | 11/11 - 100% |
+| Long-Post recall | 3/33 - 9.09% | 0/33 - 0% |
+| Exact text on matched long Posts | 3/3 - 100% | not measurable |
+| Original / reply / quote recall | 19.64% / 2.5% / 5.0% | 9.82% / 0% / 0% |
+| Type accuracy on matches | 100% | 100% |
+| Referenced-context text coverage | 2/3 - 66.67% | no referenced match |
+| Media coverage on matched media Posts | 16/16 - 100% | 11/11 - 100% |
+| Duplicate rows across requests | 288 | 336 |
+| Pagination-gap signals | 129 | 168 |
+| Spend | $0.09975 actual | $0.0966 conservative estimate; actual unavailable |
+| Observed response span | 1423.33 s across all attempts; final broad pass 112.08 s | 238.55 s |
+
+The one TwitterAPI.io text mismatch was a quote: the provider returned 14 characters while the stored Official X text contained 38 characters including an appended URL. It was not a long-Post truncation, but it fails the strict 100% full-text requirement. Author, timestamp, conversation ID, and referenced Post ID had no mismatch on matched Posts for either provider.
+
+Neither provider is accepted. TwitterAPI.io produced the larger sample and higher observed recall, but its trial ended incomplete, full-text exactness was below 100%, and reply/quote recall was materially weak. SocialData also ended incomplete and returned no matched long Posts, replies, or quotes. Because both runs were limited by trial budget or credit and had large pagination gaps, their low recall is not treated as a definitive provider quality failure. Official X remains the production source. No SocialData Monitoring experiment is promoted from this result.
+
+Before and after the spike, PostgreSQL remained at 214 `posts`, 378 `first_party_x_posts`, and four `sync_state` rows. The serialized `sync_state` SHA-256 stayed `92646163dc70d3888c0fa1f981a1af725c5cd3f5f836211c3d4cc7b32990df53`.
+
+## Future SocialData Monitoring Experiment
+
+If a future separately authorized test supplies stronger SocialData evidence, the next possible optimization experiment remains:
+
+```text
+grouped Search Query Monitors
+  -> webhook
+  -> Normalized Post
+```
+
+That experiment is not implemented by Task 004D. It must group followed authors, attempt broad Post capture without keyword pre-filtering, and leave relevance decisions to the project's own LLM pipeline. It must not create approximately 370 permanent User Monitors. Monitoring, webhooks, scheduling, provider switching, fallback, and polling replacement require a separate explicit task and cost controls.

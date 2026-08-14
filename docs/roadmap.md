@@ -10,7 +10,7 @@ Status: Canonical implementation sequence and progress record
 - Stage 3 - X Collection Pipeline - Completed
 - Stage 4 - Minimum Knowledge Base - In Progress
 - Current task - Task 005B - Ethplorer Knowledge Import - Planned, awaiting its explicit task specification
-- Last completed task - Task 005C.1 - First-Party X Corpus Corrections
+- Last completed task - Task 004D - X Provider Shadow Quality Spike
 - Local PostgreSQL implementation is ready
 - Real Supabase migration and database validation are complete
 - Task 003 documentation review, diagnostic probe, live OAuth, endpoint, pagination, refresh, and checkpoint validation are complete
@@ -18,7 +18,7 @@ Status: Canonical implementation sequence and progress record
 - Task 004A implementation, synthetic validation, and bounded live X-to-Supabase validation are complete
 - Task 004B implementation, migration 002, synthetic validation, and bounded live validation are complete
 - Task 004C and Task 004C.1 implementation, synthetic validation, explicit baseline acceptance, and bounded incremental live validation are complete
-- Task 004D provider abstraction and quality spike are Deferred until the Opportunity pipeline proves useful in the MVP/pilot
+- Task 004D provider shadow quality and cost spike is Completed; neither incomplete trial met acceptance and Official X remains production
 - Task 005A knowledge inventory, Git-backed source contract, catalog evidence linkage, and offline validation are complete
 - Task 005C first-party Ethplorer/Binplorer X corpus, migration 003, historical import, and incremental lifecycle validation are complete
 - Task 005C.1 corrected first-party resource accounting and downstream read contracts without another X request or schema change
@@ -64,7 +64,7 @@ Post-MVP work may cover:
 | 0 | Repository Bootstrap | Completed | Task 001 | Yes |
 | 1 | Durable Storage Foundation | Completed | Task 002 | Yes |
 | 2 | X API Access Spike | Completed | Task 003 | Yes |
-| 3 | X Collection Pipeline | Completed | Tasks 004A through 004C.1 complete; Task 004D deferred | Yes |
+| 3 | X Collection Pipeline | Completed | Tasks 004A through 004D complete; 004D made no production change | Yes |
 | 4 | Minimum Knowledge Base | In Progress | Tasks 005A, 005C, and 005C.1 complete; Task 005B next | Yes |
 | 5 | Relevance Filtering and Signal Clustering | Planned | Task 006 | Yes |
 | 6 | Opportunity Gate and Context Enrichment | Planned | Task 007 | Yes |
@@ -217,7 +217,7 @@ Current state:
 - Task 004B - Content Completeness and Review Views - Completed
 - Task 004C - Complete Incremental Collection and Cost Guardrails - Completed
 - Task 004C.1 - Explicit Baseline Acceptance - Completed
-- Task 004D - Pluggable X Data Providers + Provider Quality Spike - Deferred optimization
+- Task 004D - X Provider Shadow Quality Spike - Completed, non-production exception
 
 ### Task 004A Validation Record
 
@@ -272,9 +272,9 @@ Current state:
 
 ### Task 004D - Pluggable X Data Providers + Provider Quality Spike
 
-Status: Deferred optimization
+Status: Completed as an owner-authorized non-production exception
 
-Task 004D must not begin before Task 005B, Task 006 and the LLM relevance work, the Opportunity pipeline, and a working MVP/pilot have demonstrated that the intellectual pipeline produces useful Opportunities. It does not reopen Stage 3, change its Completed status, or block the current Task 005B priority.
+The owner explicitly authorized one bounded quality and cost spike before Task 005B and Task 006 and asked that it reach an evidence-backed result now. This supersedes only the earlier activation timing. It does not reopen Stage 3, change its Completed status, alter the production collector, or change Task 005B and Task 006 as the next MVP work.
 
 The future goal is provider-independent X ingestion with an explicit manual configuration switch among preliminary providers:
 
@@ -314,7 +314,29 @@ The first future provider-quality test must be a shadow run over the same approx
 
 The initial quality hypothesis for a cheaper provider is approximately 90-95% overall Post recall, provided missing Posts are not systematic; 100% full text for every received Post; no systematic loss of long Posts, quotes, or replies; stable canonical `post_id`; and materially lower cost than Official X. Relevant-Post recall must be evaluated separately after Task 006 produces real AI relevance decisions and is more important than aggregate raw recall.
 
-A possible later operating model is broad collection through a cheaper provider with Official X retained for explicit benchmarks, selective enrichment, or controlled fallback. Task 004D currently records this hypothesis only; it implements no adapter, provider account, shadow run, collector change, or checkpoint change.
+A possible later operating model is broad collection through a cheaper provider with Official X retained for explicit benchmarks, selective enrichment, or controlled fallback.
+
+The current Task 004D implementation is intentionally shadow-only:
+
+- a local `official_x | twitterapi_io | socialdata` adapter boundary terminates in one Normalized Post comparison contract;
+- one CLI command reads an Official X home benchmark and searches only authors active in that same window;
+- raw responses remain under ignored `data/runtime/x-provider-shadow/`;
+- each third-party provider has a hard $0.10 spend ceiling;
+- HTTP 402 becomes `incomplete_due_to_credit`, not an automatic quality rejection;
+- no PostgreSQL table, `sync_state`, production collector path, fallback, or provider switch is touched.
+
+If the SocialData result justifies another experiment, grouped Search Query Monitors feeding webhooks into the Normalized Post boundary are the next separate optimization candidate. That future experiment must group followed authors and capture their Posts without a keyword pre-filter so Task 006 relevance logic remains authoritative. It must not create approximately 370 User Monitors. Monitoring, webhooks, scheduling, and polling replacement are not implemented by Task 004D.
+
+#### Task 004D Completion Record
+
+- Completion date: 2026-08-14
+- Final commit:
+- Live window: 2026-08-06T12:01:06Z through 2026-08-07T12:01:06Z
+- Official X benchmark: fresh retrieval returned HTTP 402; 192 already-collected `x_home_timeline` Posts from 71 active authors were reused read-only with zero incremental X spend
+- TwitterAPI.io result: incomplete due to trial credit; 25/192 matched IDs, 13.02% recall, 96.0% exact text on matches, $0.09975 actual spend
+- SocialData result: incomplete due to budget; 11/192 matched IDs, 5.73% recall, 100% exact text on matches, $0.0966 conservative estimated spend
+- Recommendation: accept neither provider; retain Official X as production source and do not promote SocialData Monitoring from this evidence
+- Validation summary: 156 default tests passed with 4 external tests skipped; canonical DB counts and the `sync_state` fingerprint were identical before and after; raw provider data remains ignored and no production collector, database row, or checkpoint changed
 
 ## Stage 4 - Minimum Knowledge Base
 
