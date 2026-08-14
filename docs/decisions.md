@@ -267,3 +267,5 @@ Migration 004 adds a nullable relational `unavailable_reason` field to `first_pa
 Two security-invoker views provide manual Supabase inspection without redirect crawling or new X reads. `first_party_x_post_urls` reads both main and `note_tweet` URL entities, deduplicates stored representations, and applies the existing `unwound_url`, then `expanded_url`, then `url` precedence. `first_party_x_posts_review` exposes canonical `first_party_x_posts.text`, provenance, context state, and resolved and article URL arrays and counts. Article flags are limited to deterministic stored Ethplorer `/posts/...` destinations currently evidenced in the corpus.
 
 Task 005C.2 does not map a destination URL to a static knowledge `source_id`, extract capabilities or keywords, call an LLM, integrate analytics, or collect X data. Exact X Post to article to source to reviewed capability linkage remains Task 005D - Reviewed Knowledge + Unified Prefilter Vocabulary. Stage 4 remains In Progress.
+
+The Task 005D label supersedes the earlier Task 005B label for the next reviewed-knowledge direction without changing its evidence requirements or starting that work in Task 005C.2.

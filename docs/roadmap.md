@@ -9,8 +9,8 @@ Status: Canonical implementation sequence and progress record
 - Stage 2 - X API Access Spike - Completed
 - Stage 3 - X Collection Pipeline - Completed
 - Stage 4 - Minimum Knowledge Base - In Progress
-- Current task - Task 005B - Ethplorer Knowledge Import - Planned, awaiting its explicit task specification
-- Last completed task - Task 004D - X Provider Shadow Quality Spike
+- Current task - Task 005D - Reviewed Knowledge + Unified Prefilter Vocabulary - Planned, awaiting its explicit task specification
+- Last completed task - Task 005C.2 - First-Party X Reference Reasons + URL Review Views
 - Local PostgreSQL implementation is ready
 - Real Supabase migration and database validation are complete
 - Task 003 documentation review, diagnostic probe, live OAuth, endpoint, pagination, refresh, and checkpoint validation are complete
@@ -22,6 +22,7 @@ Status: Canonical implementation sequence and progress record
 - Task 005A knowledge inventory, Git-backed source contract, catalog evidence linkage, and offline validation are complete
 - Task 005C first-party Ethplorer/Binplorer X corpus, migration 003, historical import, and incremental lifecycle validation are complete
 - Task 005C.1 corrected first-party resource accounting and downstream read contracts without another X request or schema change
+- Task 005C.2 added relational unavailable-reference reasons and stored-URL review views through migration 004 without an X request
 
 Stage 1 must not be marked Completed until the real Supabase database has been created, migrations have been applied, and database validation has passed.
 
@@ -65,7 +66,7 @@ Post-MVP work may cover:
 | 1 | Durable Storage Foundation | Completed | Task 002 | Yes |
 | 2 | X API Access Spike | Completed | Task 003 | Yes |
 | 3 | X Collection Pipeline | Completed | Tasks 004A through 004D complete; 004D made no production change | Yes |
-| 4 | Minimum Knowledge Base | In Progress | Tasks 005A, 005C, and 005C.1 complete; Task 005B next | Yes |
+| 4 | Minimum Knowledge Base | In Progress | Tasks 005A and 005C through 005C.2 complete; Task 005D next | Yes |
 | 5 | Relevance Filtering and Signal Clustering | Planned | Task 006 | Yes |
 | 6 | Opportunity Gate and Context Enrichment | Planned | Task 007 | Yes |
 | 7 | Drafts, Human Review and Pilot | Planned | Task 008 | Yes |
@@ -274,7 +275,7 @@ Current state:
 
 Status: Completed as an owner-authorized non-production exception
 
-The owner explicitly authorized one bounded quality and cost spike before Task 005B and Task 006 and asked that it reach an evidence-backed result now. This supersedes only the earlier activation timing. It does not reopen Stage 3, change its Completed status, alter the production collector, or change Task 005B and Task 006 as the next MVP work.
+The owner explicitly authorized one bounded quality and cost spike before the next reviewed-knowledge work and Task 006 and asked that it reach an evidence-backed result. This superseded only the earlier activation timing. It did not reopen Stage 3, change its Completed status, alter the production collector, or change the subsequent MVP direction.
 
 The future goal is provider-independent X ingestion with an explicit manual configuration switch among preliminary providers:
 
@@ -364,7 +365,8 @@ Create the minimum reviewed knowledge required for credible Opportunity decision
 - Task 005A - Knowledge Architecture + Import Contract - Completed
 - Task 005C - First-Party X Corpus Import + Continuous Sync - Completed by explicit owner decision before final unified vocabulary work
 - Task 005C.1 - First-Party X Corpus Corrections - Completed
-- Task 005B - Ethplorer Knowledge Import - Planned and next
+- Task 005C.2 - First-Party X Reference Reasons + URL Review Views - Completed
+- Task 005D - Reviewed Knowledge + Unified Prefilter Vocabulary - Planned and next
 
 ### Task 005A Validation Record
 
@@ -383,7 +385,7 @@ Create the minimum reviewed knowledge required for credible Opportunity decision
 - Article inventory amendment date: 2026-08-13
 - Article inventory: all 12 files read in full; each has one unique H1, a substantial coherent body, distinct body content, stable source metadata, and `source_type = ethplorer_article`; Task 005A did not bulk-reformat the articles
 - Article validator: canonical location, source type, title-to-H1 match, body completeness guard, fenced-block closure, and duplicate content checks are offline; validation targets structural usability rather than byte identity
-- Normalization correction: Task 005B may make meaning-preserving Markdown repairs or normalization only where machine readability improves or an actual artifact is repaired; source identity, provenance, claims, historical facts, and meaning remain unchanged
+- Normalization correction: Task 005D may make meaning-preserving Markdown repairs or normalization only where machine readability improves or an actual artifact is repaired; source identity, provenance, claims, historical facts, and meaning remain unchanged
 - Normalization correction commit: `32f742baf7cec7e95468c535e6baf3b6875877ed`
 - Article inventory validation: 12 sources and 0 assets validated with 0 errors, 0 network requests, and 0 LLM calls; the full default suite passed with 105 tests and 4 external tests skipped
 - DOCX conversion amendment date: 2026-08-13
@@ -392,15 +394,15 @@ Create the minimum reviewed knowledge required for credible Opportunity decision
 - DOCX cleanup: the temporary `knowledge/sources/posts/Delete/` staging directory and all five source DOCX files were removed only after successful conversion checks
 - Current inventory validation: 17 sources and 0 capability assets validated with 0 errors, 0 network requests, and 0 LLM calls; the full default suite passed with 108 tests and 4 external tests skipped
 - DOCX conversion implementation commit: `1475479b9a2336c25d5f5b42ea22b6aa02b19444`
-- Deferred to Task 005B: capability, limitation, topic, product, network, and `assets_catalog.csv` extraction
+- Deferred to Task 005D: capability, limitation, topic, product, network, unified prefilter vocabulary, and `assets_catalog.csv` extraction
 - Article inventory amendment commit: `29db23781fb5dca3373198477b19ea43303124b3`
-- Stage boundary: Stage 4 remains In Progress; Task 005B is next and Task 006 has not started
+- Stage boundary: Stage 4 remains In Progress; Task 005D is next and Task 006 has not started
 
 ### Task 005C Validation Record
 
 - Completion date: 2026-08-14
 - Final implementation commit: `44aec27c13d951f6d934ef60f3038152920e91f4`
-- Owner sequencing decision: first-party corpus collection was performed before final unified vocabulary work; Task 005B remains the next separate static capability-review task
+- Owner sequencing decision: first-party corpus collection was performed before final unified vocabulary work; Task 005D remains the next separate reviewed-knowledge and vocabulary task
 - Schema: migration 003 creates RLS-enabled `first_party_x_posts` and `first_party_x_post_references`, separate from incoming `posts`; no old migration was changed
 - Corpus lifecycle: historical and future Ethplorer/Binplorer Posts share one permanent table; source checkpoints are `first_party_x_ethplorer` and `first_party_x_binplorer`; repeat sync uses `since_id`
 - Content: original, reply, quote, and repost Posts are retained; long text prefers `note_tweet.text`; all direct relationships are ordered and lossless; context is explicitly available, unavailable, or not applicable; returned media metadata is stored without downloading media
@@ -432,11 +434,24 @@ Create the minimum reviewed knowledge required for credible Opportunity decision
 - Scope boundary: no migration, historical backfill, keyword or knowledge extraction, LLM processing, Task 006, analytics adapter, provider adapter, media download, or X write operation was added
 - Final implementation commit: `f222ac55c97002fb134ed3a4b1b6196ad8925866`
 
+### Task 005C.2 Validation Record
+
+- Completion date: 2026-08-15
+- Final implementation commit: `9caa0160eda11e0f73b03660ec8e9a55641b9600`
+- Schema: migration 004 adds constrained relational `unavailable_reason` and the security-invoker `first_party_x_post_urls` and `first_party_x_posts_review` views; migration 003 is unchanged
+- Reference reasons: all 17 historical unavailable relationships were backfilled as `unknown` without an X request; available relationships retain NULL; future repository persistence writes safe parser reasons and preserves JSON provenance
+- URL views: 348 deduplicated URL rows cover 232 Posts, including 81 Ethplorer URLs, 22 Binplorer URLs, and 8 deterministic Ethplorer article URLs; resolution remains `unwound_url`, then `expanded_url`, then `url`
+- Known article check: `https://ethplorer.io/posts/ethereum-rich-list-by-aggregated-usd-holdings-part-1` is visible in both new review views using stored database entities only
+- Database: PostgreSQL 17.6 healthy; migrations 1 through 4 current; pending 0; RLS intact; both new views use `security_invoker=true`
+- Preservation: 378 first-party rows and distinct IDs, 214 incoming rows and distinct IDs, and both first-party checkpoints remain unchanged
+- Validation: 158 default tests passed with 5 external tests skipped; 3 explicit PostgreSQL integration tests passed; knowledge validation passed for 17 sources and 0 assets
+- Scope boundary: no X request, sync, URL crawl, article-to-source mapping, keyword or capability extraction, LLM processing, analytics integration, provider adapter, or media download was performed
+
 ### Completion Record
 
 - Completion date:
 - Final commit: `222bc5e9de2ea46b5fe26639a7ebbe612edb3cae`
-- Validation summary: Tasks 005A and 005C complete; Task 005B and Stage 4 completion remain pending.
+- Validation summary: Tasks 005A and 005C through 005C.2 complete; Task 005D and Stage 4 completion remain pending.
 - Remaining limitations: The 17 Ethplorer articles remain pending substantive review; no evidence-backed capability rows have been extracted yet.
 
 ## Stage 5 - Relevance Filtering and Signal Clustering

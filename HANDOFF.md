@@ -1,12 +1,12 @@
 # Ethplorer X Signal Finder - Handoff
 
-Last updated: 2026-08-14
+Last updated: 2026-08-15
 
-Repository HEAD before the HANDOFF metadata update: `d86b4bdb44bb8058de190dd4b2e3a271a4ff9624`
+Repository HEAD before the HANDOFF metadata update: `9caa0160eda11e0f73b03660ec8e9a55641b9600`
 
-Validated commit: `d86b4bdb44bb8058de190dd4b2e3a271a4ff9624`
+Validated commit: `9caa0160eda11e0f73b03660ec8e9a55641b9600`
 
-Validated implementation commit: `222bc5e9de2ea46b5fe26639a7ebbe612edb3cae` for Task 004D
+Validated implementation commit: `9caa0160eda11e0f73b03660ec8e9a55641b9600` for Task 005C.2
 
 This file is a short current-state snapshot. It is not a canonical product, technical, architecture, or roadmap source.
 
@@ -27,12 +27,12 @@ The project is building an AI-assisted X intelligence pipeline for Ethplorer. It
 ## 2. Current Status
 
 - Current stage: Stage 4 - Minimum Knowledge Base - In Progress.
-- Current task: Task 005B - Ethplorer Knowledge Import - Planned, awaiting its explicit task specification.
-- Last completed task: Task 004D - X Provider Shadow Quality Spike.
+- Current task: Task 005D - Reviewed Knowledge + Unified Prefilter Vocabulary - Planned, awaiting its explicit task specification.
+- Last completed task: Task 005C.2 - First-Party X Reference Reasons + URL Review Views.
 - Completed bounded exception: Task 004D accepted no third-party provider and made no production change.
-- Next implementation action: continue Task 005B after its explicit task specification is available.
+- Next implementation action: start Task 005D only after its explicit task specification is available.
 - Roadmap status: Stages 0 through 3 are Completed; Stage 4 is In Progress; Stages 5 through 7 are Planned; Stage 8 automation is Deferred.
-- Task 004D is an owner-authorized non-production shadow spike. It does not reopen Stage 3, change the production collector, or change Task 005B and Task 006 as the next MVP work.
+- Task 004D is a completed non-production shadow spike. It did not reopen Stage 3, change the production collector, or accept a third-party production provider.
 - Task 006B - Author Quality Monitoring and Follow-list Hygiene is Planned after Task 006 produces real AI relevance decisions. It is not current work.
 
 ## 3. What Works Now
@@ -40,7 +40,7 @@ The project is building an AI-assisted X intelligence pipeline for Ethplorer. It
 The following capabilities have been implemented and validated:
 
 - protected PostgreSQL storage hosted in Supabase;
-- checksum-tracked migrations 001 through 003;
+- checksum-tracked migrations 001 through 004;
 - migration 003 with a separate permanent first-party X corpus and ordered direct-reference table;
 - Row Level Security on operational tables;
 - OAuth 2.0 Authorization Code flow with S256 PKCE;
@@ -76,6 +76,8 @@ The following capabilities have been implemented and validated:
 - compact safe reasons for unavailable referenced context when X supplies a resource-specific error;
 - deterministic destination URLs from stored X entities without redirect crawling or another X request;
 - `first_party_x_posts.text` as the canonical downstream analysis text, with full `note_tweet.text` preferred over normal `text`.
+- relational unavailable-reference reasons constrained to safe categories, with historical unknown backfill and preserved JSON provenance;
+- security-invoker first-party URL and Post review views with deterministic stored URL resolution and article URL arrays.
 - completed Task 004D read-only provider comparison with canonical ID, content, context, media, pagination, and spend reporting; neither trial was accepted and Official X remains production.
 
 ## 4. Current Data Flow
@@ -102,7 +104,7 @@ Ethplorer/Binplorer User Posts
 
 The X API, collector, and PostgreSQL portion exists. Runtime relevance filtering, Signals, Opportunity Gate evaluation, Opportunity creation, draft generation, and the human review workflow are not implemented. Publication remains outside the application and must be performed manually.
 
-The Git-backed static knowledge architecture and 17-article Ethplorer source inventory exist, but Task 005B has not extracted reviewed capabilities or asset rows. The implemented first-party X corpus may later inform vocabulary, style, reaction patterns, and prior public positioning only. Future dynamic analytics must be queried from their upstream source with temporal scope and provenance. No corpus analysis or dynamic analytics adapter exists yet.
+The Git-backed static knowledge architecture and 17-article Ethplorer source inventory exist, but Task 005D has not started reviewed capability or unified prefilter vocabulary work. The implemented first-party X corpus may later inform vocabulary, style, reaction patterns, and prior public positioning only. Future dynamic analytics must be queried from their upstream source with temporal scope and provenance. No corpus analysis or dynamic analytics adapter exists yet.
 
 ## 5. Architecture Snapshot
 
@@ -157,7 +159,7 @@ Operational tables:
 - `posts` - deduplicated X Posts and audit metadata;
 - `sync_state` - independent source checkpoints and collection state;
 - `first_party_x_posts` - permanent deduplicated Ethplorer/Binplorer editorial corpus;
-- `first_party_x_post_references` - ordered direct reply, quote, and repost context with availability state;
+- `first_party_x_post_references` - ordered direct reply, quote, and repost context with availability state and safe unavailable reason;
 - `usage_events` - request and estimated-cost records;
 - `signals` - future structured Signal records;
 - `signal_posts` - future Signal-to-Post evidence links;
@@ -169,6 +171,8 @@ Review views:
 - `posts_review` - direct links, full text source, referenced context, and media indicators;
 - `author_source_stats` - preliminary stored home-author statistics;
 - `author_unfollow_candidates` - preliminary keyword-based candidates for manual review only.
+- `first_party_x_post_urls` - one row per deduplicated stored URL entity with deterministic destination and first-party/article flags;
+- `first_party_x_posts_review` - canonical first-party text, provenance, context state, and resolved/article URL arrays for manual inspection.
 
 The author views are not AI source-quality evaluation and never change X account state.
 
@@ -255,7 +259,9 @@ These commands read required values from local environment configuration. Never 
 - Task 004D reused a stored 192-Post Official X benchmark after a fresh request returned HTTP 402. TwitterAPI.io matched 25 IDs at 13.02% recall and 96.0% exact matched text for $0.09975 actual spend; SocialData matched 11 IDs at 5.73% recall and 100% exact matched text for a conservative $0.0966 estimate. Both runs were incomplete, neither provider was accepted, and raw responses remained ignored locally.
 - Task 004D DB verification preserved 214 `posts`, 378 `first_party_x_posts`, four `sync_state` rows, and the exact pre-run `sync_state` fingerprint.
 - A mandatory cost-preflight rule now blocks every future usage-based external call until its provider, endpoint, purpose, expected requests and resources, price, expected cost, conservative maximum, and enforcing hard guard are shown and explicitly approved. Local data must be reused before purchasing equivalent data, and provider tests start with approximately 20 to 50 Posts or the smallest sufficient window.
-- Latest local default suite: 156 passed with 4 external tests skipped. Explicit PostgreSQL integration suite: 2 passed previously. Knowledge validation remains valid for 17 sources and 0 assets with no network or model calls.
+- Task 005C.2 applied migration 004 without an X request. All 17 historical unavailable references now have relational reason `unknown`; available references have NULL. The two security-invoker review views expose 348 URL rows across 232 Posts, including 81 Ethplorer, 22 Binplorer, and 8 deterministic article URLs.
+- The known Rich List destination `https://ethplorer.io/posts/ethereum-rich-list-by-aggregated-usd-holdings-part-1` is visible in both first-party review views from stored entities only. The database remains at 378 distinct first-party Posts and 214 distinct incoming Posts, and both first-party checkpoints are unchanged.
+- PostgreSQL 17.6 is healthy with migrations 1 through 4 current, no pending migrations, and RLS intact. Latest default suite: 158 passed with 5 external tests skipped. Explicit PostgreSQL integration suite: 3 passed. Knowledge validation remains valid for 17 sources and 0 assets with no network or model calls.
 
 These are validation estimates and observations, not a Developer Console billing statement. No raw Post text or raw X response belongs in this file.
 
@@ -271,6 +277,7 @@ These are validation estimates and observations, not a Developer Console billing
 - Production provider-independent X ingestion is not implemented. Official X remains the production source. Task 004D implements only an isolated local shadow comparison and no provider switch, fallback, scheduler, monitor, webhook, or checkpoint integration.
 - Task 004D did not produce a qualifying third-party provider. Its historical stored benchmark and incomplete trial runs limit provider-quality conclusions; Official X remains production.
 - The first-party corpus is stored and synchronized, but no vocabulary, style, keyword, or LLM analysis is derived from it yet.
+- Stored article URLs are reviewable, but exact URL-to-static-`source_id` and reviewed-capability linkage is reserved for Task 005D.
 - The dynamic analytics adapter is not implemented; `ethereum-top-addresses-pipeline` remains separate and no snapshot is copied into this repository.
 - Signals and Opportunities have schema placeholders but no runtime creation pipeline.
 - Telegram delivery is not implemented.
@@ -283,9 +290,9 @@ These are validation estimates and observations, not a Developer Console billing
 
 ## 11. Next Intended Work
 
-The next intended work is Task 005B - Ethplorer Knowledge Import. Its completion criterion is substantive review of the 17 inventoried articles and extraction of only the capabilities, limitations, topics, products, networks, and asset links directly supported by those source IDs.
+The next intended work is Task 005D - Reviewed Knowledge + Unified Prefilter Vocabulary. Its completion criterion will be defined by its explicit task specification and must preserve the evidence contract while connecting reviewed knowledge and the project vocabulary without unsupported capability claims.
 
-Private or licensed source text, unsupported capabilities, crawling, database or vector storage, runtime knowledge integration, LLM calls, Task 006 relevance filtering, Signals, Opportunities, delivery automation, and publication are outside Task 005B unless its explicit specification says otherwise within canonical project boundaries.
+Private or licensed source text, unsupported capabilities, crawling, vector storage, LLM calls, Task 006 relevance filtering, Signals, Opportunities, delivery automation, and publication remain outside the current completed work. Task 005D must not begin until its explicit specification is provided.
 
 ## 12. Deferred and Planned Work
 
