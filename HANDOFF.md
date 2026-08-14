@@ -2,9 +2,9 @@
 
 Last updated: 2026-08-14
 
-Repository HEAD before the HANDOFF metadata update: `222bc5e9de2ea46b5fe26639a7ebbe612edb3cae`
+Repository HEAD before the HANDOFF metadata update: `d86b4bdb44bb8058de190dd4b2e3a271a4ff9624`
 
-Validated commit: `222bc5e9de2ea46b5fe26639a7ebbe612edb3cae`
+Validated commit: `d86b4bdb44bb8058de190dd4b2e3a271a4ff9624`
 
 Validated implementation commit: `222bc5e9de2ea46b5fe26639a7ebbe612edb3cae` for Task 004D
 
@@ -254,6 +254,7 @@ These commands read required values from local environment configuration. Never 
 - The X Developer Console balance observed on 2026-08-14 was USD 5.12. This is a forward reconciliation baseline only, not evidence of Task 005C actual cost; future approved live validation should record balance before and after the run where practical.
 - Task 004D reused a stored 192-Post Official X benchmark after a fresh request returned HTTP 402. TwitterAPI.io matched 25 IDs at 13.02% recall and 96.0% exact matched text for $0.09975 actual spend; SocialData matched 11 IDs at 5.73% recall and 100% exact matched text for a conservative $0.0966 estimate. Both runs were incomplete, neither provider was accepted, and raw responses remained ignored locally.
 - Task 004D DB verification preserved 214 `posts`, 378 `first_party_x_posts`, four `sync_state` rows, and the exact pre-run `sync_state` fingerprint.
+- A mandatory cost-preflight rule now blocks every future usage-based external call until its provider, endpoint, purpose, expected requests and resources, price, expected cost, conservative maximum, and enforcing hard guard are shown and explicitly approved. Local data must be reused before purchasing equivalent data, and provider tests start with approximately 20 to 50 Posts or the smallest sufficient window.
 - Latest local default suite: 156 passed with 4 external tests skipped. Explicit PostgreSQL integration suite: 2 passed previously. Knowledge validation remains valid for 17 sources and 0 assets with no network or model calls.
 
 These are validation estimates and observations, not a Developer Console billing statement. No raw Post text or raw X response belongs in this file.
@@ -303,6 +304,8 @@ Private or licensed source text, unsupported capabilities, crawling, database or
 - The repository is public. Treat every committed file as publicly visible.
 - Never commit secrets, credentials, `.env`, database URLs, raw operational X content, runtime databases, dumps, or private and licensed exports.
 - Never print access tokens, refresh tokens, authorization headers, or raw API response bodies.
+- Before any usage-based or potentially paid external call, perform a zero-cost preflight, show the exact conservative maximum and enforcing hard guard, and wait for explicit approval of that ceiling. A higher ceiling requires a new preflight and approval.
+- Do not purchase data already available in PostgreSQL or approved local artifacts. Start external quality tests with approximately 20 to 50 Posts or the smallest sufficient window, and report actual usage and spend after every approved run.
 - Do not invent Ethplorer capabilities. Use only reviewed knowledge-base evidence.
 - Do not treat first-party editorial history or dynamic metrics as capability proof without reviewed supporting static evidence.
 - Keep verified facts, inference, and unresolved uncertainty distinct.

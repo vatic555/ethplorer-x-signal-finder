@@ -300,7 +300,7 @@ Provider-specific response formats must terminate at the adapter. Downstream pro
 
 For third-party discovery, the initial hypothesis is periodic public-Post collection from the account's current follow-set, estimated at approximately 370 accounts when this task was defined, with several manual or scheduled passes per day to be evaluated later. No provider purchase, adapter, scheduling, or collection is approved by this task.
 
-The first future provider-quality test must be a shadow run over the same approximately 24-hour period for Official X, TwitterAPI.io, and SocialData, not a retrospective benchmark. Official X remains the production source during the test, and third-party results must not change operational checkpoints. The shadow run must compare:
+Any future provider-quality continuation must begin with a zero-cost preflight and reuse the existing 214 incoming Official X Posts or other suitable local evidence before purchasing equivalent benchmark data. TwitterAPI.io and SocialData must each begin with a separately approved schema and content sample of approximately 20 to 50 Posts or the smallest sufficient window. Only after that sample verifies schema, full text, quotes and replies, and pagination may a larger same-period comparison be proposed with a new cost ceiling and approval. Official X remains the production source, and third-party results must not change operational checkpoints. The comparison must cover:
 
 - canonical Post ID coverage, missing Posts, and extra Posts;
 - complete text and long Posts;
@@ -324,6 +324,8 @@ The current Task 004D implementation is intentionally shadow-only:
 - each third-party provider has a hard $0.10 spend ceiling;
 - HTTP 402 becomes `incomplete_due_to_credit`, not an automatic quality rejection;
 - no PostgreSQL table, `sync_state`, production collector path, fallback, or provider switch is touched.
+
+The completed spike does not authorize another provider call. Every future usage-based external call must disclose provider, endpoint, purpose, expected requests and resources, unit price, expected cost, conservative maximum, and an enforcing hard guard, then wait for explicit approval. Unknown pricing requires separate approval of a technically enforced hard dollar cap. The run may not enlarge pages, time window, Posts, retries, or provider calls beyond the approved maximum.
 
 If the SocialData result justifies another experiment, grouped Search Query Monitors feeding webhooks into the Normalized Post boundary are the next separate optimization candidate. That future experiment must group followed authors and capture their Posts without a keyword pre-filter so Task 006 relevance logic remains authoritative. It must not create approximately 370 User Monitors. Monitoring, webhooks, scheduling, and polling replacement are not implemented by Task 004D.
 
@@ -433,7 +435,7 @@ Create the minimum reviewed knowledge required for credible Opportunity decision
 ### Completion Record
 
 - Completion date:
-- Final commit:
+- Final commit: `222bc5e9de2ea46b5fe26639a7ebbe612edb3cae`
 - Validation summary: Tasks 005A and 005C complete; Task 005B and Stage 4 completion remain pending.
 - Remaining limitations: The 17 Ethplorer articles remain pending substantive review; no evidence-backed capability rows have been extracted yet.
 

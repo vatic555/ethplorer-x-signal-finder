@@ -21,3 +21,15 @@
 - Do not silently change terminology definitions. Document and review every terminology change.
 - Preserve the distinction between a Signal, an Opportunity, and a draft.
 - Prefer no output over weak, forced, or unsupported promotional participation.
+
+## External Cost Preflight Guardrail
+
+- This rule is mandatory for X API, LLM APIs, TwitterAPI.io, SocialData, and every current or future external service with usage-based or potentially paid calls.
+- Before any paid external call, perform a zero-cost preflight. Show the user the provider and endpoint, why the call is needed, expected request count, expected billable resources, known unit price, expected cost, conservative maximum cost, and the technical hard guard that prevents spending above that maximum. Then stop and wait for explicit approval.
+- Approval applies only to the stated ceiling, for example: `Approved maximum external spend: $0.25`. A new or higher limit requires a new preflight and new explicit approval.
+- The run must stop before exceeding the approved ceiling. Do not independently increase pages, time window, Post count, model tokens, retries, or provider calls when that can increase the approved maximum spend.
+- If pricing is unknown or cannot be estimated reliably, do not make the paid call unless the user separately approves an experiment with a stated hard dollar cap and the run has a technical mechanism that enforces that cap.
+- Do not buy data that is already available locally. Before proposing an external read, inventory suitable PostgreSQL records, ignored runtime artifacts, and other approved local evidence, and use them as the benchmark whenever they can answer the question.
+- Start with the smallest sample that can test the hypothesis. Provider quality spikes begin with approximately 20 to 50 Posts or the smallest useful time window to verify schema, full text, quotes and replies, and pagination. A larger shadow run requires a separate proposal and approval.
+- After every approved paid run, report the planned maximum, actual requests and billable resources, estimated or known actual spend, variance from plan, and whether the run produced enough evidence.
+- Task 004D must not repeat an expensive Official X 24-hour collection automatically. It must first use the existing PostgreSQL corpus as the Official X benchmark where suitable, run only a small approved schema and content test for TwitterAPI.io and SocialData, and propose the cost of any larger comparison separately.

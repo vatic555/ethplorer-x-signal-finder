@@ -18,6 +18,8 @@ The manually started collector uses OAuth refresh, fetches home or `@Ethplorer` 
 
 Task 004D provides a separate read-only shadow CLI for one bounded Official X, TwitterAPI.io, and SocialData quality and cost comparison. It uses an internal Normalized Post comparison contract, writes raw responses only under ignored local runtime storage, enforces a maximum $0.10 spend per third-party provider, and never writes PostgreSQL or changes the production collector. LLM integration, Telegram, and publication are not implemented. All publication remains a mandatory human action.
 
+Every future usage-based external call requires a zero-cost preflight and explicit approval of a technically enforced maximum spend. The preflight must identify the provider, endpoint, purpose, expected requests and billable resources, unit price, expected cost, conservative maximum, and hard guard. Existing PostgreSQL data or approved local artifacts must be reused before equivalent data is purchased. Provider quality tests begin with approximately 20 to 50 Posts or the smallest sufficient window; a larger comparison requires a new preflight and approval.
+
 The repository remains public during the MVP. Public visibility does not change the existing prohibition on committing credentials, local `.env` files, raw operational X content, runtime database data or dumps, private or licensed exports, or confidential internal documents.
 
 ## Implementation Status

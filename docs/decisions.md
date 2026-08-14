@@ -245,3 +245,15 @@ A fresh Official X benchmark request returned HTTP 402, so the bounded spike reu
 TwitterAPI.io ended `incomplete_due_to_credit` after $0.09975 actual spend and SocialData ended `incomplete_due_to_budget` after a conservative $0.0966 estimate. Neither run met the 90-95% recall and 100% full-text acceptance conditions. Because both runs were incomplete and exposed large pagination gaps, the result does not establish that either provider is intrinsically low quality.
 
 No third-party provider is accepted for production. Official X remains the explicit production source. Provider switching, fallback, scheduling, monitoring, and webhooks remain unimplemented. The SocialData grouped Search Query Monitor idea remains deferred and is not promoted by this evidence. Current MVP work returns to Task 005B and then Task 006.
+
+## 2026-08-14 - Mandatory external cost preflight and local-data-first rule
+
+Status: Accepted
+
+Every usage-based or potentially paid external service call requires a zero-cost preflight before execution. This applies to X API, LLM APIs, TwitterAPI.io, SocialData, and future providers. The preflight must identify the provider and endpoint, purpose, expected requests and billable resources, known unit price, expected cost, conservative maximum cost, and a technical hard guard that prevents spending above that maximum. Execution must pause for explicit user approval of that exact ceiling. Increasing pages, time range, Post volume, tokens, retries, provider calls, or the dollar ceiling requires a new preflight and approval.
+
+Unknown or unreliable pricing blocks the call unless the owner separately approves a bounded experiment with a stated and technically enforced hard dollar cap. After an approved run, the operator must report the planned maximum, actual requests and resources, estimated or known spend, variance, and evidentiary result.
+
+Local data is the first source for validation. The system and its operators must not purchase data already available in PostgreSQL or approved local runtime artifacts when that local data can answer the question. Quality experiments begin with the smallest sufficient sample, normally approximately 20 to 50 Posts or the minimum useful window, before any larger comparison is proposed.
+
+Task 004D is amended immediately. It must not automatically buy another approximately 24-hour Official X benchmark. The existing 214 incoming Official X Posts in PostgreSQL must be evaluated first as the benchmark for schema, full text, quote and reply coverage, and other applicable quality checks. TwitterAPI.io and SocialData must each begin with a small, separately approved schema and content test. Any larger shadow comparison requires a new cost preflight and explicit approval. This decision changes neither the current MVP stage nor task ordering.
