@@ -373,7 +373,7 @@ Create the minimum reviewed knowledge required for credible Opportunity decision
 ### Task 005C Validation Record
 
 - Completion date: 2026-08-14
-- Final implementation commit: `PENDING_TASK_005C_COMMIT`
+- Final implementation commit: `44aec27c13d951f6d934ef60f3038152920e91f4`
 - Owner sequencing decision: first-party corpus collection was performed before final unified vocabulary work; Task 005B remains the next separate static capability-review task
 - Schema: migration 003 creates RLS-enabled `first_party_x_posts` and `first_party_x_post_references`, separate from incoming `posts`; no old migration was changed
 - Corpus lifecycle: historical and future Ethplorer/Binplorer Posts share one permanent table; source checkpoints are `first_party_x_ethplorer` and `first_party_x_binplorer`; repeat sync uses `since_id`
