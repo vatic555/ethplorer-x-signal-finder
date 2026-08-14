@@ -65,3 +65,31 @@ def test_content_review_migration_contains_bounded_manual_review_views() -> None
     assert "blockchain_keyword_matches = 0" in sql
     assert "DELETE" not in sql.upper()
     assert "UPDATE" not in sql.upper()
+
+
+def test_first_party_review_migration_has_safe_reasons_and_url_views() -> None:
+    sql = (
+        Path(__file__).parents[1]
+        / "migrations"
+        / "004_first_party_x_review_fields.sql"
+    ).read_text(encoding="utf-8")
+
+    assert "ADD COLUMN unavailable_reason text" in sql
+    assert "SET unavailable_reason = 'unknown'" in sql
+    for reason in (
+        "not_found",
+        "protected_or_inaccessible",
+        "api_unavailable",
+        "unknown",
+    ):
+        assert f"'{reason}'" in sql
+    assert "context_state = 'available' AND unavailable_reason IS NULL" in sql
+    assert "CREATE VIEW public.first_party_x_post_urls" in sql
+    assert "CREATE VIEW public.first_party_x_posts_review" in sql
+    assert sql.count("WITH (security_invoker = true)") == 2
+    assert "COALESCE(unwound_url, expanded_url, original_url)" in sql
+    assert "p.raw_json #> '{note_tweet,entities,urls}'" in sql
+    assert "DISTINCT ON" in sql
+    assert "AS is_article_url" in sql
+    assert "p.text" in sql
+    assert "DROP TABLE" not in sql.upper()

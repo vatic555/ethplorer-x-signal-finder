@@ -73,3 +73,11 @@ def test_post_upsert_preserves_first_seen_and_workflow_fields() -> None:
         "last_verified_at",
     ):
         assert f"{field} = EXCLUDED.{field}" in conflict_update
+
+
+def test_first_party_reference_persistence_includes_safe_reason_column() -> None:
+    source = inspect.getsource(StorageRepository.upsert_first_party_x_posts)
+
+    assert "context_state, unavailable_reason" in source
+    assert 'reference.get("unavailable_reason", "unknown")' in source
+    assert 'reference["context_state"] == "unavailable"' in source

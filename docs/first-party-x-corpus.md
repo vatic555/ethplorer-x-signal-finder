@@ -1,6 +1,6 @@
 # First-Party X Editorial Corpus
 
-Status: Tasks 005C and 005C.1 complete; Stage 4 remains In Progress
+Status: Tasks 005C, 005C.1, and 005C.2 complete; Stage 4 remains In Progress
 
 Live validation date: 2026-08-14
 
@@ -43,7 +43,7 @@ python -m x_signal_finder first-party-x sync \
   --max-estimated-cost-usd 5.00
 ```
 
-Normal execution never applies migrations automatically. Apply migration 003 explicitly before the first sync.
+Normal execution never applies migrations automatically. Apply migrations 003 and 004 explicitly before a future sync.
 
 ## Storage contract
 
@@ -53,6 +53,13 @@ Migration `003_first_party_x_corpus.sql` creates:
 - `first_party_x_post_references` - an ordered, lossless set of direct reply, quote, and repost relationships.
 
 Both tables have Row Level Security enabled with the same protected-connection model as the existing operational tables. `first_party_x_posts` is separate from incoming `posts` and uses `post_id` as its primary key. Upsert refreshes authoritative X content and last-seen values while preserving `first_seen_run_id`, `first_collected_at`, `publication_origin`, and `opportunity_id`.
+
+Migration `004_first_party_x_review_fields.sql` adds relational `unavailable_reason` to each direct reference. Available context requires a NULL reason. Unavailable context requires `not_found`, `protected_or_inaccessible`, `api_unavailable`, or `unknown`. The 17 historical unavailable rows were backfilled as `unknown` without another X request. Future sync persistence writes the safe parser reason while retaining the existing JSON audit representation.
+
+Migration 004 also adds two protected security-invoker review views:
+
+- `first_party_x_post_urls` - one row per deduplicated stored URL entity from both main and `note_tweet` entities, including original, expanded, unwound, resolved, hostname, first-party-site, and article-path fields;
+- `first_party_x_posts_review` - one row per first-party Post with canonical text, provenance, reference state, resolved URL arrays, article URL arrays, and counts for convenient Supabase inspection.
 
 `publication_origin` defaults to `unknown`. The optional values `manual` and `pipeline_assisted` are set only from known provenance. Task 005C performs no text-similarity or fuzzy Opportunity matching. `opportunity_id` remains nullable.
 
@@ -77,6 +84,8 @@ else url
 ```
 
 The helper reads both the stored main `entities` object and `raw_json.note_tweet.entities` when present, removes duplicate representations within one Post, and returns the original and resolved values plus the selected source. It performs no network I/O.
+
+The PostgreSQL URL view uses the same precedence. It flags Ethplorer and Binplorer hostnames directly from the resolved destination and marks `is_article_url` only for deterministic Ethplorer `/posts/...` paths currently present in the corpus. It does not infer links from Post text, crawl redirects, or map an article URL to a static knowledge `source_id`. Exact URL-to-source mapping is reserved for Task 005D.
 
 ## Usage and safe diagnostics
 
@@ -103,10 +112,12 @@ The successful historical run made eight requests and recorded a `$2.650` estima
 
 On 2026-08-14 the observed X Developer Console remaining balance was USD 5.12. It is a forward reconciliation baseline only: no reliable immediately-before balance exists, so it must not be used to infer Task 005C actual cost. For a future explicitly approved live X validation, where practical record `balance_before`, run identity, `balance_after`, and `observed_delta`. Actual observed billing remains separate from internal estimated usage.
 
-PostgreSQL ended with 378 corpus rows, 378 distinct Post IDs, and zero duplicate groups. The separate incoming `posts` table remained at 214 rows and 214 distinct IDs. Migration 003 is current, no migrations are pending, and all operational tables retain RLS.
+PostgreSQL ended with 378 corpus rows, 378 distinct Post IDs, and zero duplicate groups. The separate incoming `posts` table remained at 214 rows and 214 distinct IDs.
 
 Task 005C.1 validated deterministic URL reads against the unchanged 378-row corpus without an X request. The corpus contains 232 Posts with URL entities and 348 deduplicated URL entities: 343 include `expanded_url`, 62 include `unwound_url`, and 4 remain `t.co`-only after deterministic resolution. Resolved destinations include 81 Ethplorer and 22 Binplorer site URLs. PostgreSQL integration tests passed, both first-party checkpoints remained unchanged, and the separate incoming table remained at 214 rows.
 
+Task 005C.2 applied migration 004 without an X request. PostgreSQL 17.6 is healthy with migrations 1 through 4 current, no pending migration, and RLS intact. All 17 existing unavailable references have relational reason `unknown`; no available reference has a reason. The URL view contains 348 rows across 232 Posts, including 81 Ethplorer URLs, 22 Binplorer URLs, and 8 deterministic Ethplorer article URLs. Both new views use `security_invoker=true`. The known Rich List destination `https://ethplorer.io/posts/ethereum-rich-list-by-aggregated-usd-holdings-part-1` is visible in both the URL view and the Post review view. The 378 first-party rows, 214 incoming rows, and both first-party checkpoints remain unchanged.
+
 ## Boundaries
 
-Task 005C does not implement keyword extraction, trigger phrases, a prefilter vocabulary, style-guide generation, embeddings, clustering, LLM analysis, relevance filtering, Signals, Opportunities, media download, X write access, scheduling, publication, the Task 005B capability review, or the dynamic analytics adapter.
+Tasks 005C through 005C.2 do not implement keyword extraction, trigger phrases, a prefilter vocabulary, style-guide generation, embeddings, clustering, LLM analysis, relevance filtering, Signals, Opportunities, media download, X write access, scheduling, publication, reviewed capability extraction, URL-to-`source_id` mapping, or the dynamic analytics adapter. Reviewed Knowledge + Unified Prefilter Vocabulary remains the separate Task 005D direction.

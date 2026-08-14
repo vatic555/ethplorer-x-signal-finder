@@ -175,6 +175,7 @@ def test_relationship_types_retain_available_context(
     assert record["referenced_context_state"] == "available"
     assert record["references"][0]["referenced_text"] == "external context"
     assert record["references"][0]["referenced_author_username"] == "external"
+    assert "unavailable_reason" not in record["references"][0]
 
 
 def test_long_note_tweet_is_authoritative_without_truncation() -> None:

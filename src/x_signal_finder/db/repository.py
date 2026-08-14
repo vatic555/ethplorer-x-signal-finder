@@ -254,15 +254,15 @@ class StorageRepository:
         reference_statement = """
             INSERT INTO first_party_x_post_references (
                 source_post_id, relationship_index, relationship_type,
-                referenced_post_id, context_state, referenced_text,
-                referenced_author_id, referenced_author_username,
-                referenced_created_at, referenced_entities,
-                referenced_media_metadata, raw_relationship,
-                expanded_raw_json
+                referenced_post_id, context_state, unavailable_reason,
+                referenced_text, referenced_author_id,
+                referenced_author_username, referenced_created_at,
+                referenced_entities, referenced_media_metadata,
+                raw_relationship, expanded_raw_json
             )
             VALUES (
                 %s, %s, %s, %s, %s, %s, %s, %s,
-                %s, %s, %s, %s, %s
+                %s, %s, %s, %s, %s, %s
             )
         """
         for post in posts:
@@ -308,6 +308,11 @@ class StorageRepository:
                         reference["relationship_type"],
                         reference["referenced_post_id"],
                         reference["context_state"],
+                        (
+                            reference.get("unavailable_reason", "unknown")
+                            if reference["context_state"] == "unavailable"
+                            else None
+                        ),
                         reference.get("referenced_text"),
                         reference.get("referenced_author_id"),
                         reference.get("referenced_author_username"),

@@ -257,3 +257,13 @@ Unknown or unreliable pricing blocks the call unless the owner separately approv
 Local data is the first source for validation. The system and its operators must not purchase data already available in PostgreSQL or approved local runtime artifacts when that local data can answer the question. Quality experiments begin with the smallest sufficient sample, normally approximately 20 to 50 Posts or the minimum useful window, before any larger comparison is proposed.
 
 Task 004D is amended immediately. It must not automatically buy another approximately 24-hour Official X benchmark. The existing 214 incoming Official X Posts in PostgreSQL must be evaluated first as the benchmark for schema, full text, quote and reply coverage, and other applicable quality checks. TwitterAPI.io and SocialData must each begin with a small, separately approved schema and content test. Any larger shadow comparison requires a new cost preflight and explicit approval. This decision changes neither the current MVP stage nor task ordering.
+
+## 2026-08-15 - Relational reference reasons and stored-URL review views
+
+Status: Accepted
+
+Migration 004 adds a nullable relational `unavailable_reason` field to `first_party_x_post_references`. Available context requires NULL. Unavailable context requires `not_found`, `protected_or_inaccessible`, `api_unavailable`, or `unknown`. Existing unavailable rows are backfilled as `unknown` because no safely persisted category can be reconstructed without another X request. Future persistence writes the safe parser category while retaining the existing JSON audit representation.
+
+Two security-invoker views provide manual Supabase inspection without redirect crawling or new X reads. `first_party_x_post_urls` reads both main and `note_tweet` URL entities, deduplicates stored representations, and applies the existing `unwound_url`, then `expanded_url`, then `url` precedence. `first_party_x_posts_review` exposes canonical `first_party_x_posts.text`, provenance, context state, and resolved and article URL arrays and counts. Article flags are limited to deterministic stored Ethplorer `/posts/...` destinations currently evidenced in the corpus.
+
+Task 005C.2 does not map a destination URL to a static knowledge `source_id`, extract capabilities or keywords, call an LLM, integrate analytics, or collect X data. Exact X Post to article to source to reviewed capability linkage remains Task 005D - Reviewed Knowledge + Unified Prefilter Vocabulary. Stage 4 remains In Progress.

@@ -30,8 +30,8 @@ The repository remains public during the MVP. Public visibility does not change 
 - Stage 3 - X Collection Pipeline - Completed
 - Stage 4 - Minimum Knowledge Base - In Progress
 - Completed bounded exception - Task 004D - X Provider Shadow Quality Spike
-- Last completed task - Task 004D - X Provider Shadow Quality Spike
-- Next task - Task 005B - Ethplorer Knowledge Import - Planned, awaiting its explicit task specification
+- Last completed task - Task 005C.2 - First-Party X Reference Reasons + URL Review Views
+- Next task - Task 005D - Reviewed Knowledge + Unified Prefilter Vocabulary - Planned, awaiting its explicit task specification
 
 See the canonical [implementation roadmap](docs/roadmap.md), [product and technical specification](docs/project-spec.md), and [architecture decision log](docs/decisions.md).
 
@@ -141,7 +141,7 @@ python -m x_signal_finder first-party-x sync --source binplorer
 python -m x_signal_finder first-party-x sync --source both
 ```
 
-The same tables contain historical and future Ethplorer/Binplorer Posts. Initial sync paginates the retrievable User Posts window; later runs use independent `since_id` checkpoints. Replies, quotes, and reposts are retained. Direct referenced context is completed in bounded deduplicated batches when needed, and missing context remains explicitly unavailable with a safe reason when X provides one. `first_party_x_posts.text` is the canonical analysis field: it uses `note_tweet.text` when available and normal text only as fallback. Stored URL entities expose deterministic destinations without redirect crawling. Returned Post, User, and Media resource classes are counted and costed separately, and the guard uses their conservative estimated total. No media is downloaded, no X write scope is requested, and diagnostics contain no Post text. See [the first-party corpus operating guide](docs/first-party-x-corpus.md).
+The same tables contain historical and future Ethplorer/Binplorer Posts. Initial sync paginates the retrievable User Posts window; later runs use independent `since_id` checkpoints. Replies, quotes, and reposts are retained. Direct referenced context is completed in bounded deduplicated batches when needed, and missing context remains explicitly unavailable with a safe relational reason and its JSON audit representation. `first_party_x_posts.text` is the canonical analysis field: it uses `note_tweet.text` when available and normal text only as fallback. The security-invoker views `first_party_x_post_urls` and `first_party_x_posts_review` expose deterministic stored destinations and article URLs without redirect crawling. They do not map an article URL to a static knowledge source ID. Returned Post, User, and Media resource classes are counted and costed separately, and the guard uses their conservative estimated total. No media is downloaded, no X write scope is requested, and diagnostics contain no Post text. See [the first-party corpus operating guide](docs/first-party-x-corpus.md).
 
 Task 004D provider shadow spike:
 
