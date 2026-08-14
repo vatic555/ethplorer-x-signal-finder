@@ -330,7 +330,7 @@ If the SocialData result justifies another experiment, grouped Search Query Moni
 #### Task 004D Completion Record
 
 - Completion date: 2026-08-14
-- Final commit:
+- Final implementation commit: `222bc5e9de2ea46b5fe26639a7ebbe612edb3cae`
 - Live window: 2026-08-06T12:01:06Z through 2026-08-07T12:01:06Z
 - Official X benchmark: fresh retrieval returned HTTP 402; 192 already-collected `x_home_timeline` Posts from 71 active authors were reused read-only with zero incremental X spend
 - TwitterAPI.io result: incomplete due to trial credit; 25/192 matched IDs, 13.02% recall, 96.0% exact text on matches, $0.09975 actual spend
