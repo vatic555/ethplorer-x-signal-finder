@@ -491,7 +491,7 @@ Create the minimum reviewed knowledge required for credible Opportunity decision
 - Vocabulary: 76 manually reviewed derivative triggers, including 46 reviewed and 30 candidate rows; 65 have static basis, 38 have non-repost authored basis, 28 have referenced-context basis, and 9 have exact article-link basis
 - Safety boundary: no raw X content, historical numerical trigger, external request, LLM call, runtime filter, database migration, dynamic analytics adapter, Signal, or Opportunity was added
 - Validation summary: offline validation passed for 17 sources, 11 assets, 12 routes, and 76 triggers; 184 default tests passed with 5 external tests skipped; 3 PostgreSQL integration tests passed; PostgreSQL 17.6 is healthy with migrations 1 through 4 current and RLS intact; 378 distinct first-party Posts, 1,040 distinct incoming Posts, four `sync_state` rows, and checkpoint fingerprint `410535ed27aa2a464bc63953df0aa318` were preserved
-- Final implementation commit: pending final validated commit
+- Final implementation commit: `a01f09d0d05de5a7bb85a6d1786619b84baa98df`
 - Stage boundary: Stage 4 remains In Progress; Task 005E is next and Task 006 has not started
 
 ### Completion Record
