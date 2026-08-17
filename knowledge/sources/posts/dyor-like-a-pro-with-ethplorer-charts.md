@@ -2,12 +2,13 @@
 source_id = "ethplorer.article.dyor-like-a-pro-with-ethplorer-charts"
 title = "DYOR like a pro | All you need with Ethplorer charts 🤓"
 source_type = "ethplorer_article"
-products = []
-networks = []
+products = ["ethplorer"]
+networks = ["ethereum"]
+source_url = "https://ethplorer.io/posts/dyor-like-a-pro-with-ethplorer-charts"
 approved_provenance = "Canonical Ethplorer article archive supplied in knowledge/sources/posts/"
-review_status = "pending"
-confirms = []
-limitations = []
+review_status = "reviewed"
+confirms = ["Ethplorer described mobile-compatible charts for addresses and tokens, including historical USD balances, candlesticks, timeframe highs and lows, moving averages, transactions, volume, and market capitalization."]
+limitations = ["This source documents the feature set at publication time and does not establish current availability or accuracy.", "The source does not prove investment outcomes or replace independent analysis."]
 +++
 
 # DYOR like a pro | All you need with Ethplorer charts 🤓

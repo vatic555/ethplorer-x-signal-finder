@@ -2,12 +2,13 @@
 source_id = "ethplorer.article.ethereum-rich-list-aggregated-usd-part-2"
 title = "Ethereum Rich List by Aggregated USD Holdings: How Capital Moves and Where Risks Emerge"
 source_type = "ethplorer_article"
-products = []
-networks = []
+products = ["ethplorer", "ethplorer_aggregated_rich_list"]
+networks = ["ethereum"]
+source_url = "https://ethplorer.io/posts/ethereum-rich-list-by-aggregated-usd-holdings-part-2"
 approved_provenance = "Canonical Ethplorer article archive supplied in knowledge/sources/posts/"
-review_status = "pending"
-confirms = []
-limitations = []
+review_status = "reviewed"
+confirms = ["The article applies Ethplorer's Aggregated Rich List to compare activity, balance changes, smart-contract participation, liquidity filtering, and capital composition against an ETH-only ranking.", "It defines the Printing-Press Index as own-token USD value divided by total token USD value and uses it to frame self-issued exposure in a historical analysis."]
+limitations = ["All amounts, percentages, project rankings, PPI values, thresholds, volatility observations, and risk interpretations are historical analytical claims, not current scores or guarantees.", "PPI is a documented analytical concept, not a generic AML or risk-scoring capability, and current results require dated structured evidence from the future analytics adapter."]
 +++
 
 # Ethereum Rich List by Aggregated USD Holdings: How Capital Moves and Where Risks Emerge
@@ -138,6 +139,5 @@ Activity, volatility, and balance composition reveal a system where capital flow
      The top 5% of addresses drive the largest balance movements and volatility spikes, primarily within exchange and liquidity-hub wallets.
 
 >_**The Ethereum rich list is no longer a ranking of wealth - it is a map of capital flows and embedded risk.**_
-
 
 

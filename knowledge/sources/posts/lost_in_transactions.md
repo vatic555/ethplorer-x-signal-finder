@@ -2,12 +2,13 @@
 source_id = "ethplorer.article.lost-in-transactions"
 title = "Lost in transactions. Crypto accounting with Ethplorer."
 source_type = "ethplorer_article"
-products = []
-networks = []
+products = ["ethplorer"]
+networks = ["ethereum"]
+source_url = "https://ethplorer.io/posts/lost_in_transactions"
 approved_provenance = "Canonical Ethplorer article archive supplied in knowledge/sources/posts/"
-review_status = "pending"
-confirms = []
-limitations = []
+review_status = "reviewed"
+confirms = ["This attributed user story describes using Ethplorer tags and notes to classify transactions and exporting CSV or JSON for accounting and portfolio workflows.", "The source supplies user-problem language around finding payments, organizing counterparties, calculating returns, and tracking wallet activity."]
+limitations = ["This is an attributed user experience and is contextual evidence, not sufficient by itself to establish a current product capability.", "Accounting, tax, ROI, and completeness outcomes are user claims and are not verified guarantees."]
 +++
 
 # Lost in transactions. Crypto accounting with Ethplorer.

@@ -2,13 +2,13 @@
 source_id = "ethplorer.article.beincrypto-interview-questions-and-answers-altseason"
 title = "Questions and answers - BeInCrypto Interview: Mathematically proven - Altseason Already Happened."
 source_type = "ethplorer_article"
-products = []
-networks = []
+products = ["ethplorer", "ethplorer_aggregated_rich_list"]
+networks = ["ethereum"]
 approved_provenance = "User-provided DOCX import: Questions and answers - BeInCrypto Interview- Mathematically proven - Altseason Already Happened.docx"
 source_file_sha256 = "84b6d5a4cab98bb3391b5d7ab0bfb3202f63add407388a20fdd7a1e6f8c1e284"
-review_status = "pending"
-confirms = []
-limitations = []
+review_status = "reviewed"
+confirms = ["This approved Q&A explains Ethplorer's Aggregated Rich List and the motivation for ranking total USD holdings rather than ETH alone.", "It records the stated liquidity-filter approach and defines Printing-Press Index for own-token exposure as interview methodology and framing."]
+limitations = ["This is a Q&A preparation document with incomplete question numbering and placeholders, not a published canonical article route.", "All numerical answers, thresholds, dates, rankings, and market conclusions are historical editorial claims and require dated structured evidence before current use."]
 +++
 
 # Questions and answers - BeInCrypto Interview: Mathematically proven - Altseason Already Happened.

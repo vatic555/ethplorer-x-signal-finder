@@ -2,12 +2,13 @@
 source_id = "ethplorer.article.crypto-market-trends-analyze-tool"
 title = "What’s your go-to tool for analyzing crypto market trends?"
 source_type = "ethplorer_article"
-products = []
-networks = []
+products = ["ethplorer"]
+networks = ["ethereum"]
+source_url = "https://ethplorer.io/posts/crypto-market-trends-analyze-tool"
 approved_provenance = "Canonical Ethplorer article archive supplied in knowledge/sources/posts/"
-review_status = "pending"
-confirms = []
-limitations = []
+review_status = "reviewed"
+confirms = ["Ethplorer described charts for token and address analysis, including price candles, moving averages, transfer activity, trade volume, market capitalization, holder distribution, and USD portfolio values.", "The article presents mobile chart use and project-research use cases based on public on-chain address and token data."]
+limitations = ["The article is product and educational marketing, not evidence that chart interpretation predicts prices or establishes project legitimacy.", "Feature availability and displayed metrics may have changed since publication and require current product verification."]
 +++
 
 # What’s your go-to tool for analyzing crypto market trends?
@@ -74,5 +75,4 @@ Ethplorer provides the best set of tools for a quick scan of daily market trends
 
 
 [Try out Ethplorer charts here (and be sure to try it on your mobile) →](https://ethplorer.io/)
-
 

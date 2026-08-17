@@ -2,12 +2,13 @@
 source_id = "ethplorer.article.ethereum-rich-list-aggregated-usd-part-1"
 title = "Ethereum Rich List by Aggregated USD Holdings: Where Capital Really Resides"
 source_type = "ethplorer_article"
-products = []
-networks = []
+products = ["ethplorer", "ethplorer_aggregated_rich_list"]
+networks = ["ethereum"]
+source_url = "https://ethplorer.io/posts/ethereum-rich-list-by-aggregated-usd-holdings-part-1"
 approved_provenance = "Canonical Ethplorer article archive supplied in knowledge/sources/posts/"
-review_status = "pending"
-confirms = []
-limitations = []
+review_status = "reviewed"
+confirms = ["Ethplorer describes an Aggregated Rich List ranked by totalBalanceUsd across ETH, ERC-20 tokens, and stablecoins, with token contracts and the Beacon deposit contract excluded for the stated methodology.", "The source demonstrates balance-composition, address-overlap, holder-age, stablecoin-share, and tagged-entity analysis for a historical snapshot."]
+limitations = ["All balances, percentages, rankings, correlations, address ages, and conclusions are historical snapshot findings and must not be presented as current metrics.", "The article does not fully specify snapshot dates, liquidity filters, entity-tag coverage, or reproducibility inputs; current numerical evidence belongs to the future dynamic analytics adapter."]
 +++
 
 # Ethereum Rich List by Aggregated USD Holdings: Where Capital Really Resides
@@ -92,4 +93,3 @@ Ethereum’s on-chain data no longer supports analysis based on ETH balances alo
 * What appears as two-thirds of Ethereum’s supply is actually a cumulative deposit log - in The Aggregated Rank, **Beacon staking account for less than 10% of Ethereum's network capital.**
 
 *In [_Part 2_](/posts/ethereum-rich-list-by-aggregated-usd-holdings-part-2), we move from where capital sits to how it moves - and why the next phase of analysis is no longer about size, but about structure and behavior…*
-

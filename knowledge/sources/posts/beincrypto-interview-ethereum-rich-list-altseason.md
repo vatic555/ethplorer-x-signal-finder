@@ -2,13 +2,13 @@
 source_id = "ethplorer.article.beincrypto-interview-ethereum-rich-list-altseason"
 title = "BeInCrypto Interview - Ethereum Rich List by Aggregated USD Holdings. Mathematically proven - Altseason Already Happened"
 source_type = "ethplorer_article"
-products = []
-networks = []
+products = ["ethplorer", "ethplorer_aggregated_rich_list"]
+networks = ["ethereum"]
 approved_provenance = "User-provided DOCX import: BeInCrypto Interview - Ethereum Rich List by Aggregated USD Holdings. Mathematically proven-Altseason Already Happened.docx"
 source_file_sha256 = "1c16774f31d53739f2f9e5e79ce2b96b6a98a7657ca8b79797d5d94f39b66cc2"
-review_status = "pending"
-confirms = []
-limitations = []
+review_status = "reviewed"
+confirms = ["This approved interview brief explains Ethplorer's Aggregated Rich List, its ETH-plus-token balance-composition lens, and the stated treatment of Beacon and token contracts.", "It documents historical uses of address activity, holder age, smart-contract share, liquidity filters, and the Printing-Press Index."]
+limitations = ["This is an interview preparation brief without a canonical public article URL recorded in this repository.", "All values, dates, project examples, rankings, PPI levels, and market narratives are historical; the source does not establish current analytics or investment conclusions."]
 +++
 
 # BeInCrypto Interview - Ethereum Rich List by Aggregated USD Holdings. Mathematically proven - Altseason Already Happened

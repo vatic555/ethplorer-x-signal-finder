@@ -39,7 +39,9 @@ def test_knowledge_validate_is_offline_and_valid(capsys) -> None:
     report = json.loads(capsys.readouterr().out)
     assert report["status"] == "valid"
     assert report["source_count"] == 17
-    assert report["asset_count"] == 0
+    assert report["asset_count"] == 11
+    assert report["route_count"] == 12
+    assert report["vocabulary_count"] == 76
     assert report["network_requests"] == 0
     assert report["llm_calls"] == 0
 

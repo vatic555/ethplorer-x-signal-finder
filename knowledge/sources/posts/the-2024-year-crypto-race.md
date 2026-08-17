@@ -2,12 +2,13 @@
 source_id = "ethplorer.article.the-2024-year-crypto-race"
 title = "Looking Back at 2024: The Year Crypto Raced Ahead 🚀"
 source_type = "ethplorer_article"
-products = []
-networks = []
+products = ["ethplorer"]
+networks = ["ethereum"]
+source_url = "https://ethplorer.io/posts/the-2024-year-crypto-race"
 approved_provenance = "Canonical Ethplorer article archive supplied in knowledge/sources/posts/"
-review_status = "pending"
-confirms = []
-limitations = []
+review_status = "reviewed"
+confirms = ["The article demonstrates an Ethplorer-oriented token research workflow using price, market capitalization, transfers, volume periods, holder concentration, public entity information, and address monitoring.", "It records a retrospective 2024 market narrative and historical token metrics."]
+limitations = ["All market values, rankings, project assessments, and 2024 performance figures are historical and must not be treated as current evidence or routing triggers.", "The article does not prove legitimacy, future performance, TVL, or general investment quality, and some cited metrics come from third-party sources."]
 +++
 
 # Looking Back at 2024: The Year Crypto Raced Ahead 🚀 

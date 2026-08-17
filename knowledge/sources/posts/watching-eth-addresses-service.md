@@ -2,12 +2,13 @@
 source_id = "ethplorer.article.watching-eth-addresses-service"
 title = "Watch your bag 👀 Ethplorer's watching service to make your life easier"
 source_type = "ethplorer_article"
-products = []
-networks = []
+products = ["ethplorer", "ethplorer_watching_service"]
+networks = ["ethereum"]
+source_url = "https://ethplorer.io/posts/watching-eth-addresses-service"
 approved_provenance = "Canonical Ethplorer article archive supplied in knowledge/sources/posts/"
-review_status = "pending"
-confirms = []
-limitations = []
+review_status = "reviewed"
+confirms = ["Ethplorer described a Watching Service for registered users that monitors selected Ethereum addresses or token contracts and sends email or Telegram transaction notifications.", "The source describes incoming and outgoing filters, price-based junk filtering, and address tags as companion workflow features."]
+limitations = ["Free availability, notification limits, delivery channels, supported event types, and current behavior are historical product statements requiring current verification.", "Alerts do not prevent theft, guarantee timely delivery, or provide investment advice."]
 +++
 
 # Watch your bag 👀 Ethplorer's watching service to make your life easier

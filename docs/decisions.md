@@ -284,6 +284,20 @@ The owner approved manifest `85a70f069262451a275f626209ed3836e4eb2fcdfa6b93cb20a
 
 This corrective amendment does not reopen Stage 3, change the production collector, accept a third-party provider, or authorize any new external call. It is complete, and Task 005D remains the next MVP task.
 
+## 2026-08-17 - Reviewed static knowledge and derivative routing vocabulary
+
+Status: Accepted
+
+Task 005D establishes the first usable reviewed static capability layer without changing the three knowledge-source authority classes. All 17 canonical Markdown sources are substantively reviewed for the claims they explicitly support, their product and network scope, and their limitations. Reviewed status means reliable evidence of what a source says. Historical balances, percentages, ranks, prices, product status, API limits, and analytical conclusions remain time-bound and are never silently promoted into current facts.
+
+The compact capability catalog contains reusable evidence-backed capabilities rather than one row per article. Every reviewed capability references reviewed static source IDs. Generic DeFi liquidity analysis, AML, generic risk scoring, and price prediction are not product capabilities. Balance composition and Printing-Press Index are documented analytical methods whose current numerical results require dated dynamic evidence.
+
+Canonical public Ethplorer article identity is carried by each applicable source's `source_url` metadata. Offline normalization removes harmless scheme, `www`, trailing-slash, query, and fragment differences while preserving the exact `/posts/<slug>` route. One canonical route maps to one static source ID. Stored first-party X article URLs may join to this map exactly, but no raw Post body or per-Post mapping is committed.
+
+The unified prefilter vocabulary is a derivative Git artifact, not canonical knowledge and not a runtime filter. It combines reviewed static terms, non-repost first-party authored wording, separately counted available referenced context, and exact article-link provenance. First-party X can support wording, audience language, and prior public positioning but cannot prove a capability. Reposts indicate topic interest only, unavailable context remains unknown, and historical numerical values are excluded from triggers. Negative context never overrides positive product, capability, integration, or user-problem evidence.
+
+Task 005E remains the next Stage 4 task. It must dynamically discover the latest appropriate `ethereum-top-addresses-pipeline` comparison, verify exact values in structured files from the same comparison, and preserve upstream commit, dates, metric, scope, entity, source path, and caveats. It must not hard-code a dated directory or copy the dynamic corpus into this repository. Task 005D adds no runtime matching, LLM calls, database migration, Signal, Opportunity, or Task 006 processing.
+
 ## 2026-08-17 - Provider-specific discovery and approval-bound preflight
 
 Status: Accepted

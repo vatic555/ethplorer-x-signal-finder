@@ -2,13 +2,13 @@
 source_id = "ethplorer.article.cryptodaily-ethereum-rich-list-part-2"
 title = "CryptoDaily - Ethereum Rich List by Aggregated USD Holdings (Part 2): How Capital Moves and Where Risk Emerges"
 source_type = "ethplorer_article"
-products = []
-networks = []
+products = ["ethplorer", "ethplorer_aggregated_rich_list"]
+networks = ["ethereum"]
 approved_provenance = "User-provided DOCX import: CryptoDaily Part 2 - Ethereum Rich List by Aggregated USD Holdings_ How Capital Moves and Where Risk Emerges.docx"
 source_file_sha256 = "f412b6b8c85b4c1d98aea8271e6ab0925c8918849afdc28593680bd7cbf15db3"
-review_status = "pending"
-confirms = []
-limitations = []
+review_status = "reviewed"
+confirms = ["This approved CryptoDaily brief documents Aggregated Rich List comparisons for capital activity, smart-contract share, liquidity filtering, and balance composition.", "It defines and applies the Printing-Press Index to own-token exposure in a historical Ethereum address analysis."]
+limitations = ["The brief is an approved derivative editorial source without a canonical Ethplorer article URL in this repository.", "All values, ranks, thresholds, project examples, volatility claims, and risk interpretations are historical and do not establish current metrics or a generic risk-scoring capability."]
 +++
 
 # CryptoDaily - Ethereum Rich List by Aggregated USD Holdings (Part 2): How Capital Moves and Where Risk Emerges

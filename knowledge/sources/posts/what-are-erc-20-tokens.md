@@ -2,12 +2,13 @@
 source_id = "ethplorer.article.what-are-erc-20-tokens"
 title = "What Are ERC-20 Tokens? Find Out Now as the Decentralized Finance Industry Takes Off"
 source_type = "ethplorer_article"
-products = []
-networks = []
+products = ["ethplorer"]
+networks = ["ethereum"]
+source_url = "https://ethplorer.io/posts/what-are-erc-20-tokens"
 approved_provenance = "Canonical Ethplorer article archive supplied in knowledge/sources/posts/"
-review_status = "pending"
-confirms = []
-limitations = []
+review_status = "reviewed"
+confirms = ["The source is an educational overview of ERC-20 tokens and describes using Ethplorer to inspect token activity, transaction status, address portfolios, USD values, and historical portfolio performance.", "It documents search-by-address as the entry point to an address portfolio summary."]
+limitations = ["Token counts, transfer volumes, prices, ecosystem statements, and market history are time-bound to the article and are not current facts.", "General ERC-20 education and third-party wallet references are contextual knowledge, not Ethplorer capability evidence beyond the features explicitly described."]
 +++
 
 # What Are ERC-20 Tokens? Find Out Now as the Decentralized Finance Industry Takes Off
@@ -137,4 +138,3 @@ Ethplorer will give you a summary of an address’s portfolio, including the tot
 ‍
 That’s essentially what you look for in a portfolio tracker – the whole portfolio’s value in USD on any given date in the past.
 The ERC-20 token has been fundamental in the development and implementation of digital currencies in the mainstream. While some have criticized that it is too easy for people to create their own tokens with ERC-20, the token’s regulations and guidelines have provided a benchmark for other Ethereum tokens to follow which overall is helping to create a healthier ecosystem for the future.
-

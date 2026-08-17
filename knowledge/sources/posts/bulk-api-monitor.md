@@ -2,12 +2,13 @@
 source_id = "ethplorer.article.bulk-api-monitor"
 title = "Ethplorer Bulk API Monitor: A Better Way of Tracing Ethereum Tokens"
 source_type = "ethplorer_article"
-products = []
-networks = []
+products = ["ethplorer", "ethplorer_bulk_api_monitor"]
+networks = ["ethereum"]
+source_url = "https://ethplorer.io/posts/bulk-api-monitor"
 approved_provenance = "Canonical Ethplorer article archive supplied in knowledge/sources/posts/"
-review_status = "pending"
-confirms = []
-limitations = []
+review_status = "reviewed"
+confirms = ["Ethplorer described a Bulk API Monitor that tracks operations for configured Ethereum address and token-contract pools.", "The source documents developer use cases, polling by pool, returned transaction details, and filtering or export of results."]
+limitations = ["Product availability, endpoint behavior, capacity, pricing, plan limits, and real-time claims are historical statements and require current documentation before use.", "Claims about unlimited or million-address scale and forecasting market moves were not independently validated by this review."]
 +++
 
 # Ethplorer Bulk API Monitor: A Better Way of Tracing Ethereum Tokens
@@ -52,4 +53,3 @@ Of course, Ethplorer isn't the only Ethereum tracking service out there. What ma
 [Coinmarketcap](https://coinmarketcap.com/headlines/news/ethplorer-launches-bulk-api-monitor-the-first-tool-capable/)
 [Coinspeaker](https://www.coinspeaker.com/ethplorer-bulk-api-monitor/)
 [Finance Yahoo](https://finance.yahoo.com/news/ethereum-token-browser-ethplorer-launches-163400942.html)
-

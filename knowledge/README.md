@@ -59,11 +59,15 @@ knowledge/
     other/
     _source-template.md
   assets_catalog.csv
+  prefilter/
+    README.md
+    vocabulary.csv
+  review_summary.md
   source_documents.md
   README.md
 ```
 
-Current Git static-knowledge inventory: two terminology documents, 17 complete Ethplorer Markdown articles under `sources/posts/`, 11 deduplicated local article images directly under `sources/posts/assets/`, zero dynamic analytical records, and zero asset or capability rows. The separate PostgreSQL editorial corpus contains 378 operational first-party rows and is intentionally not counted or read by this Git inventory. The articles are inventoried as pending static sources, but their capabilities, limitations, topics, and capability-catalog links are intentionally deferred to Task 005B.
+Current Git static-knowledge inventory: two terminology documents, 17 reviewed Ethplorer Markdown articles under `sources/posts/`, 11 deduplicated local article images directly under `sources/posts/assets/`, 11 reviewed capability rows, 12 canonical Ethplorer article routes carried by source metadata, one 76-row reviewed derivative vocabulary, and zero dynamic analytical records. The separate PostgreSQL editorial corpus contains 378 operational first-party rows and remains outside the static Git inventory.
 
 ## Source Document Contract
 
@@ -89,11 +93,13 @@ Provenance requires at least one non-empty field:
 
 Optional dates are `published_date` and `retrieved_date` in `YYYY-MM-DD` form when known. Unknown dates remain omitted rather than guessed.
 
+For a canonical public Ethplorer article, `source_url` is also the deterministic article identity. Offline normalization accepts harmless HTTP/HTTPS, `www`, trailing-slash, query, and fragment differences while preserving the `/posts/<slug>` identity. One active canonical URL can map to only one source ID. Approved derivative or interview documents without a canonical public route retain `approved_provenance` instead.
+
 For a converted source whose original file is intentionally removed from the public repository, optional `source_file_sha256` records the original file digest without retaining the DOCX itself.
 
 Managed article images use a flat namespace directly under `knowledge/sources/posts/assets/`. Markdown files reference them as `assets/<filename>`. Add a descriptive suffix when two distinct images would otherwise collide; do not create dated or temporary import subdirectories.
 
-Pending sources may leave `products`, `networks`, `confirms`, and `limitations` empty until substantive review. A source cannot become `reviewed` while `confirms` is empty.
+Pending sources may leave `products`, `networks`, `confirms`, and `limitations` empty until substantive review. A source cannot become `reviewed` while `confirms` is empty. Reviewed means the source reliably establishes what it says, not that every historical figure, product state, price, or limit remains current.
 
 Source content must preserve the source identity, provenance, claims, and substantive meaning. Byte-for-byte equality with imported Markdown is not required. The corpus should be structurally reliable and machine-readable.
 
@@ -116,13 +122,13 @@ Normalization must not:
 - change substantive meaning;
 - present an inferred capability as a source claim.
 
-Do not commit full private, internal, confidential, or licensed documents to this public repository. Task 005A did not bulk-reformat the first 12 inventoried articles. Five later DOCX inputs were converted with meaning-preserving structural normalization and their source files removed after verification. Task 005B may further normalize an article only where doing so improves machine readability or repairs an actual artifact.
+Do not commit full private, internal, confidential, or licensed documents to this public repository. Task 005A did not bulk-reformat the first 12 inventoried articles. Five later DOCX inputs were converted with meaning-preserving structural normalization and their source files removed after verification. Task 005D reviewed all 17 sources without cosmetic body rewrites; future edits remain limited to meaning-preserving repairs.
 
 Copy [`sources/_source-template.md`](sources/_source-template.md) when starting an import. The template itself is not a source and is ignored by validation.
 
 ## Asset Catalog Contract
 
-[`assets_catalog.csv`](assets_catalog.csv) is the compact capability layer. It has no capability rows yet. Its columns are:
+[`assets_catalog.csv`](assets_catalog.csv) is the compact capability layer. It contains 11 reviewed reusable capabilities rather than one row per article. Its columns are:
 
 - `asset_id` - stable unique identifier;
 - `name`;
@@ -138,6 +144,14 @@ Copy [`sources/_source-template.md`](sources/_source-template.md) when starting 
 - `last_reviewed` - `YYYY-MM-DD` when reviewed or updated.
 
 Every row must reference at least one existing source. A reviewed capability must reference at least one reviewed source; pending or missing evidence can never support a reviewed capability. A URL is not a substitute for `source_ids`.
+
+Historical article findings are not current capability values. The catalog may preserve a stable method such as aggregated holdings or balance-composition analysis while its limitations defer current numbers to dated dynamic evidence.
+
+## Unified Prefilter Vocabulary
+
+[`prefilter/vocabulary.csv`](prefilter/vocabulary.csv) is a derivative routing layer built from reviewed static evidence, non-repost first-party authored wording, separate referenced or audience context, and exact stored article links. It does not replace the source documents or capability catalog and does not implement runtime filtering.
+
+The vocabulary uses exact tokens, phrases, and entities with reviewed or candidate status, qualitative strength, evidence links, and aggregate local-corpus counts. Generic noise and historical numerical values are excluded. First-party X wording may inform routing but never proves a capability. See [`prefilter/README.md`](prefilter/README.md) and [`review_summary.md`](review_summary.md).
 
 ## Terminology
 
@@ -158,7 +172,8 @@ This workflow applies only to static reviewed knowledge:
 4. Add the source to [`source_documents.md`](source_documents.md).
 5. Review the source and set its status accurately.
 6. Add or update an asset row only when the source directly supports that capability.
-7. Run the offline validator and default tests.
+7. Update derivative routing terms only when their evidence and authority are explicit.
+8. Run the offline validator and default tests.
 
 ## Offline Validation
 
@@ -166,10 +181,10 @@ This workflow applies only to static reviewed knowledge:
 python -m x_signal_finder knowledge validate
 ```
 
-Validation reads local Markdown and CSV only. It makes no network requests and performs no LLM calls. It checks required structure and metadata, unique IDs, review statuses, catalog-to-source references, reviewed-evidence rules, and local Markdown links.
+Validation reads local Markdown and CSV only. It makes no PostgreSQL, network, or LLM calls. It checks required structure and metadata, unique IDs, review statuses, canonical article routes, catalog-to-source references, reviewed-evidence rules, vocabulary schema and references, normalized term duplicates, and local Markdown links.
 
 For `sources/posts/`, it also requires `source_type = ethplorer_article`, one H1 matching metadata title, a substantial non-empty body, closed fenced blocks, and no duplicate body after whitespace normalization for comparison only. Source-site routes and legacy article media references are not treated as missing repository files. Managed local image references below `assets/` must resolve to non-empty files.
 
 Validation targets metadata integrity and semantic or structural usability. It does not enforce byte identity with an imported Markdown file. Duplicate detection may fold whitespace and case for comparison without changing stored content.
 
-The validator intentionally does not access or validate the implemented PostgreSQL editorial corpus or dynamic analytical evidence. Those non-static classes use separate task-specific storage, readers, and tests; offline Git validation must remain independent of PostgreSQL.
+The validator intentionally does not access or reproduce the implemented PostgreSQL editorial corpus or dynamic analytical evidence. The committed first-party counts are a reviewed snapshot, while raw corpus data remains operational. Those non-static classes use separate task-specific storage, readers, and tests; offline Git validation remains independent of PostgreSQL.

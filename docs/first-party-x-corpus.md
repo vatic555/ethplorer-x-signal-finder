@@ -2,7 +2,9 @@
 
 Status: Tasks 005C, 005C.1, and 005C.2 complete; Stage 4 remains In Progress
 
-Live validation date: 2026-08-14
+Initial X live validation date: 2026-08-14
+
+Latest PostgreSQL and review-view validation date: 2026-08-15
 
 ## Purpose and authority
 
@@ -85,7 +87,7 @@ else url
 
 The helper reads both the stored main `entities` object and `raw_json.note_tweet.entities` when present, removes duplicate representations within one Post, and returns the original and resolved values plus the selected source. It performs no network I/O.
 
-The PostgreSQL URL view uses the same precedence. It flags Ethplorer and Binplorer hostnames directly from the resolved destination and marks `is_article_url` only for deterministic Ethplorer `/posts/...` paths currently present in the corpus. It does not infer links from Post text, crawl redirects, or map an article URL to a static knowledge `source_id`. Exact URL-to-source mapping is reserved for Task 005D.
+The PostgreSQL URL view uses the same precedence. It flags Ethplorer and Binplorer hostnames directly from the resolved destination and marks `is_article_url` only for deterministic Ethplorer `/posts/...` paths currently present in the corpus. It does not infer links from Post text or crawl redirects. Task 005D maps an exact normalized article destination to canonical Git `source_url` metadata without persisting a per-Post mapping.
 
 ## Usage and safe diagnostics
 
@@ -120,4 +122,4 @@ Task 005C.2 applied migration 004 without an X request. PostgreSQL 17.6 is healt
 
 ## Boundaries
 
-Tasks 005C through 005C.2 do not implement keyword extraction, trigger phrases, a prefilter vocabulary, style-guide generation, embeddings, clustering, LLM analysis, relevance filtering, Signals, Opportunities, media download, X write access, scheduling, publication, reviewed capability extraction, URL-to-`source_id` mapping, or the dynamic analytics adapter. Reviewed Knowledge + Unified Prefilter Vocabulary remains the separate Task 005D direction.
+Tasks 005C through 005C.2 do not implement keyword extraction, trigger phrases, a prefilter vocabulary, style-guide generation, embeddings, clustering, LLM analysis, relevance filtering, Signals, Opportunities, media download, X write access, scheduling, publication, reviewed capability extraction, URL-to-`source_id` mapping, or the dynamic analytics adapter. Task 005D subsequently adds reviewed static capabilities, exact route identity, and a derivative vocabulary without changing corpus storage or implementing runtime filtering. Task 005E dynamic analytics and Task 006 relevance processing remain separate.

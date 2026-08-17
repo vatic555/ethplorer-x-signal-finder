@@ -2,12 +2,13 @@
 source_id = "ethplorer.article.keep-your-deals-clean"
 title = "Keep your deals clean 😷  Ethplorer Features updates 📫"
 source_type = "ethplorer_article"
-products = []
-networks = []
+products = ["ethplorer"]
+networks = ["ethereum"]
+source_url = "https://ethplorer.io/posts/keep_your_deals_clean"
 approved_provenance = "Canonical Ethplorer article archive supplied in knowledge/sources/posts/"
-review_status = "pending"
-confirms = []
-limitations = []
+review_status = "reviewed"
+confirms = ["Ethplorer described user tags and notes for addresses and transactions, with browser-local use without registration and JSON import or export.", "The article describes CSV export of address transaction history and importing data into another Ethplorer account."]
+limitations = ["Storage behavior, account flows, export formats, and current availability are historical product statements requiring current verification.", "A scam label is an aid only and does not replace due diligence or establish comprehensive fraud detection."]
 +++
 
 # Keep your deals clean 😷  Ethplorer Features updates 📫
@@ -43,5 +44,4 @@ Check out these details:
 \
 
 Wait, that’s not all! You can read the story from our user who has recently shared his experience of using Ethplorer tags and notes for tokens transactions [here](https://ethplorer.io/posts/lost_in_transactions).
-
 

@@ -2,13 +2,13 @@
 source_id = "ethplorer.article.cryptodaily-ethereum-rich-list-part-1"
 title = "CryptoDaily Part 1 - The Real Top You’ve Never Seen: Inside Ethereum Rich List by Aggregated USD Holdings"
 source_type = "ethplorer_article"
-products = []
-networks = []
+products = ["ethplorer", "ethplorer_aggregated_rich_list"]
+networks = ["ethereum"]
 approved_provenance = "User-provided DOCX import: CryptoDaily Part 1 - The Real Top You’ve Never Seen_ Inside Ethereum Rich List by Aggregated USD Holdings.docx"
 source_file_sha256 = "800a812554c0649f4cbdad7e4a1f8cd592afbd092e0416adef1290fc676936d8"
-review_status = "pending"
-confirms = []
-limitations = []
+review_status = "reviewed"
+confirms = ["This approved CryptoDaily brief describes Ethplorer's Aggregated Rich List methodology using totalBalanceUsd across ETH, ERC-20 tokens, and stablecoins.", "It provides a historical balance-composition, address-overlap, holder-age, stablecoin, and tagged-entity analysis with supporting images."]
+limitations = ["The brief is an approved derivative editorial source without a canonical Ethplorer article URL in this repository.", "All balances, percentages, rankings, dates, and conclusions are historical snapshot findings and must not be treated as current numerical evidence."]
 +++
 
 # CryptoDaily Part 1 - The Real Top You’ve Never Seen: Inside Ethereum Rich List by Aggregated USD Holdings

@@ -9,8 +9,9 @@ Status: Canonical implementation sequence and progress record
 - Stage 2 - X API Access Spike - Completed
 - Stage 3 - X Collection Pipeline - Completed
 - Stage 4 - Minimum Knowledge Base - In Progress
-- Current task - Task 005D - Reviewed Knowledge + Unified Prefilter Vocabulary - Planned, awaiting its explicit task specification
-- Last completed corrective task - Task 004D Recovery Amendment
+- Current task - Task 005D - Reviewed Knowledge + Unified Prefilter Vocabulary - Completed
+- Next task - Task 005E - Dynamic Analytics Adapter - Planned
+- Last completed corrective task - Task 004D.2 - Fix Provider Discovery Runner
 - Last completed MVP product task - Task 005C.2 - First-Party X Reference Reasons + URL Review Views
 - Local PostgreSQL implementation is ready
 - Real Supabase migration and database validation are complete
@@ -66,8 +67,8 @@ Post-MVP work may cover:
 | 0 | Repository Bootstrap | Completed | Task 001 | Yes |
 | 1 | Durable Storage Foundation | Completed | Task 002 | Yes |
 | 2 | X API Access Spike | Completed | Task 003 | Yes |
-| 3 | X Collection Pipeline | Completed | Tasks 004A through 004D complete; bounded 004D aftermath recovery does not reopen the stage | Yes |
-| 4 | Minimum Knowledge Base | In Progress | Tasks 005A and 005C through 005C.2 complete; Task 005D next | Yes |
+| 3 | X Collection Pipeline | Completed | Tasks 004A through 004D.2 complete; bounded shadow corrections do not reopen the stage | Yes |
+| 4 | Minimum Knowledge Base | In Progress | Tasks 005A and 005C through 005D complete; Task 005E next | Yes |
 | 5 | Relevance Filtering and Signal Clustering | Planned | Task 006 | Yes |
 | 6 | Opportunity Gate and Context Enrichment | Planned | Task 007 | Yes |
 | 7 | Drafts, Human Review and Pilot | Planned | Task 008 | Yes |
@@ -398,7 +399,8 @@ Create the minimum reviewed knowledge required for credible Opportunity decision
 - Task 005C - First-Party X Corpus Import + Continuous Sync - Completed by explicit owner decision before final unified vocabulary work
 - Task 005C.1 - First-Party X Corpus Corrections - Completed
 - Task 005C.2 - First-Party X Reference Reasons + URL Review Views - Completed
-- Task 005D - Reviewed Knowledge + Unified Prefilter Vocabulary - Planned and next
+- Task 005D - Reviewed Knowledge + Unified Prefilter Vocabulary - Completed
+- Task 005E - Dynamic Analytics Adapter - Planned and next
 
 ### Task 005A Validation Record
 
@@ -479,12 +481,25 @@ Create the minimum reviewed knowledge required for credible Opportunity decision
 - Validation: 158 default tests passed with 5 external tests skipped; 3 explicit PostgreSQL integration tests passed; knowledge validation passed for 17 sources and 0 assets
 - Scope boundary: no X request, sync, URL crawl, article-to-source mapping, keyword or capability extraction, LLM processing, analytics integration, provider adapter, or media download was performed
 
+### Task 005D Validation Record
+
+- Completion date: 2026-08-17
+- Static review: all 17 sources were read completely and double-checked; all 11 managed informative images were inspected; 17 sources are reviewed with explicit supported claims and historical or product-status limitations
+- Capability layer: 11 compact reviewed capabilities link only to reviewed static evidence; no unsupported Binplorer, generic DeFi liquidity, AML, generic risk-scoring, or price-prediction capability was added
+- Route identity: 12 canonical Ethplorer article URLs are normalized from source metadata; exact stored URL linkage found 8 first-party Posts across 5 reviewed source IDs without fuzzy matching or a committed per-Post export
+- Editorial analysis: all 378 first-party rows were analysed locally as 170 originals, 132 replies, 26 quotes, and 50 reposts; 187 available and 17 unavailable referenced contexts retained separate authority roles
+- Vocabulary: 76 manually reviewed derivative triggers, including 46 reviewed and 30 candidate rows; 65 have static basis, 38 have non-repost authored basis, 28 have referenced-context basis, and 9 have exact article-link basis
+- Safety boundary: no raw X content, historical numerical trigger, external request, LLM call, runtime filter, database migration, dynamic analytics adapter, Signal, or Opportunity was added
+- Validation summary: offline validation passed for 17 sources, 11 assets, 12 routes, and 76 triggers; 184 default tests passed with 5 external tests skipped; 3 PostgreSQL integration tests passed; PostgreSQL 17.6 is healthy with migrations 1 through 4 current and RLS intact; 378 distinct first-party Posts, 1,040 distinct incoming Posts, four `sync_state` rows, and checkpoint fingerprint `410535ed27aa2a464bc63953df0aa318` were preserved
+- Final implementation commit: pending final validated commit
+- Stage boundary: Stage 4 remains In Progress; Task 005E is next and Task 006 has not started
+
 ### Completion Record
 
 - Completion date:
-- Final commit: `222bc5e9de2ea46b5fe26639a7ebbe612edb3cae`
-- Validation summary: Tasks 005A and 005C through 005C.2 complete; Task 005D and Stage 4 completion remain pending.
-- Remaining limitations: The 17 Ethplorer articles remain pending substantive review; no evidence-backed capability rows have been extracted yet.
+- Final commit:
+- Validation summary: Tasks 005A and 005C through 005D complete; Task 005E and Stage 4 completion remain pending.
+- Remaining limitations: Dynamic analytical evidence is not integrated, and reviewed static Binplorer capability evidence is still missing.
 
 ## Stage 5 - Relevance Filtering and Signal Clustering
 

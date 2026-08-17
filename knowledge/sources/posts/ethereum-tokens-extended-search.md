@@ -2,12 +2,13 @@
 source_id = "ethplorer.article.ethereum-tokens-extended-search"
 title = "🔍 Off the scale crypto explorer / Ethplorer extended search 🔎"
 source_type = "ethplorer_article"
-products = []
-networks = []
+products = ["ethplorer"]
+networks = ["ethereum"]
+source_url = "https://ethplorer.io/posts/ethereum-tokens-extended-search"
 approved_provenance = "Canonical Ethplorer article archive supplied in knowledge/sources/posts/"
-review_status = "pending"
-confirms = []
-limitations = []
+review_status = "reviewed"
+confirms = ["Ethplorer described ranked search across tokens, addresses, public tags, and user-created private tags and notes.", "The article says token-result ranking considered transaction and fund-flow activity in addition to price."]
+limitations = ["The ranking formula, coverage, and current feature behavior are not specified and require live product or current documentation verification.", "Search ranking and labels do not prove that a token or address is safe or relevant."]
 +++
 
 # 🔍 Off the scale crypto explorer / Ethplorer extended search 🔎

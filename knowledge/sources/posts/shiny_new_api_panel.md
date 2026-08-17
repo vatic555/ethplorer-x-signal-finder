@@ -2,12 +2,13 @@
 source_id = "ethplorer.article.shiny-new-api-panel"
 title = "Developers, this one’s for you 🚀 Shiny new API Panel 🤓"
 source_type = "ethplorer_article"
-products = []
-networks = []
+products = ["ethplorer", "ethplorer_api", "ethplorer_bulk_api_monitor"]
+networks = ["ethereum"]
+source_url = "https://ethplorer.io/posts/shiny_new_api_panel"
 approved_provenance = "Canonical Ethplorer article archive supplied in knowledge/sources/posts/"
-review_status = "pending"
-confirms = []
-limitations = []
+review_status = "reviewed"
+confirms = ["Ethplorer announced an account API Panel for self-service API keys, usage statistics, limits, recent requests, and debugging.", "The same source announced Bulk API Monitor for high-volume address monitoring with minimal polling and coding."]
+limitations = ["The article describes launch-time behavior, including test-mode and scale claims; current API products, limits, pricing, and account recovery flows require current documentation.", "The source does not establish unlimited present-day capacity."]
 +++
 
 # Developers, this one’s for you 🚀 Shiny new API Panel 🤓

@@ -2,13 +2,13 @@
 source_id = "ethplorer.article.ethereum-capital-outside-eth-and-defi-self-issued"
 title = "58% of Ethereum’s Capital Lives Outside ETH Balances - And Half of DeFi Capital Is Self-Issued"
 source_type = "ethplorer_article"
-products = []
-networks = []
+products = ["ethplorer", "ethplorer_aggregated_rich_list"]
+networks = ["ethereum"]
 approved_provenance = "User-provided DOCX import: 58% of Ethereum’s Capital Lives Outside ETH Balances - And Half of DeFi Capital Is Self-Issued.docx"
 source_file_sha256 = "e384cb4d8f655b625cb8e2ae078f350429065f70937444531572212c766c2993"
-review_status = "pending"
-confirms = []
-limitations = []
+review_status = "reviewed"
+confirms = ["This approved article describes Ethplorer's Aggregated Rich List as a totalBalanceUsd ranking across ETH, ERC-20 tokens, and stablecoins, with stated exclusions and liquidity filtering.", "It documents balance-composition, address attribution, smart-contract participation, and Printing-Press Index analysis for a historical Ethereum snapshot."]
+limitations = ["The source has no canonical public article URL recorded in this repository and includes editorial interpretation alongside methodology.", "Its balances, percentages, dates, thresholds, project examples, and risk conclusions are historical and sometimes differ from other snapshots; they must not be reconciled into current facts."]
 +++
 
 # 58% of Ethereum’s Capital Lives Outside ETH Balances - And Half of DeFi Capital Is Self-Issued

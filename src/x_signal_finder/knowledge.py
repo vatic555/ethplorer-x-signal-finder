@@ -11,10 +11,31 @@ from pathlib import Path
 import re
 import tomllib
 from typing import Any
-from urllib.parse import unquote
+from urllib.parse import unquote, urlsplit, urlunsplit
 
 
 REVIEW_STATUSES = frozenset({"pending", "reviewed", "deprecated"})
+VOCABULARY_REVIEW_STATUSES = frozenset({"candidate", "reviewed", "deprecated"})
+VOCABULARY_MATCH_TYPES = frozenset({"token", "phrase", "entity"})
+VOCABULARY_CATEGORIES = frozenset(
+    {
+        "product",
+        "network",
+        "capability",
+        "user_problem",
+        "user_intent",
+        "analytics_concept",
+        "project_entity",
+        "infrastructure",
+        "bizdev_integration",
+        "contextual",
+        "exclusion_context",
+    }
+)
+VOCABULARY_ROLES = frozenset(
+    {"positive_trigger", "context_only", "negative_context"}
+)
+VOCABULARY_STRENGTHS = frozenset({"strong", "normal", "weak"})
 ID_PATTERN = re.compile(r"^[a-z0-9][a-z0-9._-]*$")
 SHA256_PATTERN = re.compile(r"^[a-f0-9]{64}$")
 MARKDOWN_LINK_PATTERN = re.compile(r"(?<!!)\[[^]]*]\(([^)]+)\)")
@@ -45,10 +66,31 @@ ASSET_COLUMNS = (
     "review_status",
     "last_reviewed",
 )
+VOCABULARY_COLUMNS = (
+    "trigger_id",
+    "term",
+    "match_type",
+    "category",
+    "role",
+    "strength",
+    "products",
+    "networks",
+    "asset_ids",
+    "static_source_ids",
+    "static_basis",
+    "first_party_authored_count",
+    "referenced_context_count",
+    "exact_article_link_basis",
+    "review_status",
+    "notes",
+)
 REQUIRED_PATHS = (
     "README.md",
     "assets_catalog.csv",
     "source_documents.md",
+    "review_summary.md",
+    "prefilter/README.md",
+    "prefilter/vocabulary.csv",
     "terminology/shared-analytics.md",
     "terminology/x-signal.md",
     "sources/_source-template.md",
@@ -67,6 +109,8 @@ class KnowledgeValidationResult:
     knowledge_root: Path
     source_count: int
     asset_count: int
+    route_count: int
+    vocabulary_count: int
     errors: tuple[str, ...]
 
     @property
@@ -79,6 +123,8 @@ class KnowledgeValidationResult:
             "knowledge_root": str(self.knowledge_root),
             "source_count": self.source_count,
             "asset_count": self.asset_count,
+            "route_count": self.route_count,
+            "vocabulary_count": self.vocabulary_count,
             "error_count": len(self.errors),
             "errors": list(self.errors),
             "network_requests": 0,
@@ -142,7 +188,7 @@ def _validate_source(
     path: Path,
     root: Path,
     errors: list[str],
-) -> tuple[str | None, str | None, str | None]:
+) -> tuple[str | None, str | None, str | None, str | None]:
     label = path.relative_to(root).as_posix()
     metadata, body = _split_front_matter(path, errors)
     for field in SOURCE_REQUIRED_FIELDS:
@@ -228,11 +274,35 @@ def _validate_source(
             )
         if body.count("```") % 2:
             errors.append(f"{label}: unclosed fenced Markdown block")
-    return source_id, status, body_signature
+    canonical_url = None
+    if relative.parts[:2] == ("sources", "posts") and isinstance(source_url, str):
+        canonical_url = normalize_article_url(source_url)
+        if source_url.strip() and canonical_url is None:
+            errors.append(
+                f"{label}: source_url must identify an Ethplorer /posts/ article"
+            )
+    return source_id, status, body_signature, canonical_url
 
 
 def _split_ids(value: str) -> tuple[str, ...]:
     return tuple(item.strip() for item in value.split(";") if item.strip())
+
+
+def normalize_article_url(value: str) -> str | None:
+    """Normalize a public Ethplorer article URL without network access."""
+    try:
+        parsed = urlsplit(value.strip())
+    except ValueError:
+        return None
+    hostname = (parsed.hostname or "").rstrip(".").casefold()
+    if parsed.scheme.casefold() not in {"http", "https"}:
+        return None
+    if hostname not in {"ethplorer.io", "www.ethplorer.io"}:
+        return None
+    path = re.sub(r"/+", "/", unquote(parsed.path)).rstrip("/")
+    if not re.fullmatch(r"/posts/[A-Za-z0-9_-]+", path):
+        return None
+    return urlunsplit(("https", "ethplorer.io", path, "", ""))
 
 
 def _validate_assets(
@@ -305,6 +375,153 @@ def _validate_assets(
     return len(rows)
 
 
+def _read_asset_ids(path: Path) -> set[str]:
+    if not path.is_file():
+        return set()
+    try:
+        with path.open(newline="", encoding="utf-8") as handle:
+            return {
+                (row.get("asset_id") or "").strip()
+                for row in csv.DictReader(handle)
+                if (row.get("asset_id") or "").strip()
+            }
+    except (OSError, UnicodeError, csv.Error):
+        return set()
+
+
+def _nonnegative_integer(value: str) -> bool:
+    try:
+        return int(value) >= 0
+    except ValueError:
+        return False
+
+
+def _validate_vocabulary(
+    path: Path,
+    source_statuses: dict[str, str],
+    asset_ids: set[str],
+    canonical_routes: dict[str, str],
+    errors: list[str],
+) -> int:
+    if not path.is_file():
+        return 0
+    try:
+        with path.open(newline="", encoding="utf-8") as handle:
+            reader = csv.DictReader(handle)
+            if tuple(reader.fieldnames or ()) != VOCABULARY_COLUMNS:
+                errors.append(
+                    "prefilter/vocabulary.csv: columns must exactly match the documented contract"
+                )
+                return 0
+            rows = list(reader)
+    except (OSError, UnicodeError, csv.Error) as error:
+        errors.append(
+            "prefilter/vocabulary.csv: cannot read vocabulary "
+            f"({type(error).__name__})"
+        )
+        return 0
+
+    seen_ids: set[str] = set()
+    seen_terms: dict[str, str] = {}
+    routed_source_ids = set(canonical_routes.values())
+    for row_number, row in enumerate(rows, start=2):
+        label = f"prefilter/vocabulary.csv:{row_number}"
+        for field in (
+            "trigger_id",
+            "term",
+            "match_type",
+            "category",
+            "role",
+            "strength",
+            "static_basis",
+            "first_party_authored_count",
+            "referenced_context_count",
+            "review_status",
+            "notes",
+        ):
+            if not (row.get(field) or "").strip():
+                errors.append(f"{label}: {field} is required")
+
+        trigger_id = (row.get("trigger_id") or "").strip()
+        if not ID_PATTERN.fullmatch(trigger_id):
+            errors.append(f"{label}: trigger_id must be a stable lowercase identifier")
+        elif trigger_id in seen_ids:
+            errors.append(f"{label}: duplicate trigger_id {trigger_id}")
+        else:
+            seen_ids.add(trigger_id)
+
+        term = (row.get("term") or "").strip()
+        normalized_term = re.sub(r"\s+", " ", term).casefold()
+        if normalized_term:
+            duplicate_of = seen_terms.get(normalized_term)
+            if duplicate_of is not None:
+                errors.append(
+                    f"{label}: normalized duplicate term matches {duplicate_of}"
+                )
+            else:
+                seen_terms[normalized_term] = trigger_id or label
+
+        match_type = (row.get("match_type") or "").strip()
+        category = (row.get("category") or "").strip()
+        role = (row.get("role") or "").strip()
+        strength = (row.get("strength") or "").strip()
+        status = (row.get("review_status") or "").strip()
+        static_basis = (row.get("static_basis") or "").strip()
+        if match_type not in VOCABULARY_MATCH_TYPES:
+            errors.append(f"{label}: invalid match_type {match_type}")
+        if category not in VOCABULARY_CATEGORIES:
+            errors.append(f"{label}: invalid category {category}")
+        if role not in VOCABULARY_ROLES:
+            errors.append(f"{label}: invalid role {role}")
+        if strength not in VOCABULARY_STRENGTHS:
+            errors.append(f"{label}: invalid strength {strength}")
+        if status not in VOCABULARY_REVIEW_STATUSES:
+            errors.append(f"{label}: invalid review_status {status}")
+        if static_basis not in {"yes", "no"}:
+            errors.append(f"{label}: static_basis must be yes or no")
+
+        for field in ("first_party_authored_count", "referenced_context_count"):
+            if not _nonnegative_integer((row.get(field) or "").strip()):
+                errors.append(f"{label}: {field} must be a non-negative integer")
+
+        row_asset_ids = _split_ids(row.get("asset_ids") or "")
+        for asset_id in sorted(set(row_asset_ids).difference(asset_ids)):
+            errors.append(f"{label}: unknown asset_id {asset_id}")
+        row_source_ids = _split_ids(row.get("static_source_ids") or "")
+        for source_id in sorted(set(row_source_ids).difference(source_statuses)):
+            errors.append(f"{label}: unknown static_source_id {source_id}")
+        if static_basis == "yes" and not row_source_ids:
+            errors.append(f"{label}: static_basis yes requires static_source_ids")
+        exact_source_ids = _split_ids(row.get("exact_article_link_basis") or "")
+        for source_id in sorted(set(exact_source_ids).difference(routed_source_ids)):
+            errors.append(
+                f"{label}: exact article source has no canonical route {source_id}"
+            )
+        if not set(exact_source_ids).issubset(row_source_ids):
+            errors.append(
+                f"{label}: exact_article_link_basis must be included in static_source_ids"
+            )
+
+        if status == "reviewed" and (
+            static_basis != "yes"
+            or not row_source_ids
+            or not any(
+                source_statuses.get(source_id) == "reviewed"
+                for source_id in row_source_ids
+            )
+        ):
+            errors.append(f"{label}: reviewed trigger requires reviewed static evidence")
+        if (
+            status == "reviewed"
+            and category == "capability"
+            and (not row_asset_ids or not row_source_ids)
+        ):
+            errors.append(
+                f"{label}: reviewed capability trigger requires asset and static evidence"
+            )
+    return len(rows)
+
+
 def _local_link_target(raw_target: str) -> str | None:
     target = raw_target.strip()
     if target.startswith("<") and ">" in target:
@@ -355,6 +572,7 @@ def validate_knowledge(root: Path | None = None) -> KnowledgeValidationResult:
     source_statuses: dict[str, str] = {}
     seen_source_ids: set[str] = set()
     body_signatures: dict[str, str] = {}
+    canonical_routes: dict[str, str] = {}
     sources_root = knowledge_root / "sources"
     source_paths = (
         sorted(
@@ -366,7 +584,7 @@ def validate_knowledge(root: Path | None = None) -> KnowledgeValidationResult:
         else []
     )
     for path in source_paths:
-        source_id, status, body_signature = _validate_source(
+        source_id, status, body_signature, canonical_url = _validate_source(
             path, knowledge_root, errors
         )
         label = path.relative_to(knowledge_root).as_posix()
@@ -384,10 +602,26 @@ def validate_knowledge(root: Path | None = None) -> KnowledgeValidationResult:
         seen_source_ids.add(source_id)
         if status is not None:
             source_statuses[source_id] = status
+        if canonical_url is not None:
+            existing = canonical_routes.get(canonical_url)
+            if existing is not None and existing != source_id:
+                errors.append(
+                    f"{label}: duplicate canonical article URL maps to {existing}"
+                )
+            else:
+                canonical_routes[canonical_url] = source_id
 
+    asset_path = knowledge_root / "assets_catalog.csv"
     asset_count = _validate_assets(
-        knowledge_root / "assets_catalog.csv",
+        asset_path,
         source_statuses,
+        errors,
+    )
+    vocabulary_count = _validate_vocabulary(
+        knowledge_root / "prefilter/vocabulary.csv",
+        source_statuses,
+        _read_asset_ids(asset_path),
+        canonical_routes,
         errors,
     )
     if knowledge_root.is_dir():
@@ -396,5 +630,7 @@ def validate_knowledge(root: Path | None = None) -> KnowledgeValidationResult:
         knowledge_root=knowledge_root,
         source_count=len(source_paths),
         asset_count=asset_count,
+        route_count=len(canonical_routes),
+        vocabulary_count=vocabulary_count,
         errors=tuple(sorted(set(errors))),
     )
