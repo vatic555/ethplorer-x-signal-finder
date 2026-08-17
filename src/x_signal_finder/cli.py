@@ -68,6 +68,11 @@ from x_signal_finder.x_provider_shadow import (
     ShadowSpikeError,
     run_shadow_spike,
 )
+from x_signal_finder.x_shadow_recovery import (
+    ShadowRecoveryError,
+    apply_official_shadow_recovery,
+    prepare_official_shadow_recovery,
+)
 
 
 STATUS_MESSAGE = (
@@ -259,6 +264,28 @@ def build_parser() -> argparse.ArgumentParser:
     )
     shadow_run.add_argument("--max-official-pages", type=int, default=20)
     shadow_run.add_argument(
+        "--approved-max-official-spend-usd",
+        type=Decimal,
+        help=(
+            "Explicitly approved fresh Official X ceiling; required only for the "
+            "API benchmark source."
+        ),
+    )
+    shadow_run.add_argument(
+        "--official-worst-case-cost-per-primary-usd",
+        type=Decimal,
+        help=(
+            "Preflight upper bound including all Post, User, and Media resources "
+            "attributable to one requested primary Post."
+        ),
+    )
+    shadow_run.add_argument(
+        "--max-official-results-per-page",
+        type=int,
+        default=100,
+        help="Maximum Official X page size; dynamically reduced near the ceiling.",
+    )
+    shadow_run.add_argument(
         "--output-root",
         default="data/runtime/x-provider-shadow",
         help="Ignored local directory for raw temporary responses and safe summary.",
@@ -282,6 +309,37 @@ def build_parser() -> argparse.ArgumentParser:
         choices=("twitterapi_io", "socialdata"),
         dest="shadow_providers",
         help="Limit a run to one provider; repeat to select both.",
+    )
+    shadow_recovery = shadow_subparsers.add_parser(
+        "recover-official",
+        help=(
+            "Validate and recover already-saved Official X shadow pages without "
+            "any external API request; defaults to a database read-only dry-run."
+        ),
+    )
+    shadow_recovery.add_argument(
+        "--artifact-dir",
+        required=True,
+        help="Ignored local <run-id>/official_x directory containing response pages.",
+    )
+    shadow_recovery.add_argument(
+        "--apply",
+        action="store_true",
+        help="Atomically create a recovery run and upsert Posts without sync_state writes.",
+    )
+    shadow_recovery.add_argument(
+        "--confirm-manifest-sha256",
+        help="Exact artifact digest printed by the approved dry-run.",
+    )
+    shadow_recovery.add_argument(
+        "--reported-post-reads",
+        type=int,
+        help="Historical Post Reads reported by X Developer Console.",
+    )
+    shadow_recovery.add_argument(
+        "--reported-cost-usd",
+        type=Decimal,
+        help="Historical cost reported by X Developer Console.",
     )
     return parser
 
@@ -1386,6 +1444,57 @@ def _run_first_party_x_sync(args: argparse.Namespace) -> int:
     return 1 if incomplete else 0
 
 
+def _run_official_shadow_recovery(args: argparse.Namespace) -> int:
+    if args.apply and not args.confirm_manifest_sha256:
+        raise ValueError(
+            "--apply requires --confirm-manifest-sha256 from the approved dry-run."
+        )
+    if not args.apply and args.confirm_manifest_sha256:
+        raise ValueError("--confirm-manifest-sha256 is valid only with --apply.")
+    if args.reported_post_reads is not None and args.reported_post_reads < 0:
+        raise ValueError("--reported-post-reads must not be negative.")
+    if args.reported_cost_usd is not None and args.reported_cost_usd < 0:
+        raise ValueError("--reported-cost-usd must not be negative.")
+
+    database_config = load_database_config()
+    run_id = uuid4()
+    recovered_at = datetime.now(timezone.utc)
+    with connect_database(database_config) as connection:
+        repository = StorageRepository(connection)
+        if not args.apply:
+            with connection.transaction(force_rollback=True):
+                plan = prepare_official_shadow_recovery(
+                    artifact_dir=args.artifact_dir,
+                    repository=repository,
+                    run_id=run_id,
+                    recovered_at=recovered_at,
+                )
+            print(json.dumps(plan.safe_summary(), indent=2, sort_keys=True))
+            return 0
+
+        with connection.transaction():
+            plan = prepare_official_shadow_recovery(
+                artifact_dir=args.artifact_dir,
+                repository=repository,
+                run_id=run_id,
+                recovered_at=recovered_at,
+            )
+            summary = apply_official_shadow_recovery(
+                repository=repository,
+                plan=plan,
+                confirmed_manifest_sha256=args.confirm_manifest_sha256,
+                run_id=run_id,
+                recovered_at=recovered_at,
+                usage_event_id=uuid4(),
+                application_version=__version__,
+                git_commit=None,
+                reported_post_reads=args.reported_post_reads,
+                reported_cost_usd=args.reported_cost_usd,
+            )
+        print(json.dumps(summary, indent=2, sort_keys=True))
+        return 0
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     """Run the command-line interface and return a process exit code."""
     parser = build_parser()
@@ -1508,6 +1617,32 @@ def main(argv: Sequence[str] | None = None) -> int:
         if args.shadow_command is None:
             parser.parse_args(["x-provider-shadow", "--help"])
             return 0
+        if args.shadow_command == "recover-official":
+            try:
+                return _run_official_shadow_recovery(args)
+            except (
+                ConfigurationError,
+                ShadowRecoveryError,
+                ValueError,
+            ) as error:
+                safe_error = redact_secrets(str(error))
+                print(f"Official X offline recovery failed: {safe_error}", file=sys.stderr)
+                return 2
+            except psycopg.OperationalError:
+                print(
+                    "Official X offline recovery failed: PostgreSQL connection "
+                    "unavailable. Check DATABASE_URL, network access, and SSL settings.",
+                    file=sys.stderr,
+                )
+                return 1
+            except Exception as error:
+                safe_error = redact_secrets(error)
+                print(
+                    "Official X offline recovery failed: "
+                    f"{type(error).__name__}: {safe_error}",
+                    file=sys.stderr,
+                )
+                return 1
         try:
             summary = run_shadow_spike(
                 hours=args.hours,
@@ -1516,6 +1651,13 @@ def main(argv: Sequence[str] | None = None) -> int:
                 output_root=args.output_root,
                 window_end=args.window_end,
                 official_benchmark_source=args.official_benchmark_source,
+                approved_max_official_spend_usd=(
+                    args.approved_max_official_spend_usd
+                ),
+                official_worst_case_cost_per_primary_usd=(
+                    args.official_worst_case_cost_per_primary_usd
+                ),
+                max_official_results_per_page=args.max_official_results_per_page,
                 provider_names=(
                     tuple(args.shadow_providers)
                     if args.shadow_providers

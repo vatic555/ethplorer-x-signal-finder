@@ -11,6 +11,7 @@ from email.utils import parsedate_to_datetime
 import json
 import os
 from pathlib import Path
+from tempfile import NamedTemporaryFile
 import time
 from typing import Any, Literal, Protocol
 from urllib.error import HTTPError, URLError
@@ -21,7 +22,7 @@ from dotenv import dotenv_values
 
 from x_signal_finder.config import load_database_config
 from x_signal_finder.db.connection import connect_database
-from x_signal_finder.x_api.client import XApiClient, parse_content_page
+from x_signal_finder.x_api.client import XApiClient, XApiRequestError, parse_content_page
 from x_signal_finder.x_api.config import load_x_api_config, persist_refresh_token
 from x_signal_finder.x_api.oauth import refresh_access_token
 from x_signal_finder.x_api.probe import TWEET_FIELDS, USER_FIELDS
@@ -603,9 +604,83 @@ def plan_search_tasks(
 
 def _write_json(path: Path, value: object) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(
-        json.dumps(value, indent=2, sort_keys=True, default=str),
-        encoding="utf-8",
+    rendered = json.dumps(value, indent=2, sort_keys=True, default=str)
+    temporary_name: str | None = None
+    try:
+        with NamedTemporaryFile(
+            mode="w",
+            encoding="utf-8",
+            dir=path.parent,
+            prefix=f".{path.name}.",
+            suffix=".tmp",
+            delete=False,
+        ) as temporary:
+            temporary.write(rendered)
+            temporary.flush()
+            os.fsync(temporary.fileno())
+            temporary_name = temporary.name
+        os.replace(temporary_name, path)
+    finally:
+        if temporary_name is not None and os.path.exists(temporary_name):
+            os.unlink(temporary_name)
+
+
+def plan_official_page_size(
+    *,
+    remaining_budget_usd: Decimal,
+    requested_page_size: int,
+    worst_case_cost_per_primary_usd: Decimal,
+) -> int:
+    """Return a page size whose declared worst case fits the remaining budget."""
+    if requested_page_size < 1 or requested_page_size > 100:
+        raise ValueError("Official X page size must be between 1 and 100.")
+    if remaining_budget_usd < 0:
+        raise ValueError("Remaining Official X budget must not be negative.")
+    if worst_case_cost_per_primary_usd <= 0:
+        raise ValueError("Official X worst-case unit cost must be positive.")
+    affordable = int(remaining_budget_usd // worst_case_cost_per_primary_usd)
+    return min(requested_page_size, affordable)
+
+
+def _write_official_partial_summary(
+    *,
+    artifact_dir: Path,
+    status: str,
+    successful_pages: int,
+    attempted_requests: int,
+    raw_primary_posts: int,
+    unique_primary_posts: int,
+    unique_expanded_posts: int,
+    unique_users: int,
+    unique_media: int,
+    next_token_present: bool,
+    estimated_spend_usd: Decimal,
+    approved_max_spend_usd: Decimal,
+    next_page_size: int,
+    terminal_error: XApiRequestError | None,
+) -> None:
+    _write_json(
+        artifact_dir / "official_x" / "partial-summary.json",
+        {
+            "status": status,
+            "successful_pages": successful_pages,
+            "attempted_requests": attempted_requests,
+            "raw_primary_posts": raw_primary_posts,
+            "unique_primary_posts": unique_primary_posts,
+            "unique_expanded_posts": unique_expanded_posts,
+            "unique_users": unique_users,
+            "unique_media": unique_media,
+            "next_token_present": next_token_present,
+            "estimated_spend_usd": format(estimated_spend_usd, "f"),
+            "approved_max_spend_usd": format(approved_max_spend_usd, "f"),
+            "next_page_size": next_page_size,
+            "terminal_http_status": terminal_error.status if terminal_error else None,
+            "terminal_error_category": (
+                terminal_error.category if terminal_error else None
+            ),
+            "raw_pages_durable": True,
+            "checkpoint_scope": "shadow_only_not_sync_state",
+        },
     )
 
 
@@ -762,9 +837,29 @@ def fetch_official_benchmark(
     end: datetime,
     max_pages: int,
     artifact_dir: Path,
+    approved_max_spend_usd: Decimal | None,
+    worst_case_cost_per_primary_usd: Decimal | None,
+    max_results_per_page: int = 100,
 ) -> ProviderRun:
     if max_pages < 1:
         raise ValueError("max_official_pages must be at least 1.")
+    if approved_max_spend_usd is None or approved_max_spend_usd <= 0:
+        raise ValueError(
+            "Fresh Official X requires an explicitly approved positive spend ceiling."
+        )
+    if worst_case_cost_per_primary_usd is None:
+        raise ValueError(
+            "Fresh Official X requires the preflight worst-case cost per primary Post."
+        )
+    initial_page_size = plan_official_page_size(
+        remaining_budget_usd=approved_max_spend_usd,
+        requested_page_size=max_results_per_page,
+        worst_case_cost_per_primary_usd=worst_case_cost_per_primary_usd,
+    )
+    if initial_page_size < 1:
+        raise ValueError(
+            "Approved Official X ceiling cannot fund one worst-case primary Post."
+        )
     config = load_x_api_config()
     config.require_collector_setup()
     tokens = refresh_access_token(
@@ -775,7 +870,6 @@ def fetch_official_benchmark(
     client = XApiClient(token=tokens.access_token, base_url=config.base_url)
     endpoint = f"/users/{config.user_id_for('home')}/timelines/reverse_chronological"
     base_params: dict[str, object] = {
-        "max_results": 100,
         "start_time": start.strftime("%Y-%m-%dT%H:%M:%SZ"),
         "end_time": end.strftime("%Y-%m-%dT%H:%M:%SZ"),
         "tweet.fields": TWEET_FIELDS,
@@ -790,13 +884,62 @@ def fetch_official_benchmark(
     media_keys: set[str] = set()
     token: str | None = None
     requests = 0
+    attempted_requests = 0
+    raw_primary_posts = 0
     warnings: set[str] = set()
     status = "complete"
+    terminal_error: XApiRequestError | None = None
     while requests < max_pages:
+        resources = primary_ids | expanded_ids
+        estimated_spend = (
+            OFFICIAL_X_POST_READ_COST_USD * len(resources)
+            + OFFICIAL_X_USER_READ_COST_USD * len(user_ids)
+            + OFFICIAL_X_MEDIA_READ_COST_USD * len(media_keys)
+        )
+        remaining_budget = approved_max_spend_usd - estimated_spend
+        page_size = plan_official_page_size(
+            remaining_budget_usd=max(Decimal("0"), remaining_budget),
+            requested_page_size=max_results_per_page,
+            worst_case_cost_per_primary_usd=worst_case_cost_per_primary_usd,
+        )
+        if page_size < 1:
+            status = "incomplete_due_to_budget"
+            warnings.add("official_x_hard_budget_guard_reached")
+            break
         params = dict(base_params)
+        params["max_results"] = page_size
         if token:
             params["pagination_token"] = token
-        response, elapsed = client._get(endpoint, params)
+        attempted_requests += 1
+        try:
+            response, elapsed = client._get(endpoint, params)
+        except XApiRequestError as error:
+            if not requests:
+                raise
+            terminal_error = error
+            if error.status == 402:
+                status = "incomplete_due_to_credit"
+                warnings.add("official_x_credit_exhausted_after_partial_fetch")
+            else:
+                status = "incomplete_due_to_request_failure"
+                warnings.add("official_x_request_failed_after_partial_fetch")
+            _write_official_partial_summary(
+                artifact_dir=artifact_dir,
+                status=status,
+                successful_pages=requests,
+                attempted_requests=attempted_requests,
+                raw_primary_posts=raw_primary_posts,
+                unique_primary_posts=len(primary_ids),
+                unique_expanded_posts=len(expanded_ids),
+                unique_users=len(user_ids),
+                unique_media=len(media_keys),
+                next_token_present=bool(token),
+                estimated_spend_usd=estimated_spend,
+                approved_max_spend_usd=approved_max_spend_usd,
+                next_page_size=0,
+                terminal_error=terminal_error,
+            )
+            break
         page = parse_content_page(response, endpoint=endpoint, elapsed=elapsed)
         requests += 1
         try:
@@ -816,15 +959,56 @@ def fetch_official_benchmark(
             )
             posts.append(normalized)
             primary_ids.add(normalized.post_id)
+        raw_primary_posts += len(page.posts)
         expanded_ids.update(page.expanded_posts_by_id)
         user_ids.update(page.users_by_id)
         media_keys.update(page.media_by_key)
         if page.partial_error_count:
             warnings.add("official_x_partial_errors_present")
         token = page.next_token
+        resources = primary_ids | expanded_ids
+        estimated_spend = (
+            OFFICIAL_X_POST_READ_COST_USD * len(resources)
+            + OFFICIAL_X_USER_READ_COST_USD * len(user_ids)
+            + OFFICIAL_X_MEDIA_READ_COST_USD * len(media_keys)
+        )
+        declared_page_reserve = worst_case_cost_per_primary_usd * page_size
+        if estimated_spend > approved_max_spend_usd:
+            raise ShadowSpikeError(
+                "Official X returned resources above the approved hard spend ceiling."
+            )
+        next_page_size = plan_official_page_size(
+            remaining_budget_usd=max(
+                Decimal("0"), approved_max_spend_usd - estimated_spend
+            ),
+            requested_page_size=max_results_per_page,
+            worst_case_cost_per_primary_usd=worst_case_cost_per_primary_usd,
+        )
+        _write_official_partial_summary(
+            artifact_dir=artifact_dir,
+            status="in_progress" if token else "complete",
+            successful_pages=requests,
+            attempted_requests=attempted_requests,
+            raw_primary_posts=raw_primary_posts,
+            unique_primary_posts=len(primary_ids),
+            unique_expanded_posts=len(expanded_ids),
+            unique_users=len(user_ids),
+            unique_media=len(media_keys),
+            next_token_present=bool(token),
+            estimated_spend_usd=estimated_spend,
+            approved_max_spend_usd=approved_max_spend_usd,
+            next_page_size=next_page_size,
+            terminal_error=None,
+        )
+        if estimated_spend > declared_page_reserve + (
+            approved_max_spend_usd - remaining_budget
+        ):
+            raise ShadowSpikeError(
+                "Official X response exceeded the declared per-primary worst-case bound."
+            )
         if not token:
             break
-    if token:
+    if token and status == "complete":
         status = "incomplete_due_to_page_limit"
         warnings.add("official_x_page_limit_reached")
     resources = primary_ids | expanded_ids
@@ -833,7 +1017,31 @@ def fetch_official_benchmark(
         + OFFICIAL_X_USER_READ_COST_USD * len(user_ids)
         + OFFICIAL_X_MEDIA_READ_COST_USD * len(media_keys)
     )
+    final_next_page_size = plan_official_page_size(
+        remaining_budget_usd=max(
+            Decimal("0"), approved_max_spend_usd - estimated_spend
+        ),
+        requested_page_size=max_results_per_page,
+        worst_case_cost_per_primary_usd=worst_case_cost_per_primary_usd,
+    )
+    _write_official_partial_summary(
+        artifact_dir=artifact_dir,
+        status=status,
+        successful_pages=requests,
+        attempted_requests=attempted_requests,
+        raw_primary_posts=raw_primary_posts,
+        unique_primary_posts=len(primary_ids),
+        unique_expanded_posts=len(expanded_ids),
+        unique_users=len(user_ids),
+        unique_media=len(media_keys),
+        next_token_present=bool(token),
+        estimated_spend_usd=estimated_spend,
+        approved_max_spend_usd=approved_max_spend_usd,
+        next_page_size=(final_next_page_size if token else 0),
+        terminal_error=terminal_error,
+    )
     warnings.add("official_x_cost_includes_returned_post_user_and_media_resources")
+    warnings.add("official_x_pages_and_partial_summary_are_durable_per_page")
     return ProviderRun(
         provider="official_x",
         status=status,
@@ -1191,6 +1399,9 @@ def run_shadow_spike(
     output_root: str | Path = "data/runtime/x-provider-shadow",
     window_end: str | None = None,
     official_benchmark_source: Literal["api", "stored"] = "api",
+    approved_max_official_spend_usd: Decimal | None = None,
+    official_worst_case_cost_per_primary_usd: Decimal | None = None,
+    max_official_results_per_page: int = 100,
     provider_names: Sequence[Literal["twitterapi_io", "socialdata"]] = (
         "twitterapi_io",
         "socialdata",
@@ -1242,6 +1453,11 @@ def run_shadow_spike(
             end=end,
             max_pages=max_official_pages,
             artifact_dir=artifact_dir,
+            approved_max_spend_usd=approved_max_official_spend_usd,
+            worst_case_cost_per_primary_usd=(
+                official_worst_case_cost_per_primary_usd
+            ),
+            max_results_per_page=max_official_results_per_page,
         )
     unique_benchmark = tuple(
         {post.post_id: post for post in official.posts}.values()

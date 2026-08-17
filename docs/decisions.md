@@ -269,3 +269,17 @@ Two security-invoker views provide manual Supabase inspection without redirect c
 Task 005C.2 does not map a destination URL to a static knowledge `source_id`, extract capabilities or keywords, call an LLM, integrate analytics, or collect X data. Exact X Post to article to source to reviewed capability linkage remains Task 005D - Reviewed Knowledge + Unified Prefilter Vocabulary. Stage 4 remains In Progress.
 
 The Task 005D label supersedes the earlier Task 005B label for the next reviewed-knowledge direction without changing its evidence requirements or starting that work in Task 005C.2.
+
+## 2026-08-17 - Recover retained Task 004D Official X pages offline
+
+Status: Accepted
+
+The earlier Task 004D record incorrectly described the fresh Official X attempt as a zero-result HTTP 402 request. Eleven paid pages had completed and were durably present in ignored local artifacts before the twelfth request returned HTTP 402. Those pages contain 1,082 unique primary Posts. The owner reported 1,133 billed Post Reads and $5.665 in X Developer Console. The original shadow runner propagated the terminal exception before returning its in-memory benchmark, so no Post was written to PostgreSQL and the later third-party comparison used the existing 192-Post stored benchmark.
+
+The retained pages may be recovered without another X request through a one-purpose, confirmation-gated offline action. It must validate every raw page, use the production `map_x_post` contract, exclude simple reposts, deduplicate by canonical `post_id`, and compare IDs with PostgreSQL before writing. Apply requires the exact manifest SHA-256 shown by the approved dry-run. It creates a separate audit run whose database status is `completed_with_warnings` and whose metadata states `incomplete/recovered`, upserts `posts` atomically, records historical billing provenance, and never reads or writes a provider cursor or `sync_state`. Raw X content remains ignored and must not enter Git.
+
+The future fresh Official X shadow runner must make every successful page durable before another paid request, atomically replace a safe local partial summary after each page, and return accumulated partial data when a later HTTP 402 occurs. Before each paid page it must reserve a preflight-approved worst-case cost bound, refuse to run without an approved ceiling and that bound, and reduce page size as the remaining ceiling shrinks. The local partial checkpoint is diagnostic recovery state only; canonical deduplication remains X `post_id`, and production checkpoints remain separate.
+
+The owner approved manifest `85a70f069262451a275f626209ed3836e4eb2fcdfa6b93cb20a94d221566b00d`. Recovery run `029a02d5-28e3-44b2-aa19-db027c529c9c` inserted 826 Posts, stored recovery provenance on all of them, and recorded the historical 11 requests, 1,133 Post Reads, and $5.665 reported cost. PostgreSQL now contains 1,040 distinct incoming Posts. All four `sync_state` rows and their verification fingerprint remained identical before and after apply, and the recovery made zero external API requests.
+
+This corrective amendment does not reopen Stage 3, change the production collector, accept a third-party provider, or authorize any new external call. It is complete, and Task 005D remains the next MVP task.

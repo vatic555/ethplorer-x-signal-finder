@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
+import json
 
 from x_signal_finder.x_provider_shadow import (
     NormalizedPost,
@@ -11,13 +12,16 @@ from x_signal_finder.x_provider_shadow import (
     SearchTask,
     TwitterApiIoProvider,
     compare_provider,
+    fetch_official_benchmark,
     fetch_stored_official_benchmark,
     normalize_official_post,
     normalize_socialdata_post,
     normalize_twitterapi_io_post,
     plan_search_tasks,
+    plan_official_page_size,
     run_search_provider,
 )
+from x_signal_finder.x_api.client import HttpResponse, XApiRequestError
 
 
 NOW = datetime(2026, 8, 14, 12, 0, tzinfo=timezone.utc)
@@ -208,6 +212,109 @@ def test_provider_page_overflow_is_reported_without_cursor_checkpoint(tmp_path) 
     assert result.pagination_gaps > 0
     assert "provider_page_overflow_not_followed" in result.warnings
     assert provider.calls == 2
+
+
+def test_official_page_size_shrinks_at_budget_boundary() -> None:
+    assert plan_official_page_size(
+        remaining_budget_usd=Decimal("0.31"),
+        requested_page_size=100,
+        worst_case_cost_per_primary_usd=Decimal("0.10"),
+    ) == 3
+
+
+def test_official_partial_402_keeps_page_and_partial_summary(
+    monkeypatch, tmp_path
+) -> None:
+    payload = {
+        "data": [
+            {
+                "id": "100",
+                "author_id": "10",
+                "created_at": "2026-08-14T12:00:00Z",
+                "conversation_id": "100",
+                "text": "Synthetic benchmark Post.",
+            }
+        ],
+        "includes": {"users": [{"id": "10", "username": "alice"}]},
+        "meta": {
+            "result_count": 1,
+            "newest_id": "100",
+            "oldest_id": "100",
+            "next_token": "more",
+        },
+    }
+
+    class Config:
+        client_id = "client"
+        refresh_token = "refresh"
+        base_url = "https://example.invalid"
+
+        def require_collector_setup(self):
+            return None
+
+        def user_id_for(self, source):
+            assert source == "home"
+            return "1"
+
+    class Tokens:
+        access_token = "access"
+        refresh_token = "rotated"
+
+    class Client:
+        def __init__(self, **kwargs):
+            self.calls = 0
+
+        def _get(self, endpoint, params):
+            self.calls += 1
+            if self.calls == 1:
+                return (
+                    HttpResponse(
+                        status=200,
+                        headers={},
+                        body=json.dumps(payload).encode("utf-8"),
+                    ),
+                    0.1,
+                )
+            raise XApiRequestError(
+                status=402,
+                category="api_error",
+                endpoint=endpoint,
+            )
+
+    monkeypatch.setattr(
+        "x_signal_finder.x_provider_shadow.load_x_api_config", lambda: Config()
+    )
+    monkeypatch.setattr(
+        "x_signal_finder.x_provider_shadow.refresh_access_token",
+        lambda **kwargs: Tokens(),
+    )
+    monkeypatch.setattr(
+        "x_signal_finder.x_provider_shadow.persist_refresh_token", lambda value: None
+    )
+    monkeypatch.setattr("x_signal_finder.x_provider_shadow.XApiClient", Client)
+
+    result = fetch_official_benchmark(
+        start=NOW - timedelta(hours=24),
+        end=NOW,
+        max_pages=3,
+        artifact_dir=tmp_path,
+        approved_max_spend_usd=Decimal("1.00"),
+        worst_case_cost_per_primary_usd=Decimal("0.10"),
+        max_results_per_page=10,
+    )
+
+    assert result.status == "incomplete_due_to_credit"
+    assert result.requests == 1
+    assert (tmp_path / "official_x" / "response-0001.json").is_file()
+    partial = json.loads(
+        (tmp_path / "official_x" / "partial-summary.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    assert partial["successful_pages"] == 1
+    assert partial["attempted_requests"] == 2
+    assert partial["terminal_http_status"] == 402
+    assert partial["raw_pages_durable"] is True
 
 
 def test_compare_provider_reports_recall_text_type_context_and_media() -> None:

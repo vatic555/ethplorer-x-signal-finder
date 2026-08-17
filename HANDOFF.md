@@ -1,6 +1,6 @@
 # Ethplorer X Signal Finder - Handoff
 
-Last updated: 2026-08-15
+Last updated: 2026-08-17
 
 Repository HEAD before the HANDOFF metadata update: `9caa0160eda11e0f73b03660ec8e9a55641b9600`
 
@@ -28,7 +28,8 @@ The project is building an AI-assisted X intelligence pipeline for Ethplorer. It
 
 - Current stage: Stage 4 - Minimum Knowledge Base - In Progress.
 - Current task: Task 005D - Reviewed Knowledge + Unified Prefilter Vocabulary - Planned, awaiting its explicit task specification.
-- Last completed task: Task 005C.2 - First-Party X Reference Reasons + URL Review Views.
+- Last completed corrective task: Task 004D Recovery Amendment.
+- Last completed MVP product task: Task 005C.2 - First-Party X Reference Reasons + URL Review Views.
 - Completed bounded exception: Task 004D accepted no third-party provider and made no production change.
 - Next implementation action: start Task 005D only after its explicit task specification is available.
 - Roadmap status: Stages 0 through 3 are Completed; Stage 4 is In Progress; Stages 5 through 7 are Planned; Stage 8 automation is Deferred.
@@ -79,6 +80,8 @@ The following capabilities have been implemented and validated:
 - relational unavailable-reference reasons constrained to safe categories, with historical unknown backfill and preserved JSON provenance;
 - security-invoker first-party URL and Post review views with deterministic stored URL resolution and article URL arrays.
 - completed Task 004D read-only provider comparison with canonical ID, content, context, media, pagination, and spend reporting; neither trial was accepted and Official X remains production.
+- confirmation-gated offline recovery planning for 11 already-paid Official X shadow pages, using production mapping, artifact hashing, canonical Post-ID deduplication, and no `sync_state` mutation;
+- future Official X shadow protection with atomic page persistence, per-page partial summaries, retained partial results after HTTP 402, mandatory approved spend inputs, and dynamic page sizing near the approved boundary;
 
 ## 4. Current Data Flow
 
@@ -144,6 +147,7 @@ The Git-backed static knowledge architecture and 17-article Ethplorer source inv
 - [`src/x_signal_finder/first_party_x.py`](src/x_signal_finder/first_party_x.py) - first-party corpus mapping, pagination, reference completion, usage, and checkpoint behavior.
 - [`src/x_signal_finder/x_content.py`](src/x_signal_finder/x_content.py) - safe downstream helpers for deterministic URL resolution and unavailable-reference reasons.
 - [`src/x_signal_finder/x_provider_shadow.py`](src/x_signal_finder/x_provider_shadow.py) - isolated provider adapters, Normalized Post contract, cost guards, and shadow comparison.
+- [`src/x_signal_finder/x_shadow_recovery.py`](src/x_signal_finder/x_shadow_recovery.py) - local-only Task 004D page validation, production mapping reuse, dry-run inventory, manifest confirmation, and recovery provenance.
 - [`src/x_signal_finder/x_api/`](src/x_signal_finder/x_api/) - read-only X API client, OAuth, configuration, and probe code.
 - [`src/x_signal_finder/db/`](src/x_signal_finder/db/) - PostgreSQL connection, migration, checks, and repository code.
 - [`migrations/`](migrations/) - ordered, checksum-tracked PostgreSQL schema migrations.
@@ -239,7 +243,7 @@ These commands read required values from local environment configuration. Never 
 - Task 004C.1 accepted `2085449523904778414` as the explicit home baseline from the incomplete guarded run. Acceptance used PostgreSQL only, produced no X request, did not create or change Posts, and retained audit metadata.
 - The single cheap incremental validation from that baseline received 19 primary and 10 expanded Posts, counted 29 distinct resources, saved 13 new Posts after 6 repost exclusions, estimated $0.145, and correctly left the checkpoint unchanged because the explicit one-page limit made the source incomplete.
 - Across the two Task 004C guarded runs and the final cheap validation, estimated usage was 331 distinct Post resources and $1.655. Developer Console billing remains unreconciled.
-- Latest database check found 214 Post rows, 214 distinct `post_id` values, and zero duplicate groups. The home checkpoint is the accepted baseline `2085449523904778414`.
+- The pre-recovery Stage 3 database check found 214 Post rows, 214 distinct `post_id` values, and zero duplicate groups. The home checkpoint is the accepted baseline `2085449523904778414`.
 - PostgreSQL 17.6 was healthy with migrations 1 and 2 current, no pending migrations, and operational-table RLS intact.
 - Latest default suite: 108 passed with 4 external tests skipped. Explicit PostgreSQL integration suite: 2 passed during the unchanged Stage 3 database validation.
 - The knowledge inventory contains two terminology documents, 17 canonical Ethplorer articles, and zero capability rows. Five DOCX inputs were rendered across 33 pages, structurally inspected, converted to Markdown, checked at 99.7-100% source-token coverage, and represented with 11 deduplicated local images directly under `knowledge/sources/posts/assets/` before the DOCX staging directory was removed. All articles have unique H1 titles, substantial bodies, distinct content, and stable pending metadata. The validator checks machine usability and managed image references without network requests, database access, or model calls.
@@ -256,8 +260,11 @@ These commands read required values from local environment configuration. Never 
 - Task 005C.1 validated deterministic URLs against stored entities only: 232 Posts contain 348 deduplicated URL entities, 343 have `expanded_url`, 62 have `unwound_url`, 4 remain `t.co`-only, and 103 resolve to Ethplorer or Binplorer sites.
 - Task 005C.1 preserved 378 distinct first-party rows, 214 distinct incoming rows, both first-party checkpoints, migrations 1 through 3, and RLS. It made no X request.
 - The X Developer Console balance observed on 2026-08-14 was USD 5.12. This is a forward reconciliation baseline only, not evidence of Task 005C actual cost; future approved live validation should record balance before and after the run where practical.
-- Task 004D reused a stored 192-Post Official X benchmark after a fresh request returned HTTP 402. TwitterAPI.io matched 25 IDs at 13.02% recall and 96.0% exact matched text for $0.09975 actual spend; SocialData matched 11 IDs at 5.73% recall and 100% exact matched text for a conservative $0.0966 estimate. Both runs were incomplete, neither provider was accepted, and raw responses remained ignored locally.
+- Task 004D first received 11 successful paid Official X pages containing 1,082 primary Posts; the twelfth request returned HTTP 402. The owner reported 1,133 Post Reads and $5.665. The original runner lost the in-memory result but retained all 11 raw pages locally, so the later comparison reused a stored 192-Post benchmark. TwitterAPI.io matched 25 IDs at 13.02% recall and 96.0% exact matched text for $0.09975 actual spend; SocialData matched 11 IDs at 5.73% recall and 100% exact matched text for a conservative $0.0966 estimate. Both third-party runs were incomplete and neither provider was accepted.
 - Task 004D DB verification preserved 214 `posts`, 378 `first_party_x_posts`, four `sync_state` rows, and the exact pre-run `sync_state` fingerprint.
+- The 2026-08-17 recovery dry-run made zero external calls and zero database writes. It validated all 1,082 primary Posts, excluded 256 simple reposts, found zero existing duplicates, and prepared 826 unique new Posts under manifest `85a70f069262451a275f626209ed3836e4eb2fcdfa6b93cb20a94d221566b00d`.
+- After explicit owner approval, recovery run `029a02d5-28e3-44b2-aa19-db027c529c9c` atomically inserted all 826 Posts through production mapping. `posts` now has 1,040 rows and 1,040 distinct IDs; all 826 recovered rows retain manifest provenance. The run is `completed_with_warnings` with source state `incomplete_due_to_credit` and recovery state `recovered`.
+- Recovery usage records the historical 11 successful paid requests, 1,133 owner-reported Post Reads, and $5.665 reported cost. External requests during recovery were zero. All four `sync_state` rows and fingerprint `575476c6591871422c1249dc68f56f28507ff1d13792778f36b13a07ef6b5454` were identical immediately before and after apply.
 - A mandatory cost-preflight rule now blocks every future usage-based external call until its provider, endpoint, purpose, expected requests and resources, price, expected cost, conservative maximum, and enforcing hard guard are shown and explicitly approved. Local data must be reused before purchasing equivalent data, and provider tests start with approximately 20 to 50 Posts or the smallest sufficient window.
 - Task 005C.2 applied migration 004 without an X request. All 17 historical unavailable references now have relational reason `unknown`; available references have NULL. The two security-invoker review views expose 348 URL rows across 232 Posts, including 81 Ethplorer, 22 Binplorer, and 8 deterministic article URLs.
 - The known Rich List destination `https://ethplorer.io/posts/ethereum-rich-list-by-aggregated-usd-holdings-part-1` is visible in both first-party review views from stored entities only. The database remains at 378 distinct first-party Posts and 214 distinct incoming Posts, and both first-party checkpoints are unchanged.

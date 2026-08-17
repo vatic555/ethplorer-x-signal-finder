@@ -6,7 +6,7 @@ Status: Completed with incomplete provider runs
 
 Task 004D compares TwitterAPI.io and SocialData with one approximately 24-hour Official X home-timeline benchmark. It is a read-only quality and cost spike, not production provider integration.
 
-Official X remains the production source. The shadow command does not import third-party content into PostgreSQL, write `posts`, update `sync_state`, change the existing collector, create provider fallback, or schedule collection.
+Official X remains the production source. The normal shadow run does not import third-party content into PostgreSQL, write `posts`, update `sync_state`, change the existing collector, create provider fallback, or schedule collection. A separate confirmation-gated offline recovery command exists only for the 11 already-paid Official X pages retained by the failed 2026-08-14 run. It reuses the production Post mapping and never contacts X or advances `sync_state`.
 
 ## Provider and Pricing References
 
@@ -51,7 +51,9 @@ These commands are operating references only. Do not execute them until the mand
 ```sh
 python -m x_signal_finder x-provider-shadow run \
   --hours 24 \
-  --max-provider-spend-usd 0.10
+  --max-provider-spend-usd 0.10 \
+  --approved-max-official-spend-usd APPROVED_MAX \
+  --official-worst-case-cost-per-primary-usd PREFLIGHT_BOUND
 ```
 
 When a fresh Official X request is unavailable, an already-collected benchmark can be reused read-only:
@@ -63,6 +65,8 @@ python -m x_signal_finder x-provider-shadow run \
 ```
 
 Raw responses and the local safe summary are written under `data/runtime/x-provider-shadow/<run-id>/`. That tree is ignored by Git. CLI output and committed documentation contain aggregate metrics and never contain Post text, raw provider payloads, or credentials.
+
+A fresh Official X run now refuses to start without both the approved dollar ceiling and the preflight worst-case cost bound per requested primary Post. The runner reserves that bound before each request and reduces `max_results` near the boundary. Every successful page is written atomically before another paid page is attempted, and a safe shadow-only `partial-summary.json` is replaced atomically after every page. A later HTTP 402 or other request failure returns an incomplete partial result instead of discarding the successful pages. This checkpoint is local recovery evidence only and never replaces canonical Post-ID deduplication or production `sync_state`.
 
 ## Normalized Comparison Contract
 
@@ -111,7 +115,9 @@ The initial acceptance hypothesis is 90-95% overall recall, 100% exact full text
 
 ## Live Result
 
-Completed on 2026-08-14 against the same stored Official X `x_home_timeline` window from `2026-08-06T12:01:06Z` through `2026-08-07T12:01:06Z`. A fresh Official X benchmark request returned HTTP 402, so the spike reused the already-collected window read-only. The benchmark contained 192 Posts from 71 active authors: 112 original Posts, 40 replies, 40 quotes, 33 long Posts, 80 Posts with a direct reference, and 85 with media. Incremental Official X spend was $0; historical retrieval spend is unknown.
+Completed on 2026-08-14 against the same stored Official X `x_home_timeline` window from `2026-08-06T12:01:06Z` through `2026-08-07T12:01:06Z`. The first fresh Official X attempt did not fail before retrieving data: 11 paid pages returned successfully, containing 1,082 primary Posts. The subsequent twelfth request returned HTTP 402. Because the original runner propagated that terminal error before constructing a benchmark result, the third-party comparison was then run against the already-collected 192-Post PostgreSQL window from 71 active authors. That comparison benchmark contained 112 original Posts, 40 replies, 40 quotes, 33 long Posts, 80 Posts with a direct reference, and 85 with media.
+
+The 11 ignored local pages contain 1,082 unique primary Posts, 596 unique expanded Posts, 408 unique Users, and 761 unique Media resources. The owner-reported X Developer Console result for this failed fresh attempt is 1,133 Post Reads and $5.665. The local resource inventory is provenance evidence, not a reconstruction of X daily billing deduplication. The earlier statement that the fresh attempt incurred zero incremental X spend was incorrect; only the later PostgreSQL benchmark reuse incurred zero additional Official X spend.
 
 | Metric | TwitterAPI.io | SocialData |
 |---|---:|---:|
@@ -138,6 +144,25 @@ The one TwitterAPI.io text mismatch was a quote: the provider returned 14 charac
 Neither provider is accepted. TwitterAPI.io produced the larger sample and higher observed recall, but its trial ended incomplete, full-text exactness was below 100%, and reply/quote recall was materially weak. SocialData also ended incomplete and returned no matched long Posts, replies, or quotes. Because both runs were limited by trial budget or credit and had large pagination gaps, their low recall is not treated as a definitive provider quality failure. Official X remains the production source. No SocialData Monitoring experiment is promoted from this result.
 
 Before and after the spike, PostgreSQL remained at 214 `posts`, 378 `first_party_x_posts`, and four `sync_state` rows. The serialized `sync_state` SHA-256 stayed `92646163dc70d3888c0fa1f981a1af725c5cd3f5f836211c3d4cc7b32990df53`.
+
+## Offline Recovery Aftermath
+
+The retained Official X pages are recoverable without another external request. The recovery path validates every saved page with the existing X content parser, aggregates returned Users, referenced Posts, and Media across pages, applies the production `map_x_post` contract, excludes simple reposts, deduplicates by canonical `post_id`, and compares candidate IDs with PostgreSQL before any write.
+
+The 2026-08-17 read-only dry-run produced:
+
+- raw primary Posts: 1,082;
+- valid primary Posts: 1,082;
+- invalid primary Posts: 0;
+- simple reposts excluded: 256;
+- valid mapped Posts: 826;
+- duplicates already in `posts`: 0;
+- unique new Posts ready to insert: 826;
+- artifact manifest SHA-256: `85a70f069262451a275f626209ed3836e4eb2fcdfa6b93cb20a94d221566b00d`.
+
+The dry-run wrote neither PostgreSQL nor `sync_state` and made zero external API requests. The owner approved this exact manifest, and the atomic apply completed on 2026-08-17 as recovery run `029a02d5-28e3-44b2-aa19-db027c529c9c`. It created an `incomplete_recovered` audit outcome represented by database status `completed_with_warnings`, inserted 826 Posts through the existing production mapping, and stored the recovery provenance on all 826 rows. The `posts` table increased from 214 to 1,040 rows with 1,040 distinct IDs. Historical usage records 11 successful paid requests, 1,133 owner-reported Post Reads, and $5.665 reported cost; external requests during recovery are zero.
+
+The four `sync_state` rows were unchanged. Their verification SHA-256 was `575476c6591871422c1249dc68f56f28507ff1d13792778f36b13a07ef6b5454` both immediately before and after apply. No X or third-party request occurred during dry-run, apply, or verification.
 
 ## Future SocialData Monitoring Experiment
 

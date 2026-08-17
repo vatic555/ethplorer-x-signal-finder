@@ -16,7 +16,7 @@ The existing knowledge inventory contains two separate terminology documents and
 
 The manually started collector uses OAuth refresh, fetches home or `@Ethplorer` mentions, excludes simple reposts from home, and upserts Posts plus independent source checkpoints into PostgreSQL. It preserves long-form `note_tweet.text`, returned referenced Post context, and returned media metadata without downloading media. It follows incremental pagination until completion or an explicit page, primary-Post, cost, partial-response, or error guard. Incomplete work saves available Posts and estimated usage but does not advance its source checkpoint. An explicit confirmation-gated baseline action can accept the newest first-page ID from a validated incomplete run without making another X request.
 
-Task 004D provides a separate read-only shadow CLI for one bounded Official X, TwitterAPI.io, and SocialData quality and cost comparison. It uses an internal Normalized Post comparison contract, writes raw responses only under ignored local runtime storage, enforces a maximum $0.10 spend per third-party provider, and never writes PostgreSQL or changes the production collector. LLM integration, Telegram, and publication are not implemented. All publication remains a mandatory human action.
+Task 004D provides a separate shadow CLI for one bounded Official X, TwitterAPI.io, and SocialData quality and cost comparison. It uses an internal Normalized Post comparison contract, writes raw responses only under ignored local runtime storage, and never changes the production collector. Its normal shadow run does not write PostgreSQL. A separate confirmation-gated offline command can recover the 11 already-paid Official X pages retained before HTTP 402 through the production Post mapping without external calls or `sync_state` changes. LLM integration, Telegram, and publication are not implemented. All publication remains a mandatory human action.
 
 Every future usage-based external call requires a zero-cost preflight and explicit approval of a technically enforced maximum spend. The preflight must identify the provider, endpoint, purpose, expected requests and billable resources, unit price, expected cost, conservative maximum, and hard guard. Existing PostgreSQL data or approved local artifacts must be reused before equivalent data is purchased. Provider quality tests begin with approximately 20 to 50 Posts or the smallest sufficient window; a larger comparison requires a new preflight and approval.
 
@@ -30,8 +30,9 @@ The repository remains public during the MVP. Public visibility does not change 
 - Stage 3 - X Collection Pipeline - Completed
 - Stage 4 - Minimum Knowledge Base - In Progress
 - Completed bounded exception - Task 004D - X Provider Shadow Quality Spike
-- Last completed task - Task 005C.2 - First-Party X Reference Reasons + URL Review Views
-- Next task - Task 005D - Reviewed Knowledge + Unified Prefilter Vocabulary - Planned, awaiting its explicit task specification
+- Last completed corrective task - Task 004D Recovery Amendment
+- Last completed MVP product task - Task 005C.2 - First-Party X Reference Reasons + URL Review Views
+- Next MVP task - Task 005D - Reviewed Knowledge + Unified Prefilter Vocabulary - Planned, awaiting its explicit task specification
 
 See the canonical [implementation roadmap](docs/roadmap.md), [product and technical specification](docs/project-spec.md), and [architecture decision log](docs/decisions.md).
 
@@ -146,10 +147,23 @@ The same tables contain historical and future Ethplorer/Binplorer Posts. Initial
 Task 004D provider shadow spike:
 
 ```sh
-python -m x_signal_finder x-provider-shadow run --hours 24 --max-provider-spend-usd 0.10
+python -m x_signal_finder x-provider-shadow run \
+  --hours 24 \
+  --max-provider-spend-usd 0.10 \
+  --approved-max-official-spend-usd APPROVED_MAX \
+  --official-worst-case-cost-per-primary-usd PREFLIGHT_BOUND
 ```
 
-The command requires local provider keys, benchmarks one fixed home-timeline window, searches only authors active in that benchmark, compares canonical X Post IDs and normalized content quality, and stores raw responses only under ignored `data/runtime/`. It never writes PostgreSQL or production checkpoints. The completed trial accepted neither provider: TwitterAPI.io reached 13.02% recall with 96.0% exact matched text at $0.09975 actual spend, while SocialData reached 5.73% recall with 100% exact matched text at $0.0966 estimated spend. Both runs were incomplete, so the low recall is not a definitive quality failure. Official X remains production. See [the Task 004D operating and report document](docs/x-provider-shadow-spike.md).
+The command requires local provider keys, benchmarks one fixed home-timeline window, searches only authors active in that benchmark, compares canonical X Post IDs and normalized content quality, and stores raw responses only under ignored `data/runtime/`. It never writes PostgreSQL or production checkpoints. A fresh Official X benchmark additionally requires `--approved-max-official-spend-usd` and `--official-worst-case-cost-per-primary-usd`; the page size is reduced near the approved boundary and successful pages remain durable if a later request fails. The completed trial accepted neither provider: TwitterAPI.io reached 13.02% recall with 96.0% exact matched text at $0.09975 actual spend, while SocialData reached 5.73% recall with 100% exact matched text at $0.0966 estimated spend. Both runs were incomplete, so the low recall is not a definitive quality failure. Official X remains production.
+
+Offline recovery dry-run for the retained paid pages:
+
+```sh
+python -m x_signal_finder x-provider-shadow recover-official \
+  --artifact-dir data/runtime/x-provider-shadow/20260814T205734Z/official_x
+```
+
+The dry-run validates and maps local files, reads only existing PostgreSQL IDs, forces transaction rollback, makes no X request, and prints the artifact manifest required for a later `--apply`. The approved 2026-08-17 recovery inserted 826 Posts atomically, taking `posts` to 1,040 distinct rows, and preserved the exact four-row `sync_state` fingerprint. It made no X or third-party request. Any future recovery apply remains permitted only after explicit approval of its exact dry-run manifest. See [the Task 004D operating and report document](docs/x-provider-shadow-spike.md).
 
 Database commands:
 
@@ -183,7 +197,7 @@ python -m pytest -m integration
 ## Current Limitations
 
 - No automatic historical backfill or production missed-window recovery
-- X Developer Console billing remains unreconciled; the USD 5.12 balance observed on 2026-08-14 is only a forward reconciliation baseline, and stored cost values remain estimates
+- Most X billing remains unreconciled; the owner separately reported 1,133 Post Reads and $5.665 for the failed fresh Task 004D attempt
 - Task 004D accepted no third-party provider; Official X remains production and the incomplete trials do not establish definitive third-party quality
 - Mentions pagination was not observed live because the validated response was empty
 - No LLM calls or prompt execution

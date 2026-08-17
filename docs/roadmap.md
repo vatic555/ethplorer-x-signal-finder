@@ -10,7 +10,8 @@ Status: Canonical implementation sequence and progress record
 - Stage 3 - X Collection Pipeline - Completed
 - Stage 4 - Minimum Knowledge Base - In Progress
 - Current task - Task 005D - Reviewed Knowledge + Unified Prefilter Vocabulary - Planned, awaiting its explicit task specification
-- Last completed task - Task 005C.2 - First-Party X Reference Reasons + URL Review Views
+- Last completed corrective task - Task 004D Recovery Amendment
+- Last completed MVP product task - Task 005C.2 - First-Party X Reference Reasons + URL Review Views
 - Local PostgreSQL implementation is ready
 - Real Supabase migration and database validation are complete
 - Task 003 documentation review, diagnostic probe, live OAuth, endpoint, pagination, refresh, and checkpoint validation are complete
@@ -18,7 +19,7 @@ Status: Canonical implementation sequence and progress record
 - Task 004A implementation, synthetic validation, and bounded live X-to-Supabase validation are complete
 - Task 004B implementation, migration 002, synthetic validation, and bounded live validation are complete
 - Task 004C and Task 004C.1 implementation, synthetic validation, explicit baseline acceptance, and bounded incremental live validation are complete
-- Task 004D provider shadow quality and cost spike is Completed; neither incomplete trial met acceptance and Official X remains production
+- Task 004D provider shadow quality and cost spike and its corrective offline recovery amendment are Completed; neither third-party trial met acceptance, and Official X remains production
 - Task 005A knowledge inventory, Git-backed source contract, catalog evidence linkage, and offline validation are complete
 - Task 005C first-party Ethplorer/Binplorer X corpus, migration 003, historical import, and incremental lifecycle validation are complete
 - Task 005C.1 corrected first-party resource accounting and downstream read contracts without another X request or schema change
@@ -65,7 +66,7 @@ Post-MVP work may cover:
 | 0 | Repository Bootstrap | Completed | Task 001 | Yes |
 | 1 | Durable Storage Foundation | Completed | Task 002 | Yes |
 | 2 | X API Access Spike | Completed | Task 003 | Yes |
-| 3 | X Collection Pipeline | Completed | Tasks 004A through 004D complete; 004D made no production change | Yes |
+| 3 | X Collection Pipeline | Completed | Tasks 004A through 004D complete; bounded 004D aftermath recovery does not reopen the stage | Yes |
 | 4 | Minimum Knowledge Base | In Progress | Tasks 005A and 005C through 005C.2 complete; Task 005D next | Yes |
 | 5 | Relevance Filtering and Signal Clustering | Planned | Task 006 | Yes |
 | 6 | Opportunity Gate and Context Enrichment | Planned | Task 007 | Yes |
@@ -335,11 +336,27 @@ If the SocialData result justifies another experiment, grouped Search Query Moni
 - Completion date: 2026-08-14
 - Final implementation commit: `222bc5e9de2ea46b5fe26639a7ebbe612edb3cae`
 - Live window: 2026-08-06T12:01:06Z through 2026-08-07T12:01:06Z
-- Official X benchmark: fresh retrieval returned HTTP 402; 192 already-collected `x_home_timeline` Posts from 71 active authors were reused read-only with zero incremental X spend
+- Official X benchmark: a fresh attempt returned 11 paid pages with 1,082 primary Posts, then its twelfth request returned HTTP 402; the owner reported 1,133 Post Reads and $5.665. Because the original runner discarded its in-memory partial result, 192 already-collected `x_home_timeline` Posts from 71 active authors were then reused read-only for the comparison with zero additional X spend
 - TwitterAPI.io result: incomplete due to trial credit; 25/192 matched IDs, 13.02% recall, 96.0% exact text on matches, $0.09975 actual spend
 - SocialData result: incomplete due to budget; 11/192 matched IDs, 5.73% recall, 100% exact text on matches, $0.0966 conservative estimated spend
 - Recommendation: accept neither provider; retain Official X as production source and do not promote SocialData Monitoring from this evidence
-- Validation summary: 156 default tests passed with 4 external tests skipped; canonical DB counts and the `sync_state` fingerprint were identical before and after; raw provider data remains ignored and no production collector, database row, or checkpoint changed
+- Validation summary: 156 default tests passed with 4 external tests skipped; canonical DB counts and the `sync_state` fingerprint were identical before and after the original spike; raw provider data remains ignored and no production collector or checkpoint changed
+
+#### Task 004D Recovery Amendment
+
+Status: Completed
+
+- Scope: recover only the 11 already-paid Official X pages under ignored local runtime storage; make zero X or third-party requests
+- Mapping: validate with the existing X content parser, aggregate returned context across pages, use production `map_x_post`, exclude simple reposts, deduplicate by canonical `post_id`, then upsert `posts`
+- State boundary: never change `sync_state`; represent the source collection as incomplete and the offline action as recovered with durable provenance
+- Dry-run result on 2026-08-17: 1,082 raw and unique primary Posts; 1,082 valid; 0 invalid; 256 simple reposts excluded; 826 valid mapped; 0 already present in `posts`; 826 unique new Posts ready to insert
+- Approval guard: apply requires artifact manifest SHA-256 `85a70f069262451a275f626209ed3836e4eb2fcdfa6b93cb20a94d221566b00d`
+- Apply result: owner approved the exact manifest; recovery run `029a02d5-28e3-44b2-aa19-db027c529c9c` atomically inserted 826 Posts, taking `posts` from 214 to 1,040 rows with 1,040 distinct IDs
+- Provenance: all 826 inserted rows carry the recovery manifest; the audit run is `completed_with_warnings` with source collection `incomplete_due_to_credit` and recovery state `recovered`; historical usage records 11 successful requests, 1,133 Post Reads, and $5.665 owner-reported cost
+- State validation: four `sync_state` rows and fingerprint `575476c6591871422c1249dc68f56f28507ff1d13792778f36b13a07ef6b5454` were identical immediately before and after apply
+- External activity: zero X or third-party requests during dry-run, apply, and verification
+- Runner correction: successful Official X pages and a safe partial summary are atomic and durable per page; a later 402 returns accumulated partial data; every fresh Official X run requires an approved maximum and explicit worst-case per-primary bound; the next page size shrinks near that ceiling
+- Validation: 162 default tests passed with 5 external tests skipped before apply; knowledge validation passed for 17 sources and 0 assets with zero network or LLM calls
 
 ## Stage 4 - Minimum Knowledge Base
 
