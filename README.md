@@ -16,7 +16,7 @@ The existing knowledge inventory contains two separate terminology documents and
 
 The manually started collector uses OAuth refresh, fetches home or `@Ethplorer` mentions, excludes simple reposts from home, and upserts Posts plus independent source checkpoints into PostgreSQL. It preserves long-form `note_tweet.text`, returned referenced Post context, and returned media metadata without downloading media. It follows incremental pagination until completion or an explicit page, primary-Post, cost, partial-response, or error guard. Incomplete work saves available Posts and estimated usage but does not advance its source checkpoint. An explicit confirmation-gated baseline action can accept the newest first-page ID from a validated incomplete run without making another X request.
 
-Task 004D provides a separate shadow CLI for one bounded Official X, TwitterAPI.io, and SocialData quality and cost comparison. It uses an internal Normalized Post comparison contract, writes raw responses only under ignored local runtime storage, and never changes the production collector. Its normal shadow run does not write PostgreSQL. A separate confirmation-gated offline command can recover the 11 already-paid Official X pages retained before HTTP 402 through the production Post mapping without external calls or `sync_state` changes. LLM integration, Telegram, and publication are not implemented. All publication remains a mandatory human action.
+Task 004D provides a separate shadow CLI for bounded TwitterAPI.io and SocialData quality and cost comparison against stored Official X data. Task 004D.2 gives each provider its own complete-discovery strategy, requires a zero-cost SHA-bound preflight before execution, and blocks a plan that cannot cover its initial authors within the unchanged hard cap. It also provides planning-only selection and fixture comparison for a future 50-ID lookup. The shadow path never changes the production collector or `sync_state`. A separate confirmation-gated offline command recovered the 11 already-paid Official X pages retained before HTTP 402 through the production Post mapping without external calls. LLM integration, Telegram, and publication are not implemented. All publication remains a mandatory human action.
 
 Every future usage-based external call requires a zero-cost preflight and explicit approval of a technically enforced maximum spend. The preflight must identify the provider, endpoint, purpose, expected requests and billable resources, unit price, expected cost, conservative maximum, and hard guard. Existing PostgreSQL data or approved local artifacts must be reused before equivalent data is purchased. Provider quality tests begin with approximately 20 to 50 Posts or the smallest sufficient window; a larger comparison requires a new preflight and approval.
 
@@ -147,14 +147,14 @@ The same tables contain historical and future Ethplorer/Binplorer Posts. Initial
 Task 004D provider shadow spike:
 
 ```sh
-python -m x_signal_finder x-provider-shadow run \
-  --hours 24 \
-  --max-provider-spend-usd 0.10 \
-  --approved-max-official-spend-usd APPROVED_MAX \
-  --official-worst-case-cost-per-primary-usd PREFLIGHT_BOUND
+python -m x_signal_finder x-provider-shadow plan-discovery \
+  --hours 24 --max-provider-spend-usd 0.10
+
+python -m x_signal_finder x-provider-shadow plan-direct-id \
+  --hours 168 --limit 50 --max-provider-spend-usd 0.02
 ```
 
-The command requires local provider keys, benchmarks one fixed home-timeline window, searches only authors active in that benchmark, compares canonical X Post IDs and normalized content quality, and stores raw responses only under ignored `data/runtime/`. It never writes PostgreSQL or production checkpoints. A fresh Official X benchmark additionally requires `--approved-max-official-spend-usd` and `--official-worst-case-cost-per-primary-usd`; the page size is reduced near the approved boundary and successful pages remain durable if a later request fails. The completed trial accepted neither provider: TwitterAPI.io reached 13.02% recall with 96.0% exact matched text at $0.09975 actual spend, while SocialData reached 5.73% recall with 100% exact matched text at $0.0966 estimated spend. Both runs were incomplete, so the low recall is not a definitive quality failure. Official X remains production.
+Both commands are zero-cost: they read the stored benchmark, do not load provider keys, make no provider request, and return `execution_authorized=false`. Discovery uses recursive time slicing for TwitterAPI.io and cursor plus `max_id` continuation for SocialData. A future live run requires the exact separately approved `combined_plan_sha256`; it is also refused when the initial author set cannot fit the unchanged cap. Fresh Official X retrieval, automatic retries, balance calls, and automatic cap increases are disabled in discovery. Direct-ID API execution is not implemented. The completed historical trial accepted neither provider. Official X remains production. See [the Task 004D operating and report document](docs/x-provider-shadow-spike.md).
 
 Offline recovery dry-run for the retained paid pages:
 

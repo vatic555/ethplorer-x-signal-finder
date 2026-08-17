@@ -2,17 +2,18 @@
 
 from __future__ import annotations
 
-from collections import Counter, deque
+from collections import deque
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from email.utils import parsedate_to_datetime
+from hashlib import sha256
 import json
+from math import ceil, log2
 import os
 from pathlib import Path
 from tempfile import NamedTemporaryFile
-import time
 from typing import Any, Literal, Protocol
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
@@ -39,6 +40,7 @@ OFFICIAL_X_MEDIA_READ_COST_USD = Decimal("0.005")
 TRIAL_SPEND_LIMIT_USD = Decimal("0.10")
 TWITTERAPI_IO_CREDITS_PER_USD = Decimal("100000")
 MAX_PROVIDER_PAGE_RESULTS = 20
+DEFAULT_TWITTERAPI_IO_MINIMUM_SLICE_SECONDS = 60
 SHADOW_EXPANSIONS = (
     "attachments.media_keys,author_id,in_reply_to_user_id,"
     "referenced_tweets.id,referenced_tweets.id.author_id,"
@@ -110,6 +112,9 @@ class SearchTask:
     start: datetime
     end: datetime
     depth: int = 0
+    cursor: str | None = None
+    max_id: str | None = None
+    since_id: str | None = None
 
 
 @dataclass(frozen=True, repr=False)
@@ -117,10 +122,15 @@ class ProviderPage:
     posts: tuple[NormalizedPost, ...]
     raw_payload: Mapping[str, Any]
     has_more: bool
+    next_cursor: str | None = None
+    continuation_max_id: str | None = None
+    possible_incomplete: bool = False
 
     def __repr__(self) -> str:
         return (
-            f"ProviderPage(post_count={len(self.posts)}, has_more={self.has_more})"
+            "ProviderPage(post_count="
+            f"{len(self.posts)}, has_more={self.has_more}, "
+            f"next_cursor_present={bool(self.next_cursor)})"
         )
 
 
@@ -134,6 +144,7 @@ class ProviderRun:
     estimated_spend_usd: Decimal
     actual_spend_usd: Decimal | None
     warnings: tuple[str, ...]
+    duplicates_removed: int = 0
 
     def __repr__(self) -> str:
         return (
@@ -141,6 +152,77 @@ class ProviderRun:
             f"{self.provider!r}, status={self.status!r}, "
             f"post_count={len(self.posts)}, requests={self.requests})"
         )
+
+
+@dataclass(frozen=True, repr=False)
+class ProviderCostPlan:
+    provider: ProviderName
+    mode: Literal["discovery", "direct_id"]
+    benchmark_size: int
+    author_count: int
+    window_start: datetime | None
+    window_end: datetime | None
+    strategy: str
+    estimated_requests: int
+    expected_billable_resources: int
+    expected_cost_usd: Decimal
+    strategy_worst_case_requests: int
+    hard_cap_max_requests: int
+    conservative_max_resources: int
+    conservative_max_cost_usd: Decimal
+    hard_cap_usd: Decimal
+    unit_cost_usd: Decimal
+    fits_hard_cap: bool
+    notes: tuple[str, ...]
+
+    def _digest_payload(self) -> dict[str, object]:
+        return {
+            "provider": self.provider,
+            "mode": self.mode,
+            "benchmark_size": self.benchmark_size,
+            "author_count": self.author_count,
+            "window_start": (
+                self.window_start.isoformat() if self.window_start else None
+            ),
+            "window_end": self.window_end.isoformat() if self.window_end else None,
+            "strategy": self.strategy,
+            "estimated_requests": self.estimated_requests,
+            "expected_billable_resources": self.expected_billable_resources,
+            "expected_cost_usd": format(self.expected_cost_usd, "f"),
+            "strategy_worst_case_requests": self.strategy_worst_case_requests,
+            "hard_cap_max_requests": self.hard_cap_max_requests,
+            "conservative_max_resources": self.conservative_max_resources,
+            "conservative_max_cost_usd": format(
+                self.conservative_max_cost_usd, "f"
+            ),
+            "hard_cap_usd": format(self.hard_cap_usd, "f"),
+            "unit_cost_usd": format(self.unit_cost_usd, "f"),
+            "fits_hard_cap": self.fits_hard_cap,
+            "notes": list(self.notes),
+        }
+
+    @property
+    def plan_sha256(self) -> str:
+        encoded = json.dumps(
+            self._digest_payload(), sort_keys=True, separators=(",", ":")
+        ).encode("utf-8")
+        return sha256(encoded).hexdigest()
+
+    def safe_summary(self) -> dict[str, object]:
+        return {
+            **self._digest_payload(),
+            "plan_sha256": self.plan_sha256,
+            "external_requests_during_plan": 0,
+            "approval_required": True,
+            "execution_authorized": False,
+            "hard_guard": (
+                "reserve one full provider page before every request and stop "
+                "before hard_cap_max_requests"
+            ),
+        }
+
+    def __repr__(self) -> str:
+        return f"ProviderCostPlan({self.safe_summary()!r})"
 
 
 class SearchProvider(Protocol):
@@ -513,6 +595,10 @@ class TwitterApiIoProvider:
             posts=posts,
             raw_payload=payload,
             has_more=payload.get("has_next_page") is True,
+            possible_incomplete=(
+                payload.get("has_next_page") is True
+                or len(raw_posts) >= MAX_PROVIDER_PAGE_RESULTS
+            ),
         )
 
     def balance_usd(self) -> Decimal | None:
@@ -547,11 +633,18 @@ class SocialDataProvider:
         }
 
     def search(self, task: SearchTask) -> ProviderPage:
+        params: dict[str, object] = {
+            "query": _query_for(task),
+            "type": "Latest",
+            "cursor": task.cursor,
+            "max_id": task.max_id,
+            "since_id": task.since_id,
+        }
         _, payload = _request_json(
             provider=self.name,
             url="https://api.socialdata.tools/twitter/search",
             headers=self._headers,
-            params={"query": _query_for(task), "type": "Latest"},
+            params=params,
         )
         raw_posts = payload.get("tweets", [])
         if not isinstance(raw_posts, list):
@@ -561,10 +654,28 @@ class SocialDataProvider:
             for item in raw_posts
             if isinstance(item, Mapping)
         )
+        next_cursor = _optional_string(
+            payload.get("next_cursor") or payload.get("next_cursor_str")
+        )
+        numeric_ids = [
+            int(post.post_id) for post in posts if post.post_id.isdigit()
+        ]
+        continuation_max_id = (
+            str(max(0, min(numeric_ids) - 1)) if numeric_ids else None
+        )
+        explicit_has_more = payload.get("has_more") is True
+        possible_incomplete = (
+            bool(next_cursor)
+            or explicit_has_more
+            or len(raw_posts) >= MAX_PROVIDER_PAGE_RESULTS
+        )
         return ProviderPage(
             posts=posts,
             raw_payload=payload,
-            has_more=bool(payload.get("next_cursor")),
+            has_more=bool(next_cursor) or explicit_has_more,
+            next_cursor=next_cursor,
+            continuation_max_id=continuation_max_id,
+            possible_incomplete=possible_incomplete,
         )
 
     def balance_usd(self) -> Decimal | None:
@@ -597,9 +708,181 @@ def plan_search_tasks(
     start: datetime,
     end: datetime,
 ) -> tuple[SearchTask, ...]:
-    counts = Counter(post.author for post in benchmark)
-    ordered = sorted(counts.items(), key=lambda item: (item[1], item[0].casefold()))
-    return tuple(SearchTask((author,), start, end) for author, _ in ordered)
+    authors: dict[str, tuple[str, int, int | None]] = {}
+    for post in benchmark:
+        key = post.author.casefold()
+        display, count, minimum_id = authors.get(key, (post.author, 0, None))
+        numeric_id = int(post.post_id) if post.post_id.isdigit() else None
+        if numeric_id is not None:
+            minimum_id = (
+                numeric_id if minimum_id is None else min(minimum_id, numeric_id)
+            )
+        authors[key] = (display, count + 1, minimum_id)
+    ordered = sorted(authors.values(), key=lambda item: (item[1], item[0].casefold()))
+    return tuple(
+        SearchTask(
+            (author,),
+            start,
+            end,
+            since_id=(str(max(0, minimum_id - 1)) if minimum_id is not None else None),
+        )
+        for author, _, minimum_id in ordered
+    )
+
+
+def _provider_unit_cost(provider: ProviderName) -> Decimal:
+    if provider == "twitterapi_io":
+        return TWITTERAPI_IO_UNIT_COST_USD
+    if provider == "socialdata":
+        return SOCIALDATA_UNIT_COST_USD
+    raise ValueError("Cost planning supports only third-party shadow providers.")
+
+
+def _hard_cap_max_requests(hard_cap_usd: Decimal, unit_cost_usd: Decimal) -> int:
+    if hard_cap_usd <= 0:
+        raise ValueError("Provider hard cap must be positive.")
+    if hard_cap_usd > TRIAL_SPEND_LIMIT_USD:
+        raise ValueError("Provider hard cap cannot exceed $0.10.")
+    worst_case_request = unit_cost_usd * MAX_PROVIDER_PAGE_RESULTS
+    return int(hard_cap_usd // worst_case_request)
+
+
+def build_discovery_cost_plan(
+    *,
+    provider: Literal["twitterapi_io", "socialdata"],
+    benchmark: Sequence[NormalizedPost],
+    start: datetime,
+    end: datetime,
+    hard_cap_usd: Decimal,
+    minimum_twitter_slice_seconds: int = DEFAULT_TWITTERAPI_IO_MINIMUM_SLICE_SECONDS,
+) -> ProviderCostPlan:
+    """Build a deterministic zero-cost provider discovery preflight."""
+    if start.tzinfo is None or end.tzinfo is None or start >= end:
+        raise ValueError("Discovery window must be a valid timezone-aware interval.")
+    if minimum_twitter_slice_seconds < 1:
+        raise ValueError("TwitterAPI.io minimum time slice must be at least 1 second.")
+    tasks = plan_search_tasks(benchmark, start=start, end=end)
+    author_count = len(tasks)
+    unit_cost = _provider_unit_cost(provider)
+    max_requests = _hard_cap_max_requests(hard_cap_usd, unit_cost)
+    estimated_requests = author_count
+    expected_resources = estimated_requests * MAX_PROVIDER_PAGE_RESULTS
+    expected_cost = unit_cost * expected_resources
+    if provider == "twitterapi_io":
+        seconds = max(1, int((end - start).total_seconds()))
+        ratio = max(1, ceil(seconds / minimum_twitter_slice_seconds))
+        depth = ceil(log2(ratio)) if ratio > 1 else 0
+        per_author_tree = (2 ** (depth + 1)) - 1
+        strategy_worst_case_requests = author_count * per_author_tree
+        strategy = (
+            "author windows; recursively bisect overflow/full windows; no Advanced "
+            "Search cursor as canonical traversal"
+        )
+        notes = (
+            f"minimum_time_slice_seconds={minimum_twitter_slice_seconds}",
+            "overflow at minimum slice produces explicit incomplete status",
+            "canonical post_id dedupe across parent and child windows",
+        )
+    else:
+        strategy_worst_case_requests = max_requests
+        strategy = (
+            "SocialData cursor traversal; max_id continuation fallback with repeated "
+            "cursor and ID protection"
+        )
+        notes = (
+            "SocialData does not inherit TwitterAPI.io time slicing",
+            "coverage is incomplete when cursor or max_id progress cannot be proven",
+            "canonical post_id dedupe across pages",
+        )
+    conservative_resources = max_requests * MAX_PROVIDER_PAGE_RESULTS
+    conservative_cost = conservative_resources * unit_cost
+    return ProviderCostPlan(
+        provider=provider,
+        mode="discovery",
+        benchmark_size=len({post.post_id for post in benchmark}),
+        author_count=author_count,
+        window_start=start.astimezone(timezone.utc),
+        window_end=end.astimezone(timezone.utc),
+        strategy=strategy,
+        estimated_requests=estimated_requests,
+        expected_billable_resources=expected_resources,
+        expected_cost_usd=expected_cost,
+        strategy_worst_case_requests=strategy_worst_case_requests,
+        hard_cap_max_requests=max_requests,
+        conservative_max_resources=conservative_resources,
+        conservative_max_cost_usd=conservative_cost,
+        hard_cap_usd=hard_cap_usd,
+        unit_cost_usd=unit_cost,
+        fits_hard_cap=estimated_requests <= max_requests,
+        notes=notes,
+    )
+
+
+def build_direct_id_cost_plan(
+    *,
+    provider: Literal["twitterapi_io", "socialdata"],
+    benchmark: Sequence[NormalizedPost],
+    hard_cap_usd: Decimal,
+) -> ProviderCostPlan:
+    """Plan a future direct-ID lookup without implementing or calling an endpoint."""
+    unique_count = len({post.post_id for post in benchmark})
+    unit_cost = _provider_unit_cost(provider)
+    expected_requests = ceil(unique_count / MAX_PROVIDER_PAGE_RESULTS) if unique_count else 0
+    max_requests = _hard_cap_max_requests(hard_cap_usd, unit_cost)
+    conservative_resources = expected_requests * MAX_PROVIDER_PAGE_RESULTS
+    return ProviderCostPlan(
+        provider=provider,
+        mode="direct_id",
+        benchmark_size=unique_count,
+        author_count=len({post.author.casefold() for post in benchmark}),
+        window_start=(
+            min((post.created_at for post in benchmark), default=None)
+        ),
+        window_end=max((post.created_at for post in benchmark), default=None),
+        strategy=(
+            "provider-specific batched Post lookup by canonical ID; endpoint and "
+            "pricing must be revalidated before a separate implementation task"
+        ),
+        estimated_requests=expected_requests,
+        expected_billable_resources=unique_count,
+        expected_cost_usd=unit_cost * unique_count,
+        strategy_worst_case_requests=expected_requests,
+        hard_cap_max_requests=max_requests,
+        conservative_max_resources=conservative_resources,
+        conservative_max_cost_usd=unit_cost * conservative_resources,
+        hard_cap_usd=hard_cap_usd,
+        unit_cost_usd=unit_cost,
+        fits_hard_cap=(
+            unique_count > 0
+            and expected_requests <= max_requests
+            and unit_cost * conservative_resources <= hard_cap_usd
+        ),
+        notes=(
+            "planning and offline comparison only; direct-ID API execution is absent",
+            "Official X benchmark data comes only from PostgreSQL or ignored artifacts",
+            "availability and content fields are compared by canonical post_id",
+        ),
+    )
+
+
+def combined_plan_sha256(plans: Sequence[ProviderCostPlan]) -> str:
+    payload = [plan.safe_summary() for plan in plans]
+    encoded = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode(
+        "utf-8"
+    )
+    return sha256(encoded).hexdigest()
+
+
+def build_preflight_report(plans: Sequence[ProviderCostPlan]) -> dict[str, object]:
+    return {
+        "plans": [plan.safe_summary() for plan in plans],
+        "combined_plan_sha256": combined_plan_sha256(plans),
+        "all_plans_fit_hard_caps": all(plan.fits_hard_cap for plan in plans),
+        "external_requests": 0,
+        "approval_required": True,
+        "execution_authorized": False,
+        "cost_limits_auto_increased": False,
+    }
 
 
 def _write_json(path: Path, value: object) -> None:
@@ -692,142 +975,298 @@ def run_search_provider(
     end: datetime,
     spend_limit_usd: Decimal,
     artifact_dir: Path,
+    approved_plan_sha256: str | None = None,
+    minimum_twitter_slice_seconds: int = DEFAULT_TWITTERAPI_IO_MINIMUM_SLICE_SECONDS,
 ) -> ProviderRun:
-    if spend_limit_usd <= 0 or spend_limit_usd > TRIAL_SPEND_LIMIT_USD:
-        raise ValueError("Provider spend limit must be positive and at most $0.10.")
-    before_balance: Decimal | None
-    try:
-        before_balance = provider.balance_usd()
-    except ProviderRequestError as error:
-        if error.category in {"credit_exhausted", "invalid_credentials", "access_denied"}:
-            status = {
-                "credit_exhausted": "incomplete_due_to_credit",
-                "invalid_credentials": "incomplete_due_to_auth",
-                "access_denied": "incomplete_due_to_access",
-            }[error.category]
-            return ProviderRun(
-                provider=provider.name,
-                status=status,
-                posts=(),
-                requests=0,
-                pagination_gaps=0,
-                estimated_spend_usd=Decimal("0"),
-                actual_spend_usd=Decimal("0"),
-                warnings=(f"{error.category}_before_search",),
-            )
-        raise
-    effective_limit = min(
-        spend_limit_usd,
-        before_balance if before_balance is not None else spend_limit_usd,
+    if provider.name not in {"twitterapi_io", "socialdata"}:
+        raise ValueError("Unsupported discovery provider.")
+    plan = build_discovery_cost_plan(
+        provider=provider.name,
+        benchmark=benchmark,
+        start=start,
+        end=end,
+        hard_cap_usd=spend_limit_usd,
+        minimum_twitter_slice_seconds=minimum_twitter_slice_seconds,
     )
+    _require_approved_plan(plan, approved_plan_sha256)
+    if provider.name == "twitterapi_io":
+        return _run_twitterapi_io_discovery(
+            provider,
+            benchmark=benchmark,
+            start=start,
+            end=end,
+            artifact_dir=artifact_dir,
+            plan=plan,
+            minimum_slice_seconds=minimum_twitter_slice_seconds,
+        )
+    return _run_socialdata_discovery(
+        provider,
+        benchmark=benchmark,
+        start=start,
+        end=end,
+        artifact_dir=artifact_dir,
+        plan=plan,
+    )
+
+
+def _require_approved_plan(
+    plan: ProviderCostPlan,
+    approved_plan_sha256: str | None,
+) -> None:
+    if approved_plan_sha256 is None:
+        raise ShadowSpikeError(
+            "External provider execution blocked: explicit preflight approval is missing."
+        )
+    if approved_plan_sha256 != plan.plan_sha256:
+        raise ShadowSpikeError(
+            "External provider execution blocked: approved preflight digest mismatch."
+        )
+    if not plan.fits_hard_cap:
+        raise ShadowSpikeError(
+            "External provider execution blocked: planned initial coverage exceeds the "
+            "unchanged hard cap."
+        )
+
+
+def _provider_error_status(error: ProviderRequestError) -> tuple[str, str]:
+    return {
+        "credit_exhausted": ("incomplete_due_to_credit", "credit_exhausted"),
+        "access_denied": (
+            "incomplete_due_to_access",
+            "provider_endpoint_access_denied",
+        ),
+        "invalid_credentials": (
+            "incomplete_due_to_auth",
+            "provider_credentials_rejected",
+        ),
+        "rate_limited": (
+            "incomplete_due_to_rate_limit",
+            "provider_rate_limit_reached",
+        ),
+    }.get(
+        error.category,
+        ("incomplete_due_to_request_failure", "provider_request_failed"),
+    )
+
+
+def _dedupe_posts(
+    destination: dict[str, NormalizedPost],
+    posts: Sequence[NormalizedPost],
+) -> int:
+    duplicates = 0
+    for post in posts:
+        if post.post_id in destination:
+            duplicates += 1
+        else:
+            destination[post.post_id] = post
+    return duplicates
+
+
+def _run_twitterapi_io_discovery(
+    provider: SearchProvider,
+    *,
+    benchmark: Sequence[NormalizedPost],
+    start: datetime,
+    end: datetime,
+    artifact_dir: Path,
+    plan: ProviderCostPlan,
+    minimum_slice_seconds: int,
+) -> ProviderRun:
     queue = deque(plan_search_tasks(benchmark, start=start, end=end))
-    posts: list[NormalizedPost] = []
+    seen_windows: set[tuple[tuple[str, ...], int, int]] = set()
+    posts_by_id: dict[str, NormalizedPost] = {}
     requests = 0
-    pagination_gaps = 0
-    estimated_spend = Decimal("0")
+    raw_resources = 0
+    unresolved_windows = 0
+    duplicate_rows = 0
     warnings: set[str] = set()
     status = "complete"
-    worst_case_request = MAX_PROVIDER_PAGE_RESULTS * provider.unit_cost_usd
-    last_request_started: float | None = None
     while queue:
-        if estimated_spend + worst_case_request > effective_limit:
-            status = (
-                "incomplete_due_to_credit"
-                if before_balance is not None and before_balance < spend_limit_usd
-                else "incomplete_due_to_budget"
-            )
-            warnings.add("provider_spend_guard_reached")
+        if requests >= plan.hard_cap_max_requests:
+            status = "incomplete_due_to_budget"
+            warnings.add("provider_hard_request_and_spend_guard_reached")
+            unresolved_windows += len(queue)
             break
         task = queue.popleft()
-        minimum_interval = float(
-            getattr(provider, "minimum_interval_seconds", 0.0)
+        key = (
+            tuple(author.casefold() for author in task.authors),
+            int(task.start.timestamp()),
+            int(task.end.timestamp()),
         )
-        if last_request_started is not None and minimum_interval > 0:
-            remaining_wait = minimum_interval - (time.monotonic() - last_request_started)
-            if remaining_wait > 0:
-                time.sleep(remaining_wait)
-        rate_limit_retries = 0
-        request_error: ProviderRequestError | None = None
-        while True:
-            try:
-                last_request_started = time.monotonic()
-                page = provider.search(task)
-                request_error = None
-                break
-            except ProviderRequestError as error:
-                if (
-                    error.category == "rate_limited"
-                    and rate_limit_retries
-                    < int(getattr(provider, "max_rate_limit_retries", 0))
-                ):
-                    rate_limit_retries += 1
-                    warnings.add("provider_rate_limit_retry_used")
-                    time.sleep(
-                        float(
-                            getattr(
-                                provider,
-                                "rate_limit_retry_wait_seconds",
-                                0.0,
-                            )
-                        )
-                    )
-                    continue
-                request_error = error
-                break
-        if request_error is not None:
-            if request_error.category == "credit_exhausted":
-                status = "incomplete_due_to_credit"
-                warnings.add("credit_exhausted")
-                break
-            if request_error.category == "access_denied":
-                status = "incomplete_due_to_access"
-                warnings.add("provider_endpoint_access_denied")
-                break
-            if request_error.category == "invalid_credentials":
-                status = "incomplete_due_to_auth"
-                warnings.add("provider_credentials_rejected")
-                break
-            if request_error.category == "rate_limited":
-                status = "incomplete_due_to_rate_limit"
-                warnings.add("provider_rate_limit_reached")
-                break
-            raise request_error
+        if key in seen_windows:
+            status = "incomplete_due_to_repeated_window"
+            warnings.add("twitterapi_io_repeated_window_blocked")
+            unresolved_windows += 1
+            continue
+        seen_windows.add(key)
+        try:
+            page = provider.search(task)
+        except ProviderRequestError as error:
+            status, warning = _provider_error_status(error)
+            warnings.add(warning)
+            unresolved_windows += len(queue) + 1
+            break
         requests += 1
         _write_json(
             artifact_dir / provider.name / f"response-{requests:04d}.json",
             page.raw_payload,
         )
-        posts.extend(page.posts)
-        page_cost = provider.unit_cost_usd * max(1, len(page.posts))
-        if not page.posts:
-            warnings.add("empty_request_minimum_charge_estimated")
-        estimated_spend += page_cost
-        if page.has_more:
-            pagination_gaps += 1
-            warnings.add("provider_page_overflow_not_followed")
-            warnings.add("unresolved_pagination_gap")
-    after_balance = None
-    if before_balance is not None:
-        try:
-            after_balance = provider.balance_usd()
-        except ProviderRequestError:
-            warnings.add("post_run_balance_unavailable")
-    actual_spend = (
-        max(Decimal("0"), before_balance - after_balance)
-        if before_balance is not None and after_balance is not None
-        else None
-    )
-    if actual_spend is not None and actual_spend > spend_limit_usd:
-        raise ShadowSpikeError("Provider reported spend exceeded the hard $0.10 limit.")
+        raw_resources += max(1, len(page.posts))
+        duplicate_rows += _dedupe_posts(posts_by_id, page.posts)
+        overflow = (
+            page.has_more
+            or page.possible_incomplete
+            or len(page.posts) >= MAX_PROVIDER_PAGE_RESULTS
+        )
+        if not overflow:
+            continue
+        duration_seconds = int((task.end - task.start).total_seconds())
+        if duration_seconds <= minimum_slice_seconds:
+            status = "incomplete_due_to_minimum_time_slice"
+            warnings.add("twitterapi_io_overflow_at_minimum_time_slice")
+            unresolved_windows += 1
+            continue
+        midpoint = task.start + (task.end - task.start) / 2
+        midpoint = datetime.fromtimestamp(int(midpoint.timestamp()), tz=timezone.utc)
+        if midpoint <= task.start or midpoint >= task.end:
+            status = "incomplete_due_to_minimum_time_slice"
+            warnings.add("twitterapi_io_window_cannot_be_split_further")
+            unresolved_windows += 1
+            continue
+        warnings.add("twitterapi_io_overflow_window_split")
+        left = replace(
+            task,
+            end=midpoint,
+            depth=task.depth + 1,
+            cursor=None,
+            max_id=None,
+        )
+        right = replace(
+            task,
+            start=midpoint,
+            depth=task.depth + 1,
+            cursor=None,
+            max_id=None,
+        )
+        queue.appendleft(right)
+        queue.appendleft(left)
+    if duplicate_rows:
+        warnings.add("canonical_post_id_duplicates_removed")
     return ProviderRun(
-        provider=provider.name,
+        provider="twitterapi_io",
         status=status,
-        posts=tuple(posts),
+        posts=tuple(posts_by_id.values()),
         requests=requests,
-        pagination_gaps=pagination_gaps,
-        estimated_spend_usd=estimated_spend,
-        actual_spend_usd=actual_spend,
+        pagination_gaps=unresolved_windows,
+        estimated_spend_usd=provider.unit_cost_usd * raw_resources,
+        actual_spend_usd=None,
         warnings=tuple(sorted(warnings)),
+        duplicates_removed=duplicate_rows,
+    )
+
+
+def _run_socialdata_discovery(
+    provider: SearchProvider,
+    *,
+    benchmark: Sequence[NormalizedPost],
+    start: datetime,
+    end: datetime,
+    artifact_dir: Path,
+    plan: ProviderCostPlan,
+) -> ProviderRun:
+    queue = deque(plan_search_tasks(benchmark, start=start, end=end))
+    seen_states: set[tuple[tuple[str, ...], int, int, str | None, str | None]] = set()
+    seen_cursors: set[tuple[tuple[str, ...], str]] = set()
+    seen_max_ids: set[tuple[tuple[str, ...], str]] = set()
+    posts_by_id: dict[str, NormalizedPost] = {}
+    requests = 0
+    raw_resources = 0
+    duplicate_rows = 0
+    unresolved_pages = 0
+    status = "complete"
+    warnings: set[str] = set()
+    while queue:
+        if requests >= plan.hard_cap_max_requests:
+            status = "incomplete_due_to_budget"
+            warnings.add("provider_hard_request_and_spend_guard_reached")
+            unresolved_pages += len(queue)
+            break
+        task = queue.popleft()
+        author_key = tuple(author.casefold() for author in task.authors)
+        state = (
+            author_key,
+            int(task.start.timestamp()),
+            int(task.end.timestamp()),
+            task.cursor,
+            task.max_id,
+        )
+        if state in seen_states:
+            status = "incomplete_due_to_repeated_page_state"
+            warnings.add("socialdata_repeated_page_state_blocked")
+            unresolved_pages += 1
+            continue
+        seen_states.add(state)
+        try:
+            page = provider.search(task)
+        except ProviderRequestError as error:
+            status, warning = _provider_error_status(error)
+            warnings.add(warning)
+            unresolved_pages += len(queue) + 1
+            break
+        requests += 1
+        _write_json(
+            artifact_dir / provider.name / f"response-{requests:04d}.json",
+            page.raw_payload,
+        )
+        raw_resources += max(1, len(page.posts))
+        duplicate_rows += _dedupe_posts(posts_by_id, page.posts)
+        if page.next_cursor:
+            cursor_key = (author_key, page.next_cursor)
+            if page.next_cursor == task.cursor or cursor_key in seen_cursors:
+                status = "incomplete_due_to_repeated_cursor"
+                warnings.add("socialdata_repeated_cursor_blocked")
+                unresolved_pages += 1
+                continue
+            seen_cursors.add(cursor_key)
+            warnings.add("socialdata_cursor_continuation_used")
+            queue.appendleft(
+                replace(task, cursor=page.next_cursor, max_id=None)
+            )
+            continue
+        overflow = (
+            page.has_more
+            or page.possible_incomplete
+            or len(page.posts) >= MAX_PROVIDER_PAGE_RESULTS
+        )
+        if not overflow:
+            continue
+        next_max_id = page.continuation_max_id
+        if not next_max_id:
+            status = "incomplete_due_to_unprovable_coverage"
+            warnings.add("socialdata_missing_cursor_and_max_id_continuation")
+            unresolved_pages += 1
+            continue
+        max_key = (author_key, next_max_id)
+        if next_max_id == task.max_id or max_key in seen_max_ids:
+            status = "incomplete_due_to_repeated_max_id"
+            warnings.add("socialdata_repeated_max_id_blocked")
+            unresolved_pages += 1
+            continue
+        seen_max_ids.add(max_key)
+        warnings.add("socialdata_max_id_fallback_used")
+        queue.appendleft(replace(task, cursor=None, max_id=next_max_id))
+    if duplicate_rows:
+        warnings.add("canonical_post_id_duplicates_removed")
+    return ProviderRun(
+        provider="socialdata",
+        status=status,
+        posts=tuple(posts_by_id.values()),
+        requests=requests,
+        pagination_gaps=unresolved_pages,
+        estimated_spend_usd=provider.unit_cost_usd * raw_resources,
+        actual_spend_usd=None,
+        warnings=tuple(sorted(warnings)),
+        duplicates_removed=duplicate_rows,
     )
 
 
@@ -1189,7 +1628,7 @@ def compare_provider(
 ) -> dict[str, Any]:
     benchmark_by_id = {post.post_id: post for post in benchmark}
     provider_by_id: dict[str, NormalizedPost] = {}
-    duplicate_count = 0
+    duplicate_count = run.duplicates_removed
     for post in run.posts:
         if post.post_id in provider_by_id:
             duplicate_count += 1
@@ -1350,6 +1789,92 @@ def compare_provider(
     }
 
 
+def select_direct_id_benchmark(
+    benchmark: Sequence[NormalizedPost],
+    *,
+    limit: int = 50,
+) -> tuple[NormalizedPost, ...]:
+    """Select a deterministic, content-rich local benchmark for future ID lookup."""
+    if limit < 1:
+        raise ValueError("Direct-ID benchmark limit must be at least 1.")
+    unique = {post.post_id: post for post in benchmark}
+    ordered = sorted(
+        unique.values(),
+        key=lambda post: (post.created_at, post.post_id),
+        reverse=True,
+    )
+    selected: dict[str, NormalizedPost] = {}
+    predicates = (
+        lambda post: len(post.text) > 280,
+        lambda post: post.post_type == "reply",
+        lambda post: post.post_type == "quote",
+        lambda post: post.referenced_context is not None,
+        lambda post: bool(post.media_metadata),
+    )
+    for predicate in predicates:
+        candidate = next((post for post in ordered if predicate(post)), None)
+        if candidate is not None:
+            selected.setdefault(candidate.post_id, candidate)
+            if len(selected) >= limit:
+                return tuple(selected.values())
+
+    def richness(post: NormalizedPost) -> tuple[int, datetime, str]:
+        score = sum(
+            (
+                len(post.text) > 280,
+                post.post_type == "reply",
+                post.post_type == "quote",
+                post.referenced_context is not None,
+                bool(post.media_metadata),
+            )
+        )
+        return score, post.created_at, post.post_id
+
+    for post in sorted(ordered, key=richness, reverse=True):
+        selected.setdefault(post.post_id, post)
+        if len(selected) >= limit:
+            break
+    return tuple(selected.values())
+
+
+def direct_id_selection_summary(
+    selected: Sequence[NormalizedPost],
+) -> dict[str, object]:
+    unique = {post.post_id: post for post in selected}
+    ids = sorted(unique)
+    selection_digest = sha256("\n".join(ids).encode("utf-8")).hexdigest()
+    return {
+        "selected_post_ids": len(ids),
+        "selection_sha256": selection_digest,
+        "long_posts": sum(len(post.text) > 280 for post in unique.values()),
+        "replies": sum(post.post_type == "reply" for post in unique.values()),
+        "quotes": sum(post.post_type == "quote" for post in unique.values()),
+        "with_referenced_context": sum(
+            post.referenced_context is not None for post in unique.values()
+        ),
+        "with_media": sum(bool(post.media_metadata) for post in unique.values()),
+        "official_x_external_requests": 0,
+    }
+
+
+def compare_direct_id_lookup(
+    benchmark: Sequence[NormalizedPost],
+    run: ProviderRun,
+) -> dict[str, Any]:
+    """Compare an offline direct-ID fixture or a future separately approved run."""
+    report = compare_provider(benchmark, run)
+    requested = len({post.post_id for post in benchmark})
+    available = report["matched_benchmark_ids"]
+    return {
+        "mode": "direct_id",
+        "requested_ids": requested,
+        "available_ids": available,
+        "unavailable_ids": requested - available,
+        "availability_pct": _percentage(available, requested),
+        "comparison": report,
+    }
+
+
 def _recommendation(reports: Sequence[Mapping[str, Any]]) -> dict[str, str]:
     accepted: list[Mapping[str, Any]] = []
     for report in reports:
@@ -1391,17 +1916,99 @@ def _recommendation(reports: Sequence[Mapping[str, Any]]) -> dict[str, str]:
     }
 
 
+def plan_stored_discovery(
+    *,
+    hours: int,
+    provider_names: Sequence[Literal["twitterapi_io", "socialdata"]],
+    hard_cap_usd: Decimal,
+    minimum_twitter_slice_seconds: int = DEFAULT_TWITTERAPI_IO_MINIMUM_SLICE_SECONDS,
+) -> dict[str, object]:
+    """Build a DB-read-only discovery preflight with no provider credentials or calls."""
+    if hours < 1 or hours > 168:
+        raise ValueError("hours must be between 1 and 168.")
+    if not provider_names or any(
+        provider not in {"twitterapi_io", "socialdata"}
+        for provider in provider_names
+    ):
+        raise ValueError("provider_names must select twitterapi_io and/or socialdata.")
+    official, start, end = fetch_stored_official_benchmark(hours=hours)
+    benchmark = tuple({post.post_id: post for post in official.posts}.values())
+    selected = tuple(dict.fromkeys(provider_names))
+    plans = tuple(
+        build_discovery_cost_plan(
+            provider=provider,
+            benchmark=benchmark,
+            start=start,
+            end=end,
+            hard_cap_usd=hard_cap_usd,
+            minimum_twitter_slice_seconds=minimum_twitter_slice_seconds,
+        )
+        for provider in selected
+    )
+    report = build_preflight_report(plans)
+    report.update(
+        {
+            "mode": "discovery",
+            "benchmark_source": "existing_postgresql_x_home_timeline",
+            "benchmark_posts": len(benchmark),
+            "benchmark_authors": len(
+                {post.author.casefold() for post in benchmark}
+            ),
+            "window": {"start": start.isoformat(), "end": end.isoformat()},
+        }
+    )
+    return report
+
+
+def plan_stored_direct_id(
+    *,
+    hours: int,
+    limit: int,
+    provider_names: Sequence[Literal["twitterapi_io", "socialdata"]],
+    hard_cap_usd: Decimal,
+) -> dict[str, object]:
+    """Select local IDs and build a planning-only direct lookup preflight."""
+    if hours < 1 or hours > 168:
+        raise ValueError("hours must be between 1 and 168.")
+    if limit < 1 or limit > 50:
+        raise ValueError("Direct-ID benchmark limit must be between 1 and 50.")
+    if not provider_names or any(
+        provider not in {"twitterapi_io", "socialdata"}
+        for provider in provider_names
+    ):
+        raise ValueError("provider_names must select twitterapi_io and/or socialdata.")
+    official, _, _ = fetch_stored_official_benchmark(hours=hours)
+    selected_posts = select_direct_id_benchmark(official.posts, limit=limit)
+    providers = tuple(dict.fromkeys(provider_names))
+    plans = tuple(
+        build_direct_id_cost_plan(
+            provider=provider,
+            benchmark=selected_posts,
+            hard_cap_usd=hard_cap_usd,
+        )
+        for provider in providers
+    )
+    report = build_preflight_report(plans)
+    report.update(
+        {
+            "mode": "direct_id",
+            "benchmark_source": "existing_postgresql_x_home_timeline",
+            "selection": direct_id_selection_summary(selected_posts),
+            "direct_id_api_execution_implemented": False,
+            "direct_id_api_calls": 0,
+        }
+    )
+    return report
+
+
 def run_shadow_spike(
     *,
     hours: int = 24,
     max_provider_spend_usd: Decimal = TRIAL_SPEND_LIMIT_USD,
-    max_official_pages: int = 20,
     output_root: str | Path = "data/runtime/x-provider-shadow",
-    window_end: str | None = None,
-    official_benchmark_source: Literal["api", "stored"] = "api",
-    approved_max_official_spend_usd: Decimal | None = None,
-    official_worst_case_cost_per_primary_usd: Decimal | None = None,
-    max_official_results_per_page: int = 100,
+    official_benchmark_source: Literal["api", "stored"] = "stored",
+    approved_provider_plan_sha256: str | None = None,
+    minimum_twitter_slice_seconds: int = DEFAULT_TWITTERAPI_IO_MINIMUM_SLICE_SECONDS,
     provider_names: Sequence[Literal["twitterapi_io", "socialdata"]] = (
         "twitterapi_io",
         "socialdata",
@@ -1420,6 +2027,42 @@ def run_shadow_spike(
         for provider in selected_provider_names
     ):
         raise ValueError("provider_names must select twitterapi_io and/or socialdata.")
+    if official_benchmark_source != "stored":
+        raise ShadowSpikeError(
+            "Task 004D.2 discovery execution requires a zero-cost stored Official X "
+            "benchmark; fresh Official X is disabled in this runner."
+        )
+    official, start, end = fetch_stored_official_benchmark(hours=hours)
+    unique_benchmark = tuple(
+        {post.post_id: post for post in official.posts}.values()
+    )
+    plans = tuple(
+        build_discovery_cost_plan(
+            provider=provider,
+            benchmark=unique_benchmark,
+            start=start,
+            end=end,
+            hard_cap_usd=max_provider_spend_usd,
+            minimum_twitter_slice_seconds=minimum_twitter_slice_seconds,
+        )
+        for provider in selected_provider_names
+    )
+    expected_combined_digest = combined_plan_sha256(plans)
+    if approved_provider_plan_sha256 is None:
+        raise ShadowSpikeError(
+            "Provider discovery execution blocked: run zero-cost plan-discovery and "
+            "obtain explicit approval first."
+        )
+    if approved_provider_plan_sha256 != expected_combined_digest:
+        raise ShadowSpikeError(
+            "Provider discovery execution blocked: approved combined plan digest "
+            "does not match the current zero-cost plan."
+        )
+    if not all(plan.fits_hard_cap for plan in plans):
+        raise ShadowSpikeError(
+            "Provider discovery execution blocked: the plan cannot cover every "
+            "benchmark author within the unchanged hard cap."
+        )
     keys = load_provider_keys()
     missing = [
         variable
@@ -1433,34 +2076,12 @@ def run_shadow_spike(
         raise ShadowSpikeError(
             "Missing required local provider credentials: " + ", ".join(missing)
         )
-    if official_benchmark_source == "stored":
-        if window_end is not None:
-            raise ValueError("window_end cannot be used with a stored benchmark.")
-        official, start, end = fetch_stored_official_benchmark(hours=hours)
-    else:
-        end = parse_window_end(window_end)
-        start = end - timedelta(hours=hours)
     run_id = end.strftime("%Y%m%dT%H%M%SZ")
     artifact_dir = Path(output_root) / run_id
     artifact_dir.mkdir(parents=True, exist_ok=False)
     _write_json(
         artifact_dir / "window.json",
         {"start": start.isoformat(), "end": end.isoformat(), "hours": hours},
-    )
-    if official_benchmark_source == "api":
-        official = fetch_official_benchmark(
-            start=start,
-            end=end,
-            max_pages=max_official_pages,
-            artifact_dir=artifact_dir,
-            approved_max_spend_usd=approved_max_official_spend_usd,
-            worst_case_cost_per_primary_usd=(
-                official_worst_case_cost_per_primary_usd
-            ),
-            max_results_per_page=max_official_results_per_page,
-        )
-    unique_benchmark = tuple(
-        {post.post_id: post for post in official.posts}.values()
     )
     if not unique_benchmark:
         raise ShadowSpikeError("Official X benchmark returned no Posts for the window.")
@@ -1470,6 +2091,7 @@ def run_shadow_spike(
         else SocialDataProvider(keys[name])
         for name in selected_provider_names
     )
+    plan_by_provider = {plan.provider: plan for plan in plans}
     third_party_runs = tuple(
         run_search_provider(
             provider,
@@ -1478,6 +2100,8 @@ def run_shadow_spike(
             end=end,
             spend_limit_usd=max_provider_spend_usd,
             artifact_dir=artifact_dir,
+            approved_plan_sha256=plan_by_provider[provider.name].plan_sha256,
+            minimum_twitter_slice_seconds=minimum_twitter_slice_seconds,
         )
         for provider in providers
     )
@@ -1510,6 +2134,8 @@ def run_shadow_spike(
         },
         "official_benchmark": official_report,
         "providers": comparisons,
+        "approved_provider_plan_sha256": approved_provider_plan_sha256,
+        "provider_preflight": build_preflight_report(plans),
         **recommendation,
         "raw_artifacts": str(artifact_dir),
     }

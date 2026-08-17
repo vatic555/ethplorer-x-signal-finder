@@ -1,0 +1,69 @@
+{
+  "benchmark": [
+    {
+      "post_id": "501",
+      "author": "alice",
+      "text": "A synthetic long Post used only for offline direct-ID comparison. A synthetic long Post used only for offline direct-ID comparison. A synthetic long Post used only for offline direct-ID comparison. A synthetic long Post used only for offline direct-ID comparison. A synthetic long Post used only for offline direct-ID comparison.",
+      "post_type": "original",
+      "referenced_post_id": null,
+      "referenced_context": false,
+      "media": true
+    },
+    {
+      "post_id": "502",
+      "author": "bob",
+      "text": "Synthetic reply text.",
+      "post_type": "reply",
+      "referenced_post_id": "490",
+      "referenced_context": true,
+      "media": false
+    },
+    {
+      "post_id": "503",
+      "author": "carol",
+      "text": "Synthetic quote text.",
+      "post_type": "quote",
+      "referenced_post_id": "491",
+      "referenced_context": true,
+      "media": true
+    },
+    {
+      "post_id": "504",
+      "author": "dave",
+      "text": "Synthetic original text.",
+      "post_type": "original",
+      "referenced_post_id": null,
+      "referenced_context": false,
+      "media": false
+    }
+  ],
+  "provider_result": [
+    {
+      "post_id": "501",
+      "author": "alice",
+      "text": "A synthetic long Post used only for offline direct-ID comparison. A synthetic long Post used only for offline direct-ID comparison. A synthetic long Post used only for offline direct-ID comparison. A synthetic long Post used only for offline direct-ID comparison. A synthetic long Post used only for offline direct-ID comparison.",
+      "post_type": "original",
+      "referenced_post_id": null,
+      "referenced_context": false,
+      "media": true
+    },
+    {
+      "post_id": "502",
+      "author": "bob",
+      "text": "Synthetic reply text.",
+      "post_type": "reply",
+      "referenced_post_id": "490",
+      "referenced_context": true,
+      "media": false
+    },
+    {
+      "post_id": "503",
+      "author": "carol",
+      "text": "Truncated quote",
+      "post_type": "quote",
+      "referenced_post_id": "491",
+      "referenced_context": false,
+      "media": false
+    }
+  ]
+}

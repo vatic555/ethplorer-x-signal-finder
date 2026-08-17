@@ -19,7 +19,7 @@ Status: Canonical implementation sequence and progress record
 - Task 004A implementation, synthetic validation, and bounded live X-to-Supabase validation are complete
 - Task 004B implementation, migration 002, synthetic validation, and bounded live validation are complete
 - Task 004C and Task 004C.1 implementation, synthetic validation, explicit baseline acceptance, and bounded incremental live validation are complete
-- Task 004D provider shadow quality and cost spike and its corrective offline recovery amendment are Completed; neither third-party trial met acceptance, and Official X remains production
+- Task 004D provider shadow quality and cost spike, offline recovery, and zero-cost discovery-runner correction are Completed; neither third-party trial met acceptance, and Official X remains production
 - Task 005A knowledge inventory, Git-backed source contract, catalog evidence linkage, and offline validation are complete
 - Task 005C first-party Ethplorer/Binplorer X corpus, migration 003, historical import, and incremental lifecycle validation are complete
 - Task 005C.1 corrected first-party resource accounting and downstream read contracts without another X request or schema change
@@ -220,6 +220,7 @@ Current state:
 - Task 004C - Complete Incremental Collection and Cost Guardrails - Completed
 - Task 004C.1 - Explicit Baseline Acceptance - Completed
 - Task 004D - X Provider Shadow Quality Spike - Completed, non-production exception
+- Task 004D.2 - Fix Provider Discovery Runner - Completed, zero-cost correction
 
 ### Task 004A Validation Record
 
@@ -357,6 +358,20 @@ Status: Completed
 - External activity: zero X or third-party requests during dry-run, apply, and verification
 - Runner correction: successful Official X pages and a safe partial summary are atomic and durable per page; a later 402 returns accumulated partial data; every fresh Official X run requires an approved maximum and explicit worst-case per-primary bound; the next page size shrinks near that ceiling
 - Validation: 162 default tests passed with 5 external tests skipped before apply; knowledge validation passed for 17 sources and 0 assets with zero network or LLM calls
+
+#### Task 004D.2 - Fix Provider Discovery Runner
+
+Status: Completed as a zero-cost non-production correction
+
+- Problem corrected: the old shared algorithm issued one author-window request, ignored provider continuation after the first page, and could not prove discovery coverage
+- TwitterAPI.io: overflowing or full Advanced Search windows are recursively split into two exact time halves until complete or the configured minimum slice; repeated windows and minimum-slice overflow are explicit incomplete states; canonical `post_id` dedupe spans parent and child windows
+- SocialData: a separate traversal follows advancing cursors and then decreasing `max_id` continuation when needed; repeated cursor, repeated ID, repeated page state, or missing progress produces explicit incomplete status
+- Cost control: zero-cost plans disclose benchmark, authors, window, strategy, requests, billable resources, expected cost, conservative maximum, and unchanged hard cap; execution requires the separately approved combined plan SHA-256 and is blocked before provider credentials or requests when it is absent, mismatched, or cannot cover the initial authors
+- Request discipline: one full 20-result page is reserved before every request; no automatic retry, balance request, cost-limit increase, or fresh Official X discovery benchmark is allowed
+- Direct-ID groundwork: deterministic local selection, cost planning, and fixture comparison exist for up to 50 known IDs; provider direct-ID lookup endpoints are not implemented or called
+- Current zero-cost discovery example: 826 stored Posts from 132 authors would require at least 132 requests per provider, estimated at $0.39600 for TwitterAPI.io and $0.5280 for SocialData, so both are blocked by the unchanged $0.10 cap
+- Current zero-cost 50-ID example under a $0.02 cap: three planned batches; TwitterAPI.io expected $0.00750 and conservative $0.00900; SocialData expected $0.0100 and conservative $0.0120; API execution remains absent and unapproved
+- Scope boundary: no Official X, TwitterAPI.io, SocialData, LLM, or other external API call; no production collector, database write, migration, `sync_state`, provider switch, fallback, scheduler, or monitoring change
 
 ## Stage 4 - Minimum Knowledge Base
 

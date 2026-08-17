@@ -1,6 +1,6 @@
 # Task 004D - X Provider Shadow Quality Spike
 
-Status: Completed with incomplete provider runs
+Status: Task 004D completed with incomplete provider runs; Task 004D.2 zero-cost runner correction completed
 
 ## Purpose
 
@@ -23,13 +23,13 @@ The spike uses the documented estimates current on 2026-08-14:
 - TwitterAPI.io Advanced Search - $0.00015 per returned Post, with a documented $0.00015 minimum charge per request.
 - SocialData Search - $0.0002 per returned Post; empty requests above the documented fair-use allowance may also cost $0.0002.
 
-The hard Task 004D ceiling is $0.10 for each third-party provider. The CLI rejects a higher configured limit. TwitterAPI.io reported balance is checked before and after its search run when available. SocialData has no documented balance endpoint in the reviewed API reference, so its spend is estimated conservatively from returned Posts and empty requests. HTTP 402 becomes `incomplete_due_to_credit` and does not automatically fail provider quality.
+The hard Task 004D ceiling is $0.10 for each third-party provider. The CLI rejects a higher configured limit. Task 004D.2 no longer performs automatic balance calls or rate-limit retries: neither may add an unplanned external request. Cost is planned by reserving the provider's maximum 20-result page before every search request. HTTP 402 becomes `incomplete_due_to_credit` and does not automatically fail provider quality.
 
 ## Mandatory Cost Preflight for Any Future Run
 
 The completed live result does not authorize another provider request. Before any future usage-based call, prepare a zero-cost preflight that shows the provider and endpoint, purpose, expected requests and billable resources, unit price, expected cost, conservative maximum cost, and the technical hard guard that prevents spending above that maximum. Stop and wait for explicit approval of that exact ceiling. Unknown pricing requires separate approval of an experiment with a technically enforced hard dollar cap.
 
-Do not purchase a fresh Official X benchmark when suitable data already exists locally. Inspect the 214 incoming Official X Posts in PostgreSQL and ignored approved runtime artifacts first. Third-party validation must begin with approximately 20 to 50 Posts or the smallest useful window needed to test schema, full text, quotes and replies, and pagination. A larger comparison requires a new preflight and approval. Pages, time window, Posts, retries, and provider calls may not expand beyond the approved ceiling.
+Do not purchase a fresh Official X benchmark when suitable data already exists locally. Inspect the current 1,040 incoming Official X Posts in PostgreSQL and ignored approved runtime artifacts first. Third-party validation must begin with approximately 20 to 50 Posts or the smallest useful window needed to test schema, full text, quotes and replies, and pagination. A larger comparison requires a new preflight and approval. Pages, time window, Posts, retries, and provider calls may not expand beyond the approved ceiling.
 
 After an approved paid run, report the planned maximum, actual requests and resources, estimated or known spend, variance from plan, and whether the run produced enough evidence.
 
@@ -44,29 +44,30 @@ SOCIALDATA_API_KEY=
 
 `.env.example` contains empty placeholders only. The command checks the selected provider keys before making a provider request.
 
-## Command
+## Commands
 
-These commands are operating references only. Do not execute them until the mandatory preflight above has been approved.
+These two commands are zero-cost. They read only the existing PostgreSQL benchmark and do not load provider credentials or call Official X, TwitterAPI.io, or SocialData:
+
+```sh
+python -m x_signal_finder x-provider-shadow plan-discovery \
+  --hours 24 --max-provider-spend-usd 0.10
+
+python -m x_signal_finder x-provider-shadow plan-direct-id \
+  --hours 168 --limit 50 --max-provider-spend-usd 0.02
+```
+
+The live discovery command is blocked unless its exact combined plan SHA-256 has been separately approved. This is an operating reference only and must not be executed from Task 004D.2:
 
 ```sh
 python -m x_signal_finder x-provider-shadow run \
   --hours 24 \
   --max-provider-spend-usd 0.10 \
-  --approved-max-official-spend-usd APPROVED_MAX \
-  --official-worst-case-cost-per-primary-usd PREFLIGHT_BOUND
-```
-
-When a fresh Official X request is unavailable, an already-collected benchmark can be reused read-only:
-
-```sh
-python -m x_signal_finder x-provider-shadow run \
-  --hours 24 \
-  --official-benchmark-source stored
+  --approved-provider-plan-sha256 APPROVED_PLAN_SHA256
 ```
 
 Raw responses and the local safe summary are written under `data/runtime/x-provider-shadow/<run-id>/`. That tree is ignored by Git. CLI output and committed documentation contain aggregate metrics and never contain Post text, raw provider payloads, or credentials.
 
-A fresh Official X run now refuses to start without both the approved dollar ceiling and the preflight worst-case cost bound per requested primary Post. The runner reserves that bound before each request and reduces `max_results` near the boundary. Every successful page is written atomically before another paid page is attempted, and a safe shadow-only `partial-summary.json` is replaced atomically after every page. A later HTTP 402 or other request failure returns an incomplete partial result instead of discarding the successful pages. This checkpoint is local recovery evidence only and never replaces canonical Post-ID deduplication or production `sync_state`.
+Task 004D.2 discovery accepts only the stored Official X benchmark. Fresh Official X retrieval is disabled in this runner. The earlier standalone Official X safeguard still makes successful pages and `partial-summary.json` durable, but buying a new benchmark is outside this correction and requires a separate task and preflight.
 
 ## Normalized Comparison Contract
 
@@ -89,7 +90,32 @@ This contract is not wired into production collection. The future `x_followset` 
 
 The Official X benchmark defines the exact UTC window and the authors who actually appeared in that home timeline. Third-party Advanced Search requests are restricted to those active authors and the same timestamps.
 
-Each search task contains one active benchmark author. Lower-volume benchmark authors run first so a bounded trial samples the follow-set broadly instead of spending its balance recursively splitting one prolific account. A provider page signal is recorded as a pagination gap and is not used as a production checkpoint. The spend guard reserves the documented maximum 20-result page cost before each request.
+Each initial search task contains one active benchmark author. Lower-volume benchmark authors run first. The two providers then use separate traversal methods:
+
+- TwitterAPI.io does not treat one Advanced Search page as complete. `has_next_page`, an explicit incompleteness signal, or a full 20-result page causes the exact UTC interval to be divided into two non-overlapping halves. Both halves must complete. Splitting stops at the configured minimum time slice; overflow there yields `incomplete_due_to_minimum_time_slice`. Repeated windows are blocked, and all parent and child results are deduplicated by canonical `post_id`. Advanced Search cursor state is not the canonical mechanism.
+- SocialData does not inherit the TwitterAPI.io algorithm. It follows `next_cursor` while it advances. If a page can still be incomplete but supplies no valid cursor, it continues with a decreasing `max_id` while retaining the same time query and optional `since_id`. Repeated cursor, repeated `max_id`, repeated page state, missing continuation, or exhaustion of the approved request cap yields an explicit incomplete status.
+
+Before every request, both strategies reserve a full 20-result page. There are no automatic retries and the configured hard cap never increases. Raw pages remain local and ignored; provider traversal state never becomes production `sync_state`.
+
+## Task 004D.2 Zero-Cost Preflight Examples
+
+The current stored 24-hour benchmark contains 826 Posts from 132 authors. With the unchanged $0.10 cap per provider, discovery is blocked before credentials or an external request:
+
+| Provider | Strategy | Initial requests | Expected max resources | Expected cost | Hard-cap requests/resources | Conservative maximum | Fits cap |
+|---|---|---:|---:|---:|---:|---:|---:|
+| TwitterAPI.io | recursive author-window time slicing | 132 | 2,640 | $0.39600 | 33 / 660 | $0.09900 | No |
+| SocialData | cursor, then `max_id` fallback | 132 | 2,640 | $0.5280 | 25 / 500 | $0.1000 | No |
+
+The zero-cost combined discovery plan SHA-256 was `f0f85fecbfe9500f86fd563ef1c526a86e9514c0def1567d6b042bc51f51693a`. It is evidence only, not an approval request, and `all_plans_fit_hard_caps=false` makes it non-executable even if copied to the live command.
+
+The planning-only 50-ID benchmark uses existing PostgreSQL data and deliberately includes long Posts, replies, quotes, returned reference context, and media. It selected 50 IDs from 35 authors: 39 long Posts, 23 replies, 25 quotes, 48 with referenced context, and 38 with media.
+
+| Provider | Planned ID batches | Expected resources | Expected cost | Conservative maximum | Hard cap |
+|---|---:|---:|---:|---:|---:|
+| TwitterAPI.io | 3 | 50 | $0.00750 | $0.00900 | $0.02 |
+| SocialData | 3 | 50 | $0.0100 | $0.0120 | $0.02 |
+
+The direct-ID combined plan SHA-256 was `cae638973f8a3102440b57a94cd37956038917d90400c9b2b135e3071c0a8b14`. Direct-ID provider endpoints and pricing still require verification, so API execution is intentionally not implemented. Offline fixture comparison already reports availability, exact and full text, long-Post fidelity, reply and quote types, referenced context, and media by canonical `post_id`.
 
 ## Comparison
 

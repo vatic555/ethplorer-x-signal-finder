@@ -3,6 +3,9 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 import json
+from pathlib import Path
+
+import pytest
 
 from x_signal_finder.x_provider_shadow import (
     NormalizedPost,
@@ -10,8 +13,13 @@ from x_signal_finder.x_provider_shadow import (
     ProviderPage,
     ProviderRun,
     SearchTask,
+    ShadowSpikeError,
     TwitterApiIoProvider,
+    build_direct_id_cost_plan,
+    build_discovery_cost_plan,
+    compare_direct_id_lookup,
     compare_provider,
+    direct_id_selection_summary,
     fetch_official_benchmark,
     fetch_stored_official_benchmark,
     normalize_official_post,
@@ -20,6 +28,7 @@ from x_signal_finder.x_provider_shadow import (
     plan_search_tasks,
     plan_official_page_size,
     run_search_provider,
+    select_direct_id_benchmark,
 )
 from x_signal_finder.x_api.client import HttpResponse, XApiRequestError
 
@@ -138,7 +147,7 @@ def test_plan_search_tasks_groups_only_active_benchmark_authors() -> None:
     benchmark = tuple(
         _post(str(index), author="alice" if index < 8 else "bob")
         for index in range(14)
-    )
+    ) + (_post("case-duplicate", author="ALICE"),)
     tasks = plan_search_tasks(
         benchmark,
         start=NOW - timedelta(hours=24),
@@ -153,13 +162,9 @@ class _FakeProvider:
     name = "twitterapi_io"
     unit_cost_usd = Decimal("0.00015")
 
-    def __init__(self, *, balance=Decimal("0.10"), has_more=False):
-        self._balance = balance
+    def __init__(self, *, has_more=False):
         self._has_more = has_more
         self.calls = 0
-
-    def balance_usd(self):
-        return self._balance
 
     def search(self, task: SearchTask):
         self.calls += 1
@@ -170,19 +175,18 @@ class _FakeProvider:
         )
 
 
-def test_provider_run_enforces_credit_before_request(tmp_path) -> None:
-    provider = _FakeProvider(balance=Decimal("0.001"))
-    result = run_search_provider(
-        provider,
-        benchmark=(_post("1"),),
-        start=NOW - timedelta(hours=24),
-        end=NOW,
-        spend_limit_usd=Decimal("0.10"),
-        artifact_dir=tmp_path,
-    )
+def test_provider_run_requires_approved_preflight_before_request(tmp_path) -> None:
+    provider = _FakeProvider()
+    with pytest.raises(ShadowSpikeError, match="approval is missing"):
+        run_search_provider(
+            provider,
+            benchmark=(_post("1"),),
+            start=NOW - timedelta(hours=24),
+            end=NOW,
+            spend_limit_usd=Decimal("0.10"),
+            artifact_dir=tmp_path,
+        )
 
-    assert result.status == "incomplete_due_to_credit"
-    assert result.requests == 0
     assert provider.calls == 0
 
 
@@ -198,20 +202,314 @@ def test_twitterapi_balance_includes_trial_bonus_credits(monkeypatch) -> None:
     assert TwitterApiIoProvider("key").balance_usd() == Decimal("0.1")
 
 
-def test_provider_page_overflow_is_reported_without_cursor_checkpoint(tmp_path) -> None:
-    provider = _FakeProvider(has_more=True)
+def test_twitterapi_overflow_splits_both_time_halves_and_dedupes(tmp_path) -> None:
+    class Provider:
+        name = "twitterapi_io"
+        unit_cost_usd = Decimal("0.00015")
+
+        def __init__(self):
+            self.tasks = []
+
+        def search(self, task):
+            self.tasks.append(task)
+            duration = int((task.end - task.start).total_seconds())
+            if duration > 60:
+                return ProviderPage(
+                    posts=(_post("parent", provider=self.name),),
+                    raw_payload={"window": duration},
+                    has_more=True,
+                    possible_incomplete=True,
+                )
+            suffix = "left" if task.end <= NOW - timedelta(seconds=60) else "right"
+            return ProviderPage(
+                posts=(
+                    _post(suffix, provider=self.name),
+                    _post("duplicate", provider=self.name),
+                ),
+                raw_payload={"window": suffix},
+                has_more=False,
+            )
+
+    provider = Provider()
+    benchmark = (_post("1"),)
+    start = NOW - timedelta(seconds=120)
+    plan = build_discovery_cost_plan(
+        provider="twitterapi_io",
+        benchmark=benchmark,
+        start=start,
+        end=NOW,
+        hard_cap_usd=Decimal("0.10"),
+        minimum_twitter_slice_seconds=60,
+    )
     result = run_search_provider(
         provider,
-        benchmark=(_post("1"), _post("2", author="bob")),
-        start=NOW - timedelta(minutes=6),
+        benchmark=benchmark,
+        start=start,
         end=NOW,
         spend_limit_usd=Decimal("0.10"),
         artifact_dir=tmp_path,
+        approved_plan_sha256=plan.plan_sha256,
+        minimum_twitter_slice_seconds=60,
     )
 
-    assert result.pagination_gaps > 0
-    assert "provider_page_overflow_not_followed" in result.warnings
+    assert result.status == "complete"
+    assert result.requests == 3
+    assert len(provider.tasks) == 3
+    assert {(task.start, task.end) for task in provider.tasks[1:]} == {
+        (start, NOW - timedelta(seconds=60)),
+        (NOW - timedelta(seconds=60), NOW),
+    }
+    assert {post.post_id for post in result.posts} == {
+        "parent",
+        "left",
+        "right",
+        "duplicate",
+    }
+    assert "canonical_post_id_duplicates_removed" in result.warnings
+
+
+def test_twitterapi_overflow_at_minimum_slice_stops_without_loop(tmp_path) -> None:
+    provider = _FakeProvider(has_more=True)
+    benchmark = (_post("1"),)
+    start = NOW - timedelta(seconds=60)
+    plan = build_discovery_cost_plan(
+        provider="twitterapi_io",
+        benchmark=benchmark,
+        start=start,
+        end=NOW,
+        hard_cap_usd=Decimal("0.10"),
+        minimum_twitter_slice_seconds=60,
+    )
+    result = run_search_provider(
+        provider,
+        benchmark=benchmark,
+        start=start,
+        end=NOW,
+        spend_limit_usd=Decimal("0.10"),
+        artifact_dir=tmp_path,
+        approved_plan_sha256=plan.plan_sha256,
+        minimum_twitter_slice_seconds=60,
+    )
+
+    assert result.status == "incomplete_due_to_minimum_time_slice"
+    assert result.requests == 1
+    assert provider.calls == 1
+
+
+def test_socialdata_traverses_cursor_and_blocks_repeated_cursor(tmp_path) -> None:
+    class Provider:
+        name = "socialdata"
+        unit_cost_usd = Decimal("0.0002")
+
+        def __init__(self):
+            self.tasks = []
+
+        def search(self, task):
+            self.tasks.append(task)
+            if task.cursor is None:
+                return ProviderPage(
+                    posts=(
+                        _post("100", provider=self.name),
+                        _post("99", provider=self.name),
+                    ),
+                    raw_payload={"page": 1},
+                    has_more=True,
+                    next_cursor="cursor-1",
+                    possible_incomplete=True,
+                )
+            return ProviderPage(
+                posts=(
+                    _post("99", provider=self.name),
+                    _post("98", provider=self.name),
+                ),
+                raw_payload={"page": 2},
+                has_more=True,
+                next_cursor="cursor-1",
+                possible_incomplete=True,
+            )
+
+    provider = Provider()
+    benchmark = (_post("1"),)
+    plan = build_discovery_cost_plan(
+        provider="socialdata",
+        benchmark=benchmark,
+        start=NOW - timedelta(hours=1),
+        end=NOW,
+        hard_cap_usd=Decimal("0.10"),
+    )
+    result = run_search_provider(
+        provider,
+        benchmark=benchmark,
+        start=NOW - timedelta(hours=1),
+        end=NOW,
+        spend_limit_usd=Decimal("0.10"),
+        artifact_dir=tmp_path,
+        approved_plan_sha256=plan.plan_sha256,
+    )
+
+    assert result.status == "incomplete_due_to_repeated_cursor"
+    assert result.requests == 2
+    assert provider.tasks[1].cursor == "cursor-1"
+    assert {post.post_id for post in result.posts} == {"100", "99", "98"}
+    assert "canonical_post_id_duplicates_removed" in result.warnings
+
+
+def test_socialdata_uses_max_id_fallback_when_cursor_is_absent(tmp_path) -> None:
+    class Provider:
+        name = "socialdata"
+        unit_cost_usd = Decimal("0.0002")
+
+        def __init__(self):
+            self.tasks = []
+
+        def search(self, task):
+            self.tasks.append(task)
+            if task.max_id is None:
+                return ProviderPage(
+                    posts=(_post("100", provider=self.name),),
+                    raw_payload={"page": 1},
+                    has_more=True,
+                    continuation_max_id="99",
+                    possible_incomplete=True,
+                )
+            return ProviderPage(
+                posts=(_post("98", provider=self.name),),
+                raw_payload={"page": 2},
+                has_more=False,
+            )
+
+    provider = Provider()
+    benchmark = (_post("1"),)
+    plan = build_discovery_cost_plan(
+        provider="socialdata",
+        benchmark=benchmark,
+        start=NOW - timedelta(hours=1),
+        end=NOW,
+        hard_cap_usd=Decimal("0.10"),
+    )
+    result = run_search_provider(
+        provider,
+        benchmark=benchmark,
+        start=NOW - timedelta(hours=1),
+        end=NOW,
+        spend_limit_usd=Decimal("0.10"),
+        artifact_dir=tmp_path,
+        approved_plan_sha256=plan.plan_sha256,
+    )
+
+    assert result.status == "complete"
+    assert result.requests == 2
+    assert provider.tasks[1].max_id == "99"
+    assert "socialdata_max_id_fallback_used" in result.warnings
+
+
+def test_socialdata_blocks_repeated_max_id_without_loop(tmp_path) -> None:
+    class Provider:
+        name = "socialdata"
+        unit_cost_usd = Decimal("0.0002")
+
+        def __init__(self):
+            self.calls = 0
+
+        def search(self, task):
+            self.calls += 1
+            return ProviderPage(
+                posts=(_post(str(100 - self.calls), provider=self.name),),
+                raw_payload={"call": self.calls},
+                has_more=True,
+                continuation_max_id="90",
+                possible_incomplete=True,
+            )
+
+    provider = Provider()
+    benchmark = (_post("1"),)
+    plan = build_discovery_cost_plan(
+        provider="socialdata",
+        benchmark=benchmark,
+        start=NOW - timedelta(hours=1),
+        end=NOW,
+        hard_cap_usd=Decimal("0.10"),
+    )
+    result = run_search_provider(
+        provider,
+        benchmark=benchmark,
+        start=NOW - timedelta(hours=1),
+        end=NOW,
+        spend_limit_usd=Decimal("0.10"),
+        artifact_dir=tmp_path,
+        approved_plan_sha256=plan.plan_sha256,
+    )
+
+    assert result.status == "incomplete_due_to_repeated_max_id"
+    assert result.requests == 2
     assert provider.calls == 2
+
+
+def test_direct_id_selection_and_fixture_comparison_are_offline() -> None:
+    fixture = json.loads(
+        Path("tests/fixtures/provider_direct_id.json").read_text(encoding="utf-8")
+    )
+
+    def convert(item, provider):
+        context = (
+            NormalizedReference(
+                item["referenced_post_id"], "context_author", NOW, "context", ()
+            )
+            if item["referenced_context"]
+            else None
+        )
+        return _post(
+            item["post_id"],
+            provider=provider,
+            author=item["author"],
+            post_type=item["post_type"],
+            text=item["text"],
+            referenced_post_id=item["referenced_post_id"],
+            referenced_context=context,
+            media=({"type": "photo"},) if item["media"] else (),
+        )
+
+    benchmark = tuple(convert(item, "official_x") for item in fixture["benchmark"])
+    provider_posts = tuple(
+        convert(item, "twitterapi_io") for item in fixture["provider_result"]
+    )
+    selected = select_direct_id_benchmark(benchmark, limit=4)
+    selection = direct_id_selection_summary(selected)
+    plan = build_direct_id_cost_plan(
+        provider="twitterapi_io",
+        benchmark=selected,
+        hard_cap_usd=Decimal("0.02"),
+    )
+    report = compare_direct_id_lookup(
+        selected,
+        ProviderRun(
+            provider="twitterapi_io",
+            status="complete",
+            posts=provider_posts,
+            requests=0,
+            pagination_gaps=0,
+            estimated_spend_usd=Decimal("0"),
+            actual_spend_usd=Decimal("0"),
+            warnings=("offline_fixture",),
+        ),
+    )
+
+    assert selection["selected_post_ids"] == 4
+    assert selection["long_posts"] == 1
+    assert selection["replies"] == 1
+    assert selection["quotes"] == 1
+    assert selection["with_referenced_context"] == 2
+    assert selection["with_media"] == 2
+    assert plan.estimated_requests == 1
+    assert plan.expected_billable_resources == 4
+    assert plan.fits_hard_cap is True
+    assert report["available_ids"] == 3
+    assert report["unavailable_ids"] == 1
+    assert report["comparison"]["full_text"]["exact_matches"] == 2
+    assert report["comparison"]["long_posts"]["exact_text"] == 1
+    assert report["comparison"]["post_type"]["accuracy_pct"] == 100.0
+    assert report["comparison"]["referenced_context"]["coverage_pct"] == 50.0
+    assert report["comparison"]["media"]["coverage_pct"] == 50.0
 
 
 def test_official_page_size_shrinks_at_budget_boundary() -> None:

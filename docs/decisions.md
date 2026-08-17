@@ -283,3 +283,19 @@ The future fresh Official X shadow runner must make every successful page durabl
 The owner approved manifest `85a70f069262451a275f626209ed3836e4eb2fcdfa6b93cb20a94d221566b00d`. Recovery run `029a02d5-28e3-44b2-aa19-db027c529c9c` inserted 826 Posts, stored recovery provenance on all of them, and recorded the historical 11 requests, 1,133 Post Reads, and $5.665 reported cost. PostgreSQL now contains 1,040 distinct incoming Posts. All four `sync_state` rows and their verification fingerprint remained identical before and after apply, and the recovery made zero external API requests.
 
 This corrective amendment does not reopen Stage 3, change the production collector, accept a third-party provider, or authorize any new external call. It is complete, and Task 005D remains the next MVP task.
+
+## 2026-08-17 - Provider-specific discovery and approval-bound preflight
+
+Status: Accepted
+
+Task 004D.2 corrects the methodology of the non-production provider runner without making an external API call. The former algorithm sent one author plus the full window to either provider, consumed only one response page, and merely counted `has_more` as a pagination gap. It therefore could not distinguish poor provider recall from incomplete discovery and incorrectly imposed one traversal model on providers with different semantics.
+
+TwitterAPI.io discovery now treats `has_next_page`, a full page, or another explicit incompleteness signal as an overflowing time interval. It recursively divides the exact UTC window into non-overlapping halves and requires both halves to complete. A configured minimum slice, repeated-window protection, canonical Post-ID deduplication, a hard request cap, and explicit incomplete outcomes prevent unbounded recursion and unsupported completeness claims. Advanced Search cursor state is not the primary traversal mechanism.
+
+SocialData uses a separate traversal. It follows an advancing Search cursor when available, then may continue with a decreasing `max_id` under the same time query and optional `since_id`. A repeated cursor, repeated `max_id`, repeated page state, missing continuation, or exhausted request cap produces explicit incomplete status. It does not automatically inherit TwitterAPI.io time slicing.
+
+Every future provider discovery execution is bound to a zero-cost plan generated from the stored Official X benchmark. The plan discloses benchmark size, authors, window, strategy, expected requests and billable resources, expected cost, conservative maximum, unchanged hard cap, and the maximum number of full pages that cap can fund. The live runner requires the exact separately approved combined plan SHA-256 and refuses execution before loading provider credentials when approval is absent, mismatched, or the initial author coverage does not fit. It reserves one 20-result page before every request, performs no automatic retry or balance request, and never raises the cap automatically. Fresh Official X retrieval is disabled in discovery.
+
+A future direct-ID mode may select up to 50 known benchmark IDs from PostgreSQL or ignored raw artifacts with deterministic coverage of long Posts, replies, quotes, referenced context, and media. Task 004D.2 implements local selection, cost planning, and offline fixture comparison only. Provider lookup endpoints and pricing must be revalidated in a separate task before implementation or any paid call.
+
+This decision changes no production collector, database schema, `sync_state`, provider selection, scheduler, fallback, or production data. Official X remains production and no new provider test is authorized.

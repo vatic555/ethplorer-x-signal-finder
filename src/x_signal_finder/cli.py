@@ -66,6 +66,8 @@ from x_signal_finder.x_api.oauth import (
 from x_signal_finder.x_api.probe import run_probe
 from x_signal_finder.x_provider_shadow import (
     ShadowSpikeError,
+    plan_stored_direct_id,
+    plan_stored_discovery,
     run_shadow_spike,
 )
 from x_signal_finder.x_shadow_recovery import (
@@ -262,28 +264,19 @@ def build_parser() -> argparse.ArgumentParser:
         default=Decimal("0.10"),
         help="Hard ceiling per third-party provider; cannot exceed $0.10.",
     )
-    shadow_run.add_argument("--max-official-pages", type=int, default=20)
     shadow_run.add_argument(
-        "--approved-max-official-spend-usd",
-        type=Decimal,
+        "--approved-provider-plan-sha256",
+        required=True,
         help=(
-            "Explicitly approved fresh Official X ceiling; required only for the "
-            "API benchmark source."
+            "Exact combined digest from a separately approved zero-cost "
+            "plan-discovery run."
         ),
     )
     shadow_run.add_argument(
-        "--official-worst-case-cost-per-primary-usd",
-        type=Decimal,
-        help=(
-            "Preflight upper bound including all Post, User, and Media resources "
-            "attributable to one requested primary Post."
-        ),
-    )
-    shadow_run.add_argument(
-        "--max-official-results-per-page",
+        "--minimum-twitter-slice-seconds",
         type=int,
-        default=100,
-        help="Maximum Official X page size; dynamically reduced near the ceiling.",
+        default=60,
+        help="Stop TwitterAPI.io splitting below this interval.",
     )
     shadow_run.add_argument(
         "--output-root",
@@ -291,24 +284,49 @@ def build_parser() -> argparse.ArgumentParser:
         help="Ignored local directory for raw temporary responses and safe summary.",
     )
     shadow_run.add_argument(
-        "--window-end",
-        help="Optional fixed ISO-8601 UTC end time for a reproducible window.",
-    )
-    shadow_run.add_argument(
-        "--official-benchmark-source",
-        choices=("api", "stored"),
-        default="api",
-        help=(
-            "Use a fresh Official X API window or the latest already-collected "
-            "x_home_timeline window in PostgreSQL (read-only)."
-        ),
-    )
-    shadow_run.add_argument(
         "--provider",
         action="append",
         choices=("twitterapi_io", "socialdata"),
         dest="shadow_providers",
         help="Limit a run to one provider; repeat to select both.",
+    )
+    shadow_plan_discovery = shadow_subparsers.add_parser(
+        "plan-discovery",
+        help="Build a zero-cost provider discovery plan from stored Official X Posts.",
+    )
+    shadow_plan_discovery.add_argument("--hours", type=int, default=24)
+    shadow_plan_discovery.add_argument(
+        "--max-provider-spend-usd",
+        type=Decimal,
+        default=Decimal("0.10"),
+    )
+    shadow_plan_discovery.add_argument(
+        "--minimum-twitter-slice-seconds",
+        type=int,
+        default=60,
+    )
+    shadow_plan_discovery.add_argument(
+        "--provider",
+        action="append",
+        choices=("twitterapi_io", "socialdata"),
+        dest="shadow_providers",
+    )
+    shadow_plan_direct_id = shadow_subparsers.add_parser(
+        "plan-direct-id",
+        help="Select local benchmark IDs and build a zero-cost future lookup plan.",
+    )
+    shadow_plan_direct_id.add_argument("--hours", type=int, default=168)
+    shadow_plan_direct_id.add_argument("--limit", type=int, default=50)
+    shadow_plan_direct_id.add_argument(
+        "--max-provider-spend-usd",
+        type=Decimal,
+        default=Decimal("0.02"),
+    )
+    shadow_plan_direct_id.add_argument(
+        "--provider",
+        action="append",
+        choices=("twitterapi_io", "socialdata"),
+        dest="shadow_providers",
     )
     shadow_recovery = shadow_subparsers.add_parser(
         "recover-official",
@@ -1495,6 +1513,32 @@ def _run_official_shadow_recovery(args: argparse.Namespace) -> int:
         return 0
 
 
+def _run_shadow_preflight(args: argparse.Namespace) -> int:
+    providers = (
+        tuple(args.shadow_providers)
+        if args.shadow_providers
+        else ("twitterapi_io", "socialdata")
+    )
+    if args.shadow_command == "plan-discovery":
+        report = plan_stored_discovery(
+            hours=args.hours,
+            provider_names=providers,
+            hard_cap_usd=args.max_provider_spend_usd,
+            minimum_twitter_slice_seconds=args.minimum_twitter_slice_seconds,
+        )
+    elif args.shadow_command == "plan-direct-id":
+        report = plan_stored_direct_id(
+            hours=args.hours,
+            limit=args.limit,
+            provider_names=providers,
+            hard_cap_usd=args.max_provider_spend_usd,
+        )
+    else:
+        raise ValueError("Unsupported shadow preflight command.")
+    print(json.dumps(report, indent=2, sort_keys=True))
+    return 0
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     """Run the command-line interface and return a process exit code."""
     parser = build_parser()
@@ -1617,6 +1661,20 @@ def main(argv: Sequence[str] | None = None) -> int:
         if args.shadow_command is None:
             parser.parse_args(["x-provider-shadow", "--help"])
             return 0
+        if args.shadow_command in {"plan-discovery", "plan-direct-id"}:
+            try:
+                return _run_shadow_preflight(args)
+            except (ConfigurationError, ShadowSpikeError, ValueError) as error:
+                safe_error = redact_secrets(str(error))
+                print(f"X provider preflight failed: {safe_error}", file=sys.stderr)
+                return 2
+            except psycopg.OperationalError:
+                print(
+                    "X provider preflight failed: PostgreSQL connection unavailable. "
+                    "Check DATABASE_URL, network access, and SSL settings.",
+                    file=sys.stderr,
+                )
+                return 1
         if args.shadow_command == "recover-official":
             try:
                 return _run_official_shadow_recovery(args)
@@ -1647,17 +1705,14 @@ def main(argv: Sequence[str] | None = None) -> int:
             summary = run_shadow_spike(
                 hours=args.hours,
                 max_provider_spend_usd=args.max_provider_spend_usd,
-                max_official_pages=args.max_official_pages,
                 output_root=args.output_root,
-                window_end=args.window_end,
-                official_benchmark_source=args.official_benchmark_source,
-                approved_max_official_spend_usd=(
-                    args.approved_max_official_spend_usd
+                official_benchmark_source="stored",
+                approved_provider_plan_sha256=(
+                    args.approved_provider_plan_sha256
                 ),
-                official_worst_case_cost_per_primary_usd=(
-                    args.official_worst_case_cost_per_primary_usd
+                minimum_twitter_slice_seconds=(
+                    args.minimum_twitter_slice_seconds
                 ),
-                max_official_results_per_page=args.max_official_results_per_page,
                 provider_names=(
                     tuple(args.shadow_providers)
                     if args.shadow_providers
