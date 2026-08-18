@@ -263,8 +263,9 @@ def build_parser() -> argparse.ArgumentParser:
         type=Decimal,
         default=Decimal("0.10"),
         help=(
-            "Approved budget per provider; a technical dollar ceiling exists only "
-            "when the endpoint has a documented maximum response size."
+            "Approved budget per provider, at most $0.25; a technical dollar "
+            "ceiling exists only when the endpoint has a documented maximum "
+            "response size."
         ),
     )
     shadow_run.add_argument(

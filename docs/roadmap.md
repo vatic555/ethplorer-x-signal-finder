@@ -11,7 +11,7 @@ Status: Canonical implementation sequence and progress record
 - Stage 4 - Minimum Knowledge Base - In Progress
 - Current task - Task 005D.1 - Vocabulary Precision Review - Completed
 - Next task - Task 005E - Dynamic Analytics Adapter - Planned
-- Last completed corrective task - Task 005D.1 - Vocabulary Precision Review
+- Last completed corrective task - Task 004D.2.2 - Final Paid-Test Hardening
 - Last completed MVP product task - Task 005D - Reviewed Knowledge + Unified Prefilter Vocabulary
 - Local PostgreSQL implementation is ready
 - Real Supabase migration and database validation are complete
@@ -20,7 +20,7 @@ Status: Canonical implementation sequence and progress record
 - Task 004A implementation, synthetic validation, and bounded live X-to-Supabase validation are complete
 - Task 004B implementation, migration 002, synthetic validation, and bounded live validation are complete
 - Task 004C and Task 004C.1 implementation, synthetic validation, explicit baseline acceptance, and bounded incremental live validation are complete
-- Task 004D provider shadow quality and cost spike, offline recovery, and zero-cost discovery-runner correction are Completed; neither third-party trial met acceptance, and Official X remains production
+- Task 004D provider shadow quality and cost spike, offline recovery, and zero-cost paid-test hardening are Completed; neither third-party trial met acceptance, and Official X remains production
 - Task 005A knowledge inventory, Git-backed source contract, catalog evidence linkage, and offline validation are complete
 - Task 005C first-party Ethplorer/Binplorer X corpus, migration 003, historical import, and incremental lifecycle validation are complete
 - Task 005C.1 corrected first-party resource accounting and downstream read contracts without another X request or schema change
@@ -223,6 +223,7 @@ Current state:
 - Task 004D - X Provider Shadow Quality Spike - Completed, non-production exception
 - Task 004D.2 - Fix Provider Discovery Runner - Completed, zero-cost correction
 - Task 004D.2.1 - Provider Runner Audit Fixes - Completed, zero-cost audit correction
+- Task 004D.2.2 - Final Paid-Test Hardening - Completed, zero-cost final correction
 
 ### Task 004A Validation Record
 
@@ -389,7 +390,20 @@ Status: Completed as a zero-cost non-production correction
 - Scope boundary: zero external API calls, database writes, migrations, or `sync_state` changes; production collector and provider choice remain unchanged
 - Validation: 31 targeted provider/recovery tests passed; the full suite passed with 197 tests and 5 external tests skipped; compileall and diff checks passed without a provider request or database-writing path
 - Offline plans: discovery combined SHA-256 `c4e39d9ef46889b66c2e3d6de8bf383d035831fc9fa874bb395c72b5f81e9ede` remains non-executable; the exact 50-ID combined SHA-256 is `a31b0214801f8d17be2cefb7e79aaefcfd1d3f09ff873110c9abc0f5b3d38a32`
-- Final implementation commit: `0ed283cc6962948fe9db027fa3220cfe43866eef`
+- Actual pushed implementation commit: `2653679b704166e111b6ccc3d71be1856ec0cca6`
+
+#### Task 004D.2.2 - Final Paid-Test Hardening
+
+Status: Completed as a zero-cost non-production correction
+
+- SocialData continuation: inclusive `max_id` uses the exact lowest returned Post ID; the repeated boundary row is removed by canonical `post_id` dedupe
+- Paid-response durability: each successful third-party HTTP response is atomically written to ignored runtime storage before JSON interpretation or normalization; malformed or unsupported HTTP 200 responses return explicit incomplete diagnostics with the paid artifact retained
+- Empty accounting: TwitterAPI.io and SocialData count an empty successful response as at least one conservative billable unit
+- Content comparison: URL-only appended-service differences are complete but non-exact in either direction; they are never truncation, and quote completeness additionally requires matching `referenced_post_id`
+- Cost ceiling: the runner accepts at most $0.25 per provider, while default plans remain lower; $0.25 is a validation ceiling only, and every live run still requires the exact preflight digest and explicit approval of its concrete amount
+- Guardrail alignment: `AGENTS.md` and the canonical specification distinguish documented response maxima and technical dollar caps from unknown maxima, approved request caps, conservative estimates, and after-response accounting
+- Boundary: direct-ID live lookup remains unimplemented; no Official X, TwitterAPI.io, SocialData, database, migration, or `sync_state` operation ran in this task; production collection remains Official X
+- Validation: 43 targeted provider/recovery tests passed; the full suite passed with 210 tests and 5 external tests skipped; compileall and diff checks passed with all HTTP behavior mocked locally
 
 ## Stage 4 - Minimum Knowledge Base
 

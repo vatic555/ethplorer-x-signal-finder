@@ -1,6 +1,6 @@
 # Task 004D - X Provider Shadow Quality Spike
 
-Status: Task 004D completed with incomplete provider runs; Task 004D.2.1 zero-cost audit fixes completed
+Status: Task 004D completed with incomplete provider runs; Task 004D.2.2 zero-cost final hardening completed
 
 ## Purpose
 
@@ -23,7 +23,7 @@ The spike uses the documented estimates current on 2026-08-14:
 - TwitterAPI.io Advanced Search - $0.00015 per returned Post, with a documented $0.00015 minimum charge per request.
 - SocialData Search - $0.0002 per returned Post; empty requests above the documented fair-use allowance may also cost $0.0002.
 
-The approved Task 004D planning budget is at most $0.10 for each third-party provider. The CLI rejects a higher value. TwitterAPI.io Advanced Search has a documented 20-Post maximum, so its runner can reserve a technical per-request maximum. SocialData Search is planned with an expected 20-Post page, but no documented maximum is assumed: its dollar figure is a conservative estimate, not a technical hard dollar cap. SocialData is bounded by the separately approved request count, checks actual returned billable resources after every response, and makes no further call after the approved budget is reached. HTTP 402 remains `incomplete_due_to_credit` and does not automatically fail provider quality.
+The runner accepts a preflight ceiling of at most $0.25 for each third-party provider. This is only the largest representable owner-approved amount, not an automatic approval; discovery still defaults to $0.10 and the planning-only direct-ID command defaults to $0.02. TwitterAPI.io Advanced Search has a documented 20-Post maximum, so its runner can reserve a technical per-request maximum. SocialData Search is planned with an expected 20-Post page, but no documented maximum is assumed: its dollar figure is a conservative estimate, not a technical hard dollar cap. SocialData is bounded by the separately approved request count, checks actual returned billable resources after every response, and makes no further call after the approved budget is reached. HTTP 402 remains `incomplete_due_to_credit` and does not automatically fail provider quality.
 
 ## Mandatory Cost Preflight for Any Future Run
 
@@ -56,7 +56,7 @@ python -m x_signal_finder x-provider-shadow plan-direct-id \
   --hours 168 --limit 50 --max-provider-spend-usd 0.02
 ```
 
-The live discovery command is blocked unless its exact combined plan SHA-256 has been separately approved. This is an operating reference only and was not executed by Task 004D.2.1:
+The live discovery command is blocked unless its exact combined plan SHA-256 and concrete amount have been separately approved. This is an operating reference only and was not executed by Task 004D.2.2:
 
 ```sh
 python -m x_signal_finder x-provider-shadow run \
@@ -65,7 +65,7 @@ python -m x_signal_finder x-provider-shadow run \
   --approved-provider-plan-sha256 APPROVED_PLAN_SHA256
 ```
 
-Raw responses and the local safe summary are written under `data/runtime/x-provider-shadow/<run-id>/`. The run identity combines the benchmark window, benchmark digest, short plan digest, and a unique execution identity, so repeating the same benchmark cannot collide with an existing directory. That tree is ignored by Git. CLI output and committed documentation contain aggregate metrics and never contain Post text, raw provider payloads, or credentials.
+Raw responses and the local safe summary are written under `data/runtime/x-provider-shadow/<run-id>/`. Every successful third-party HTTP response is atomically written there before JSON interpretation or normalization. Malformed JSON or an unsupported provider payload after HTTP 200 therefore produces `incomplete_due_to_malformed_response` while retaining the paid raw artifact and a safe diagnostic. The run identity combines the benchmark window, benchmark digest, short plan digest, and a unique execution identity, so repeating the same benchmark cannot collide with an existing directory. That tree is ignored by Git. CLI output and committed documentation contain aggregate metrics and never contain Post text, raw provider payloads, or credentials.
 
 Task 004D.2 discovery accepts only the stored Official X benchmark. Fresh Official X retrieval is disabled in this runner. The earlier standalone Official X safeguard still makes successful pages and `partial-summary.json` durable, but buying a new benchmark is outside this correction and requires a separate task and preflight.
 
@@ -93,11 +93,11 @@ The Official X benchmark defines the exact UTC window and the authors who actual
 Each initial search task contains one active benchmark author. Lower-volume benchmark authors run first. The two providers then use separate traversal methods:
 
 - TwitterAPI.io does not treat one Advanced Search page as complete. `has_next_page`, an explicit incompleteness signal, or a full 20-result page causes the exact UTC interval to be divided into two non-overlapping halves. Both halves must complete. Splitting stops at the configured minimum time slice; overflow there yields `incomplete_due_to_minimum_time_slice`. Repeated windows are blocked, and all parent and child results are deduplicated by canonical `post_id`. Advanced Search cursor state is not the canonical mechanism.
-- SocialData does not inherit the TwitterAPI.io algorithm. `since_id` and `max_id` are Search query operators alongside `from`, `since_time`, and `until_time`; only `cursor` is a separate HTTP parameter. The runner follows `next_cursor` while it advances, then may continue with decreasing `max_id`. Repeated cursor, repeated `max_id`, repeated page state, missing continuation, or exhaustion of the approved request cap yields an explicit incomplete status.
+- SocialData does not inherit the TwitterAPI.io algorithm. `since_id` and `max_id` are Search query operators alongside `from`, `since_time`, and `until_time`; only `cursor` is a separate HTTP parameter. The runner follows `next_cursor` while it advances, then uses the exact lowest returned Post ID for inclusive `max_id` continuation. The expected repeated boundary Post is removed by canonical `post_id` deduplication. Repeated cursor, repeated `max_id`, repeated page state, missing continuation, or exhaustion of the approved request cap yields an explicit incomplete status.
 
-TwitterAPI.io reserves its documented 20-Post maximum before each request and observes `minimum_interval_seconds` through local sleep only. A 429 is immediately incomplete and is never retried. SocialData reserves a conservative expected 20-Post response without claiming that it is a worst-case maximum, then accounts the actual returned resources before deciding whether another request is allowed. There are no automatic paid retries and no limit increases. Raw pages remain local and ignored; provider traversal state never becomes production `sync_state`.
+TwitterAPI.io reserves its documented 20-Post maximum before each request and observes `minimum_interval_seconds` through local sleep only. A 429 is immediately incomplete and is never retried. SocialData reserves a conservative expected 20-Post response without claiming that it is a worst-case maximum, then accounts the actual returned resources before deciding whether another request is allowed. An empty successful response counts as at least one conservative billable unit for both providers. There are no automatic paid retries and no limit increases. Raw pages remain local and ignored; provider traversal state never becomes production `sync_state`.
 
-## Task 004D.2.1 Zero-Cost Preflight Examples
+## Task 004D.2.2 Zero-Cost Preflight Examples
 
 The current stored 24-hour benchmark contains 826 Posts from 132 authors. With the unchanged $0.10 cap per provider, discovery is blocked before credentials or an external request:
 
@@ -116,6 +116,8 @@ The planning-only 50-ID benchmark uses existing PostgreSQL data and deliberately
 | SocialData | 3 | 50 | $0.0100 | $0.0120 | $0.02 | No - direct-ID endpoint unverified |
 
 The new direct-ID combined plan SHA-256 is `a31b0214801f8d17be2cefb7e79aaefcfd1d3f09ff873110c9abc0f5b3d38a32`. The provider plan SHA-256 values are `45c04333bcbc3a94679099eba1ee032e1e73972a2b47468848ddaa4c079bb7da` for TwitterAPI.io and `a9e0eaa2c65ff881ecb3f17de4e0cbdcfb6e8df13b99be6d00571d14565f94bc` for SocialData. Its approval scope contains the exact 50 selected Post IDs and selection SHA-256 `136684ff9d12f5ba38489f7af28eff396ed4807782e90d9aee38e4e3285fe625`. Each provider request cap is exactly the three planned batches. Direct-ID provider endpoints and pricing still require verification, so API execution is intentionally not implemented.
+
+Task 004D.2.2 validation used mocked HTTP responses and local fixtures only: 43 targeted provider/recovery tests passed, the full suite passed with 210 tests and 5 external tests skipped, and no provider or database operation ran. The ceiling tests accept exactly $0.25 for both providers and reject a higher amount before benchmark access, credentials, or a provider call.
 
 ## Comparison
 
@@ -138,7 +140,7 @@ For each third-party provider, the safe report records:
 
 Extra Posts are reported but do not count against recall because author search may return public Posts that did not appear in the personalized Official X home timeline.
 
-The explicit acceptance thresholds are at least 90% raw recall, with 95% as the target; 5-10% non-systematic raw loss is allowed. Content for every found Post must be complete, but exact provider representation may differ. Systematic reply, quote, or long-Post loss is a blocker only after the configured minimum group and missing counts are met; one missed long Post alone is not systematic. Relevant-Post recall remains a separate and more important later test after Task 006 produces real relevance decisions.
+The explicit acceptance thresholds are at least 90% raw recall, with 95% as the target; 5-10% non-systematic raw loss is allowed. Content for every found Post must be complete, but exact provider representation may differ. An appended or omitted URL-only service suffix is complete but non-exact in either direction and is not truncation. For quote Posts this exception applies only when the canonical `referenced_post_id` also matches. Systematic reply, quote, or long-Post loss is a blocker only after the configured minimum group and missing counts are met; one missed long Post alone is not systematic. Relevant-Post recall remains a separate and more important later test after Task 006 produces real relevance decisions.
 
 ## Live Result
 

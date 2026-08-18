@@ -40,7 +40,8 @@ SOCIALDATA_UNIT_COST_USD = Decimal("0.0002")
 OFFICIAL_X_POST_READ_COST_USD = Decimal("0.005")
 OFFICIAL_X_USER_READ_COST_USD = Decimal("0.010")
 OFFICIAL_X_MEDIA_READ_COST_USD = Decimal("0.005")
-TRIAL_SPEND_LIMIT_USD = Decimal("0.10")
+PROVIDER_MAX_APPROVED_SPEND_USD = Decimal("0.25")
+DEFAULT_PROVIDER_DISCOVERY_APPROVED_SPEND_USD = Decimal("0.10")
 TWITTERAPI_IO_CREDITS_PER_USD = Decimal("100000")
 TWITTERAPI_IO_DOCUMENTED_MAX_PAGE_RESULTS = 20
 SOCIALDATA_EXPECTED_PAGE_RESULTS = 20
@@ -62,10 +63,20 @@ class ShadowSpikeError(RuntimeError):
 
 
 class ProviderRequestError(ShadowSpikeError):
-    def __init__(self, provider: ProviderName, status: int | None, category: str):
+    def __init__(
+        self,
+        provider: ProviderName,
+        status: int | None,
+        category: str,
+        *,
+        response_artifact_saved: bool = False,
+        billable_resources_returned: int = 0,
+    ):
         self.provider = provider
         self.status = status
         self.category = category
+        self.response_artifact_saved = response_artifact_saved
+        self.billable_resources_returned = billable_resources_returned
         rendered_status = str(status) if status is not None else "unavailable"
         super().__init__(
             f"{provider} request failed ({category}, HTTP {rendered_status})."
@@ -564,6 +575,7 @@ def _request_json(
     headers: Mapping[str, str],
     params: Mapping[str, object] | None = None,
     timeout: float = 30.0,
+    raw_artifact_path: Path | None = None,
 ) -> tuple[int, dict[str, Any]]:
     query = urlencode(
         [(key, str(value)) for key, value in (params or {}).items() if value is not None]
@@ -579,12 +591,28 @@ def _request_json(
         body = error.read()
     except (URLError, TimeoutError, OSError) as error:
         raise ProviderRequestError(provider, None, "connection_error") from error
+    artifact_saved = False
+    if 200 <= status < 300 and raw_artifact_path is not None:
+        _write_bytes(raw_artifact_path, body)
+        artifact_saved = True
     try:
         payload = json.loads(body.decode("utf-8")) if body else {}
     except (UnicodeDecodeError, json.JSONDecodeError) as error:
-        raise ProviderRequestError(provider, status, "unexpected_response_shape") from error
+        raise ProviderRequestError(
+            provider,
+            status,
+            "unexpected_response_shape",
+            response_artifact_saved=artifact_saved,
+            billable_resources_returned=1 if 200 <= status < 300 else 0,
+        ) from error
     if not isinstance(payload, dict):
-        raise ProviderRequestError(provider, status, "unexpected_response_shape")
+        raise ProviderRequestError(
+            provider,
+            status,
+            "unexpected_response_shape",
+            response_artifact_saved=artifact_saved,
+            billable_resources_returned=1 if 200 <= status < 300 else 0,
+        )
     if not 200 <= status < 300:
         if status == 401:
             category = "invalid_credentials"
@@ -629,20 +657,58 @@ class TwitterApiIoProvider:
         self._headers = {"X-API-Key": api_key, "Accept": "application/json"}
 
     def search(self, task: SearchTask) -> ProviderPage:
+        return self._search(task, raw_artifact_path=None)
+
+    def search_with_artifact(
+        self,
+        task: SearchTask,
+        raw_artifact_path: Path,
+    ) -> ProviderPage:
+        return self._search(task, raw_artifact_path=raw_artifact_path)
+
+    def _search(
+        self,
+        task: SearchTask,
+        *,
+        raw_artifact_path: Path | None,
+    ) -> ProviderPage:
         _, payload = _request_json(
             provider=self.name,
             url="https://api.twitterapi.io/twitter/tweet/advanced_search",
             headers=self._headers,
             params={"query": _query_for(task), "queryType": "Latest"},
+            raw_artifact_path=raw_artifact_path,
         )
         raw_posts = payload.get("tweets", [])
         if not isinstance(raw_posts, list):
-            raise ProviderRequestError(self.name, 200, "unexpected_response_shape")
-        posts = tuple(
-            normalize_twitterapi_io_post(item)
-            for item in raw_posts
-            if isinstance(item, Mapping)
-        )
+            raise ProviderRequestError(
+                self.name,
+                200,
+                "unexpected_response_shape",
+                response_artifact_saved=raw_artifact_path is not None,
+                billable_resources_returned=1,
+            )
+        if any(not isinstance(item, Mapping) for item in raw_posts):
+            raise ProviderRequestError(
+                self.name,
+                200,
+                "unexpected_response_shape",
+                response_artifact_saved=raw_artifact_path is not None,
+                billable_resources_returned=max(1, len(raw_posts)),
+            )
+        try:
+            posts = tuple(
+                normalize_twitterapi_io_post(item)
+                for item in raw_posts
+            )
+        except ShadowSpikeError as error:
+            raise ProviderRequestError(
+                self.name,
+                200,
+                "normalization_error",
+                response_artifact_saved=raw_artifact_path is not None,
+                billable_resources_returned=max(1, len(raw_posts)),
+            ) from error
         return ProviderPage(
             posts=posts,
             raw_payload=payload,
@@ -686,6 +752,21 @@ class SocialDataProvider:
         }
 
     def search(self, task: SearchTask) -> ProviderPage:
+        return self._search(task, raw_artifact_path=None)
+
+    def search_with_artifact(
+        self,
+        task: SearchTask,
+        raw_artifact_path: Path,
+    ) -> ProviderPage:
+        return self._search(task, raw_artifact_path=raw_artifact_path)
+
+    def _search(
+        self,
+        task: SearchTask,
+        *,
+        raw_artifact_path: Path | None,
+    ) -> ProviderPage:
         params: dict[str, object] = {
             "query": _query_for(task, include_id_bounds=True),
             "type": "Latest",
@@ -696,24 +777,45 @@ class SocialDataProvider:
             url="https://api.socialdata.tools/twitter/search",
             headers=self._headers,
             params=params,
+            raw_artifact_path=raw_artifact_path,
         )
         raw_posts = payload.get("tweets", [])
         if not isinstance(raw_posts, list):
-            raise ProviderRequestError(self.name, 200, "unexpected_response_shape")
-        posts = tuple(
-            normalize_socialdata_post(item)
-            for item in raw_posts
-            if isinstance(item, Mapping)
-        )
+            raise ProviderRequestError(
+                self.name,
+                200,
+                "unexpected_response_shape",
+                response_artifact_saved=raw_artifact_path is not None,
+                billable_resources_returned=1,
+            )
+        if any(not isinstance(item, Mapping) for item in raw_posts):
+            raise ProviderRequestError(
+                self.name,
+                200,
+                "unexpected_response_shape",
+                response_artifact_saved=raw_artifact_path is not None,
+                billable_resources_returned=max(1, len(raw_posts)),
+            )
+        try:
+            posts = tuple(
+                normalize_socialdata_post(item)
+                for item in raw_posts
+            )
+        except ShadowSpikeError as error:
+            raise ProviderRequestError(
+                self.name,
+                200,
+                "normalization_error",
+                response_artifact_saved=raw_artifact_path is not None,
+                billable_resources_returned=max(1, len(raw_posts)),
+            ) from error
         next_cursor = _optional_string(
             payload.get("next_cursor") or payload.get("next_cursor_str")
         )
         numeric_ids = [
             int(post.post_id) for post in posts if post.post_id.isdigit()
         ]
-        continuation_max_id = (
-            str(max(0, min(numeric_ids) - 1)) if numeric_ids else None
-        )
+        continuation_max_id = str(min(numeric_ids)) if numeric_ids else None
         explicit_has_more = payload.get("has_more") is True
         possible_incomplete = (
             bool(next_cursor)
@@ -797,8 +899,8 @@ def _approved_request_cap(
 ) -> int:
     if approved_budget_usd <= 0:
         raise ValueError("Provider approved budget must be positive.")
-    if approved_budget_usd > TRIAL_SPEND_LIMIT_USD:
-        raise ValueError("Provider approved budget cannot exceed $0.10.")
+    if approved_budget_usd > PROVIDER_MAX_APPROVED_SPEND_USD:
+        raise ValueError("Provider approved budget cannot exceed $0.25.")
     if reserve_page_results < 1:
         raise ValueError("Provider page reserve must be positive.")
     reserve_cost = unit_cost_usd * reserve_page_results
@@ -1064,6 +1166,28 @@ def _write_json(path: Path, value: object) -> None:
             os.unlink(temporary_name)
 
 
+def _write_bytes(path: Path, value: bytes) -> None:
+    """Atomically persist a raw paid response before any content interpretation."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary_name: str | None = None
+    try:
+        with NamedTemporaryFile(
+            mode="wb",
+            dir=path.parent,
+            prefix=f".{path.name}.",
+            suffix=".tmp",
+            delete=False,
+        ) as temporary:
+            temporary.write(value)
+            temporary.flush()
+            os.fsync(temporary.fileno())
+            temporary_name = temporary.name
+        os.replace(temporary_name, path)
+    finally:
+        if temporary_name is not None and os.path.exists(temporary_name):
+            os.unlink(temporary_name)
+
+
 def plan_official_page_size(
     *,
     remaining_budget_usd: Decimal,
@@ -1203,6 +1327,14 @@ def _provider_error_status(error: ProviderRequestError) -> tuple[str, str]:
             "incomplete_due_to_rate_limit",
             "provider_rate_limit_reached",
         ),
+        "unexpected_response_shape": (
+            "incomplete_due_to_malformed_response",
+            "provider_response_shape_invalid",
+        ),
+        "normalization_error": (
+            "incomplete_due_to_malformed_response",
+            "provider_response_normalization_failed",
+        ),
     }.get(
         error.category,
         ("incomplete_due_to_request_failure", "provider_request_failed"),
@@ -1225,10 +1357,23 @@ def _dedupe_posts(
 def _returned_billable_resources(page: ProviderPage) -> int:
     resources = page.billable_resources_returned
     if resources is None:
-        return len(page.posts)
+        resources = len(page.posts)
     if resources < 0:
         raise ShadowSpikeError("Provider returned a negative billable-resource count.")
-    return resources
+    return max(1, resources)
+
+
+def _search_and_persist_response(
+    provider: SearchProvider,
+    task: SearchTask,
+    artifact_path: Path,
+) -> ProviderPage:
+    durable_search = getattr(provider, "search_with_artifact", None)
+    if callable(durable_search):
+        return durable_search(task, artifact_path)
+    page = provider.search(task)
+    _write_json(artifact_path, page.raw_payload)
+    return page
 
 
 def _pace_request(
@@ -1320,17 +1465,17 @@ def _run_twitterapi_io_discovery(
             sleep=sleep,
         )
         requests += 1
+        response_path = artifact_dir / provider.name / f"response-{requests:04d}.json"
         try:
-            page = provider.search(task)
+            page = _search_and_persist_response(provider, task, response_path)
         except ProviderRequestError as error:
+            raw_resources += max(0, error.billable_resources_returned)
             status, warning = _provider_error_status(error)
             warnings.add(warning)
+            if error.response_artifact_saved:
+                warnings.add("paid_response_artifact_preserved_before_normalization")
             unresolved_windows += len(queue) + 1
             break
-        _write_json(
-            artifact_dir / provider.name / f"response-{requests:04d}.json",
-            page.raw_payload,
-        )
         raw_resources += _returned_billable_resources(page)
         duplicate_rows += _dedupe_posts(posts_by_id, page.posts)
         if provider.unit_cost_usd * raw_resources >= plan.approved_budget_usd:
@@ -1436,17 +1581,17 @@ def _run_socialdata_discovery(
             continue
         seen_states.add(state)
         requests += 1
+        response_path = artifact_dir / provider.name / f"response-{requests:04d}.json"
         try:
-            page = provider.search(task)
+            page = _search_and_persist_response(provider, task, response_path)
         except ProviderRequestError as error:
+            raw_resources += max(0, error.billable_resources_returned)
             status, warning = _provider_error_status(error)
             warnings.add(warning)
+            if error.response_artifact_saved:
+                warnings.add("paid_response_artifact_preserved_before_normalization")
             unresolved_pages += len(queue) + 1
             break
-        _write_json(
-            artifact_dir / provider.name / f"response-{requests:04d}.json",
-            page.raw_payload,
-        )
         raw_resources += _returned_billable_resources(page)
         duplicate_rows += _dedupe_posts(posts_by_id, page.posts)
         if provider.unit_cost_usd * raw_resources >= plan.approved_budget_usd:
@@ -1863,18 +2008,38 @@ def _normalized_text(value: str) -> str:
     return " ".join(value.split())
 
 
-def _content_status(expected: str, actual: str) -> tuple[bool, bool, bool]:
+def _has_only_appended_urls(base: str, candidate: str) -> bool:
+    prefix = f"{base} "
+    if not base or not candidate.startswith(prefix):
+        return False
+    suffix = candidate[len(prefix) :].strip()
+    return bool(suffix and _ONLY_URLS_RE.fullmatch(suffix))
+
+
+def _content_status(
+    expected: str,
+    actual: str,
+    *,
+    post_type: PostType,
+    expected_referenced_post_id: str | None,
+    actual_referenced_post_id: str | None,
+) -> tuple[bool, bool, bool]:
     """Return exact match, complete content, and proven truncation flags."""
+    reference_complete = post_type != "quote" or (
+        bool(expected_referenced_post_id)
+        and expected_referenced_post_id == actual_referenced_post_id
+    )
     if expected == actual:
-        return True, True, False
+        return True, reference_complete, False
     expected_normalized = _normalized_text(expected)
     actual_normalized = _normalized_text(actual)
     if expected_normalized == actual_normalized:
-        return False, True, False
-    if actual_normalized.startswith(expected_normalized):
-        suffix = actual_normalized[len(expected_normalized) :].strip()
-        if suffix and _ONLY_URLS_RE.fullmatch(suffix):
-            return False, True, False
+        return False, reference_complete, False
+    url_only_difference = _has_only_appended_urls(
+        expected_normalized, actual_normalized
+    ) or _has_only_appended_urls(actual_normalized, expected_normalized)
+    if url_only_difference:
+        return False, reference_complete, False
     truncated = bool(
         actual_normalized
         and expected_normalized.startswith(actual_normalized)
@@ -1940,7 +2105,13 @@ def compare_provider(
         for post_id in matched_ids
     ]
     text_statuses = [
-        _content_status(expected.text, actual.text)
+        _content_status(
+            expected.text,
+            actual.text,
+            post_type=expected.post_type,
+            expected_referenced_post_id=expected.referenced_post_id,
+            actual_referenced_post_id=actual.referenced_post_id,
+        )
         for expected, actual in matched_pairs
     ]
     exact_text = sum(exact for exact, _, _ in text_statuses)
@@ -1959,6 +2130,13 @@ def compare_provider(
         _content_status(
             benchmark_by_id[post_id].text,
             provider_by_id[post_id].text,
+            post_type=benchmark_by_id[post_id].post_type,
+            expected_referenced_post_id=(
+                benchmark_by_id[post_id].referenced_post_id
+            ),
+            actual_referenced_post_id=(
+                provider_by_id[post_id].referenced_post_id
+            ),
         )
         for post_id in matched_long_ids
     ]
@@ -2372,7 +2550,7 @@ def plan_stored_direct_id(
 def run_shadow_spike(
     *,
     hours: int = 24,
-    max_provider_spend_usd: Decimal = TRIAL_SPEND_LIMIT_USD,
+    max_provider_spend_usd: Decimal = DEFAULT_PROVIDER_DISCOVERY_APPROVED_SPEND_USD,
     output_root: str | Path = "data/runtime/x-provider-shadow",
     official_benchmark_source: Literal["api", "stored"] = "stored",
     approved_provider_plan_sha256: str | None = None,
@@ -2386,9 +2564,9 @@ def run_shadow_spike(
         raise ValueError("hours must be between 1 and 168.")
     if (
         max_provider_spend_usd <= 0
-        or max_provider_spend_usd > TRIAL_SPEND_LIMIT_USD
+        or max_provider_spend_usd > PROVIDER_MAX_APPROVED_SPEND_USD
     ):
-        raise ValueError("max_provider_spend_usd must be positive and at most $0.10.")
+        raise ValueError("max_provider_spend_usd must be positive and at most $0.25.")
     selected_provider_names = tuple(dict.fromkeys(provider_names))
     if not selected_provider_names or any(
         provider not in {"twitterapi_io", "socialdata"}

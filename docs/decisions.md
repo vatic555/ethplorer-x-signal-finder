@@ -337,3 +337,17 @@ Task 005D.1 prioritizes high-probability routing value over maximum keyword cove
 A `context_only` term can never create a future PASS by itself, and multiple context-only terms remain insufficient together. Future PASS behavior requires at least one meaningful positive product, capability, user-problem, user-intent, analytics, infrastructure, BizDev, integration, or explicit product signal. `negative_context` is a confidence-lowering clue only when meaningful positive evidence is absent. It is not authoritative, never creates a hard reject, and cannot automatically override strong positive evidence.
 
 The current precision correction removes generic standalone `on-chain` and `exchange integration`, demotes noisy tags, chart, volume, and market-cap phrases, and retains one evidence-backed specific `address tags` trigger. It adds only a compact initial Solana and trader-oriented negative-context set. Runtime matching, PASS or rejection logic, Task 005E dynamic analytics, Task 006 relevance processing, database changes, and external calls remain unimplemented.
+
+## 2026-08-18 - Final paid-test runner contracts
+
+Status: Accepted
+
+Task 004D.2.2 finalizes the zero-cost safety contract before any separately approved 50-ID provider test. Every successful third-party HTTP response is written atomically to ignored runtime storage before JSON interpretation and provider normalization. A malformed or unsupported HTTP 200 therefore remains recoverable and produces an explicit incomplete diagnostic rather than losing already-paid evidence. Empty successful responses count as at least one conservative billable unit for both providers.
+
+SocialData inclusive `max_id` continuation uses the exact lowest returned canonical Post ID. The repeated boundary Post is expected and removed by canonical `post_id` deduplication. TwitterAPI.io retains its documented 20-result maximum and technical page reserve; SocialData retains an unknown response-size maximum, explicit request cap, conservative expected-page reserve, and after-response accounting.
+
+Content completeness is separate from exact representation. A provider-added or provider-omitted URL-only suffix is not truncation in either direction. For quote Posts, that representation exception is complete only when `referenced_post_id` also matches.
+
+The maximum amount the discovery runner will accept in a preflight is raised from $0.10 to $0.25 per provider. This is a code ceiling only, not automatic approval or a default spend. Every live run still requires its exact current plan digest and explicit owner approval of the concrete amount. Amounts above $0.25 are rejected before credentials or a provider request.
+
+This decision changes no direct-ID live implementation, production collector, provider choice, database schema, `sync_state`, scheduler, fallback, or monitor. Task 004D.2.2 itself makes no external API call and no database write.

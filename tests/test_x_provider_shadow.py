@@ -32,6 +32,7 @@ from x_signal_finder.x_provider_shadow import (
     plan_search_tasks,
     plan_official_page_size,
     run_search_provider,
+    run_shadow_spike,
     select_direct_id_benchmark,
 )
 from x_signal_finder.x_api.client import HttpResponse, XApiRequestError
@@ -191,6 +192,71 @@ def test_socialdata_provider_puts_id_bounds_in_search_query(monkeypatch) -> None
         f"from:alice since_time:{int(task.start.timestamp())} "
         f"until_time:{int(task.end.timestamp())} since_id:100 max_id:200"
     )
+
+
+def test_socialdata_provider_reuses_exact_lowest_id_as_query_max_id(
+    monkeypatch,
+) -> None:
+    captured = []
+    responses = iter(
+        (
+            {
+                "tweets": [
+                    {
+                        "id_str": "100",
+                        "full_text": "first",
+                        "tweet_created_at": "2026-08-14T12:00:00Z",
+                        "user": {"id_str": "10", "screen_name": "alice"},
+                    },
+                    {
+                        "id_str": "99",
+                        "full_text": "lowest",
+                        "tweet_created_at": "2026-08-14T11:59:00Z",
+                        "user": {"id_str": "10", "screen_name": "alice"},
+                    },
+                ],
+                "has_more": True,
+            },
+            {
+                "tweets": [
+                    {
+                        "id_str": "99",
+                        "full_text": "inclusive duplicate",
+                        "tweet_created_at": "2026-08-14T11:59:00Z",
+                        "user": {"id_str": "10", "screen_name": "alice"},
+                    }
+                ]
+            },
+        )
+    )
+
+    def request_json(**kwargs):
+        captured.append(kwargs)
+        return 200, next(responses)
+
+    monkeypatch.setattr(
+        "x_signal_finder.x_provider_shadow._request_json", request_json
+    )
+    provider = SocialDataProvider("key")
+    first_task = SearchTask(
+        authors=("alice",),
+        start=NOW - timedelta(hours=1),
+        end=NOW,
+    )
+
+    first_page = provider.search(first_task)
+    second_page = provider.search(
+        SearchTask(
+            authors=first_task.authors,
+            start=first_task.start,
+            end=first_task.end,
+            max_id=first_page.continuation_max_id,
+        )
+    )
+
+    assert first_page.continuation_max_id == "99"
+    assert "max_id:99" in captured[1]["params"]["query"]
+    assert second_page.posts[0].post_id == "99"
 
 
 class _FakeProvider:
@@ -512,6 +578,108 @@ def test_twitterapi_429_is_incomplete_without_retry(tmp_path) -> None:
     assert "provider_rate_limit_reached" in result.warnings
 
 
+def test_paid_http_200_is_durable_before_json_decode(monkeypatch, tmp_path) -> None:
+    class Response:
+        status = 200
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return None
+
+        def read(self):
+            return b"not-json-but-already-paid"
+
+    monkeypatch.setattr(
+        "x_signal_finder.x_provider_shadow.urlopen",
+        lambda request, timeout: Response(),
+    )
+    provider = TwitterApiIoProvider("offline-key")
+    benchmark = (_post("1"),)
+    start = NOW - timedelta(hours=1)
+    plan = build_discovery_cost_plan(
+        provider="twitterapi_io",
+        benchmark=benchmark,
+        start=start,
+        end=NOW,
+        hard_cap_usd=Decimal("0.10"),
+    )
+
+    result = run_search_provider(
+        provider,
+        benchmark=benchmark,
+        start=start,
+        end=NOW,
+        spend_limit_usd=Decimal("0.10"),
+        artifact_dir=tmp_path,
+        approved_plan_sha256=plan.plan_sha256,
+        monotonic_clock=lambda: 0.0,
+        sleep=lambda seconds: None,
+    )
+
+    artifact = tmp_path / "twitterapi_io" / "response-0001.json"
+    assert artifact.read_bytes() == b"not-json-but-already-paid"
+    assert result.status == "incomplete_due_to_malformed_response"
+    assert result.requests == 1
+    assert result.estimated_spend_usd == Decimal("0.00015")
+    assert "provider_response_shape_invalid" in result.warnings
+    assert "paid_response_artifact_preserved_before_normalization" in result.warnings
+
+
+def test_paid_http_200_is_durable_before_socialdata_normalization(
+    monkeypatch,
+    tmp_path,
+) -> None:
+    payload = {"tweets": [{"id_str": "100", "full_text": "missing user"}]}
+    raw_body = json.dumps(payload, separators=(",", ":")).encode("utf-8")
+
+    class Response:
+        status = 200
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return None
+
+        def read(self):
+            return raw_body
+
+    monkeypatch.setattr(
+        "x_signal_finder.x_provider_shadow.urlopen",
+        lambda request, timeout: Response(),
+    )
+    provider = SocialDataProvider("offline-key")
+    benchmark = (_post("1"),)
+    start = NOW - timedelta(hours=1)
+    plan = build_discovery_cost_plan(
+        provider="socialdata",
+        benchmark=benchmark,
+        start=start,
+        end=NOW,
+        hard_cap_usd=Decimal("0.10"),
+    )
+
+    result = run_search_provider(
+        provider,
+        benchmark=benchmark,
+        start=start,
+        end=NOW,
+        spend_limit_usd=Decimal("0.10"),
+        artifact_dir=tmp_path,
+        approved_plan_sha256=plan.plan_sha256,
+    )
+
+    artifact = tmp_path / "socialdata" / "response-0001.json"
+    assert artifact.read_bytes() == raw_body
+    assert result.status == "incomplete_due_to_malformed_response"
+    assert result.requests == 1
+    assert result.estimated_spend_usd == Decimal("0.0002")
+    assert "provider_response_normalization_failed" in result.warnings
+    assert "paid_response_artifact_preserved_before_normalization" in result.warnings
+
+
 def test_socialdata_traverses_cursor_and_blocks_repeated_cursor(tmp_path) -> None:
     class Provider:
         name = "socialdata"
@@ -582,14 +750,20 @@ def test_socialdata_uses_max_id_fallback_when_cursor_is_absent(tmp_path) -> None
             self.tasks.append(task)
             if task.max_id is None:
                 return ProviderPage(
-                    posts=(_post("100", provider=self.name),),
+                    posts=(
+                        _post("100", provider=self.name),
+                        _post("99", provider=self.name),
+                    ),
                     raw_payload={"page": 1},
                     has_more=True,
                     continuation_max_id="99",
                     possible_incomplete=True,
                 )
             return ProviderPage(
-                posts=(_post("98", provider=self.name),),
+                posts=(
+                    _post("99", provider=self.name),
+                    _post("98", provider=self.name),
+                ),
                 raw_payload={"page": 2},
                 has_more=False,
             )
@@ -616,6 +790,8 @@ def test_socialdata_uses_max_id_fallback_when_cursor_is_absent(tmp_path) -> None
     assert result.status == "complete"
     assert result.requests == 2
     assert provider.tasks[1].max_id == "99"
+    assert {post.post_id for post in result.posts} == {"100", "99", "98"}
+    assert "canonical_post_id_duplicates_removed" in result.warnings
     assert "socialdata_max_id_fallback_used" in result.warnings
 
 
@@ -772,6 +948,135 @@ def test_provider_accounts_returned_billable_resources_not_normalized_rows(
     assert result.requests == 1
     assert provider.calls == 1
     assert result.estimated_spend_usd == Decimal("0.0014")
+
+
+@pytest.mark.parametrize(
+    ("provider_name", "unit_cost"),
+    (
+        ("twitterapi_io", Decimal("0.00015")),
+        ("socialdata", Decimal("0.0002")),
+    ),
+)
+def test_empty_successful_response_uses_one_conservative_billable_unit(
+    tmp_path,
+    provider_name,
+    unit_cost,
+) -> None:
+    class Provider:
+        name = provider_name
+        unit_cost_usd = unit_cost
+        minimum_interval_seconds = 0.0
+
+        def __init__(self):
+            self.calls = 0
+
+        def search(self, task):
+            self.calls += 1
+            return ProviderPage(
+                posts=(),
+                raw_payload={"tweets": []},
+                has_more=False,
+                billable_resources_returned=0,
+            )
+
+    provider = Provider()
+    benchmark = (_post("1"),)
+    start = NOW - timedelta(hours=1)
+    plan = build_discovery_cost_plan(
+        provider=provider_name,
+        benchmark=benchmark,
+        start=start,
+        end=NOW,
+        hard_cap_usd=Decimal("0.10"),
+    )
+
+    result = run_search_provider(
+        provider,
+        benchmark=benchmark,
+        start=start,
+        end=NOW,
+        spend_limit_usd=Decimal("0.10"),
+        artifact_dir=tmp_path,
+        approved_plan_sha256=plan.plan_sha256,
+        monotonic_clock=lambda: 0.0,
+        sleep=lambda seconds: None,
+    )
+
+    assert result.status == "complete"
+    assert result.requests == 1
+    assert provider.calls == 1
+    assert result.estimated_spend_usd == unit_cost
+
+
+@pytest.mark.parametrize(
+    ("provider_name", "unit_cost"),
+    (
+        ("twitterapi_io", Decimal("0.00015")),
+        ("socialdata", Decimal("0.0002")),
+    ),
+)
+def test_provider_ceiling_allows_025_and_blocks_higher_before_call(
+    tmp_path,
+    provider_name,
+    unit_cost,
+) -> None:
+    class Provider:
+        name = provider_name
+        unit_cost_usd = unit_cost
+        minimum_interval_seconds = 0.0
+
+        def __init__(self):
+            self.calls = 0
+
+        def search(self, task):
+            self.calls += 1
+            return ProviderPage(posts=(), raw_payload={}, has_more=False)
+
+    provider = Provider()
+    benchmark = (_post("1"),)
+    start = NOW - timedelta(hours=1)
+
+    allowed = build_discovery_cost_plan(
+        provider=provider_name,
+        benchmark=benchmark,
+        start=start,
+        end=NOW,
+        hard_cap_usd=Decimal("0.25"),
+    )
+
+    assert allowed.approved_budget_usd == Decimal("0.25")
+    with pytest.raises(ValueError, match=r"cannot exceed \$0\.25"):
+        run_search_provider(
+            provider,
+            benchmark=benchmark,
+            start=start,
+            end=NOW,
+            spend_limit_usd=Decimal("0.2501"),
+            artifact_dir=tmp_path,
+            approved_plan_sha256="not-reached",
+        )
+    assert provider.calls == 0
+
+
+def test_top_level_shadow_run_rejects_above_025_before_benchmark_read(
+    monkeypatch,
+) -> None:
+    benchmark_reads = 0
+
+    def fetch_stored(*, hours):
+        nonlocal benchmark_reads
+        benchmark_reads += 1
+        raise AssertionError("stored benchmark must not be read")
+
+    monkeypatch.setattr(
+        "x_signal_finder.x_provider_shadow.fetch_stored_official_benchmark",
+        fetch_stored,
+    )
+
+    with pytest.raises(ValueError, match=r"at most \$0\.25"):
+        run_shadow_spike(max_provider_spend_usd=Decimal("0.2501"))
+
+    assert benchmark_reads == 0
 
 
 def test_shadow_run_identity_does_not_collide_for_same_benchmark() -> None:
@@ -1041,6 +1346,118 @@ def test_appended_quote_url_is_complete_but_not_exact() -> None:
     assert report["content_completeness"]["complete_pct"] == 100.0
     assert report["content_completeness"]["proven_truncations"] == 0
     assert report["acceptance"]["accepted"] is True
+
+
+@pytest.mark.parametrize(
+    ("expected_text", "actual_text"),
+    (
+        ("Quote commentary", "Quote commentary https://t.co/quoted"),
+        ("Quote commentary https://t.co/quoted", "Quote commentary"),
+    ),
+)
+def test_quote_url_only_difference_is_complete_when_reference_matches(
+    expected_text,
+    actual_text,
+) -> None:
+    expected = _post(
+        "1",
+        post_type="quote",
+        text=expected_text,
+        referenced_post_id="99",
+    )
+    actual = _post(
+        "1",
+        provider="socialdata",
+        post_type="quote",
+        text=actual_text,
+        referenced_post_id="99",
+    )
+    report = compare_provider(
+        (expected,),
+        ProviderRun(
+            provider="socialdata",
+            status="complete",
+            posts=(actual,),
+            requests=1,
+            pagination_gaps=0,
+            estimated_spend_usd=Decimal("0.0002"),
+            actual_spend_usd=None,
+            warnings=(),
+        ),
+    )
+
+    assert report["exact_text_match"]["pct"] == 0.0
+    assert report["content_completeness"]["complete_pct"] == 100.0
+    assert report["content_completeness"]["proven_truncations"] == 0
+
+
+def test_quote_url_only_difference_requires_matching_reference_id() -> None:
+    expected = _post(
+        "1",
+        post_type="quote",
+        text="Quote commentary https://t.co/quoted",
+        referenced_post_id="99",
+    )
+    actual = _post(
+        "1",
+        provider="twitterapi_io",
+        post_type="quote",
+        text="Quote commentary",
+        referenced_post_id="98",
+    )
+    report = compare_provider(
+        (expected,),
+        ProviderRun(
+            provider="twitterapi_io",
+            status="complete",
+            posts=(actual,),
+            requests=1,
+            pagination_gaps=0,
+            estimated_spend_usd=Decimal("0.00015"),
+            actual_spend_usd=None,
+            warnings=(),
+        ),
+    )
+
+    assert report["content_completeness"]["complete_pct"] == 0.0
+    assert report["content_completeness"]["proven_truncations"] == 0
+    assert report["content_completeness"][
+        "incomplete_non_truncating_differences"
+    ] == 1
+    assert report["acceptance"]["accepted"] is False
+
+
+def test_quote_exact_text_still_requires_matching_reference_id() -> None:
+    expected = _post(
+        "1",
+        post_type="quote",
+        text="Same quote commentary",
+        referenced_post_id="99",
+    )
+    actual = _post(
+        "1",
+        provider="socialdata",
+        post_type="quote",
+        text="Same quote commentary",
+        referenced_post_id="98",
+    )
+    report = compare_provider(
+        (expected,),
+        ProviderRun(
+            provider="socialdata",
+            status="complete",
+            posts=(actual,),
+            requests=1,
+            pagination_gaps=0,
+            estimated_spend_usd=Decimal("0.0002"),
+            actual_spend_usd=None,
+            warnings=(),
+        ),
+    )
+
+    assert report["exact_text_match"]["pct"] == 100.0
+    assert report["content_completeness"]["complete_pct"] == 0.0
+    assert report["acceptance"]["accepted"] is False
 
 
 def test_single_missed_long_post_is_not_systematic_loss() -> None:

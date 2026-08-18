@@ -28,7 +28,7 @@ The project is building an AI-assisted X intelligence pipeline for Ethplorer. It
 
 - Current stage: Stage 4 - Minimum Knowledge Base - In Progress.
 - Current task: Task 005D.1 - Vocabulary Precision Review - Completed.
-- Last completed corrective task: Task 005D.1 - Vocabulary Precision Review.
+- Last completed corrective task: Task 004D.2.2 - Final Paid-Test Hardening.
 - Last completed MVP product task: Task 005D - Reviewed Knowledge + Unified Prefilter Vocabulary.
 - Completed bounded exception: Task 004D accepted no third-party provider and made no production change.
 - Next implementation action: Task 005E - Dynamic Analytics Adapter, only after its explicit task specification is available.
@@ -91,6 +91,7 @@ The following capabilities have been implemented and validated:
 - zero-cost discovery and direct-ID preflight reports bound to SHA-256 approval, with explicit request/resource/cost maxima and execution blocked before provider credentials when the plan is absent, mismatched, or over cap;
 - deterministic local selection and offline fixture comparison for a future approximately 50-ID provider lookup; provider direct-ID execution remains absent;
 - exact-plan provider approvals covering benchmark tasks or selected IDs, provider-specific response-size contracts, TwitterAPI.io pacing without retry, collision-resistant artifact identities, and explicit raw-recall/content-completeness acceptance thresholds;
+- pre-normalization durability for successful paid provider responses, explicit malformed-response outcomes, conservative empty-response accounting, inclusive SocialData `max_id` continuation, and bidirectional URL-only content comparison;
 
 ## 4. Current Data Flow
 
@@ -279,7 +280,9 @@ These commands read required values from local environment configuration. Never 
 - The zero-cost 50-ID plan selected 39 long Posts, 23 replies, 25 quotes, 48 Posts with referenced context, and 38 with media. Under a $0.02 planning cap, TwitterAPI.io estimates $0.00750 with a $0.00900 conservative maximum and SocialData estimates $0.0100 with a $0.0120 conservative maximum. Provider direct-ID endpoints were not called and are not implemented.
 - Task 004D.2.1 recalculated the exact offline plans from the retained Official X artifacts. Discovery digest `c4e39d9ef46889b66c2e3d6de8bf383d035831fc9fa874bb395c72b5f81e9ede` is blocked because 132 initial author requests exceed both approved request caps. The exact 50-ID digest is `a31b0214801f8d17be2cefb7e79aaefcfd1d3f09ff873110c9abc0f5b3d38a32`; it remains planning-only and unapproved.
 - Task 004D.2.1 validation passed 31 targeted offline tests and the full suite with 197 passed and 5 external tests skipped; compileall and diff checks passed. No provider request, database write, migration, or `sync_state` code path was executed.
-- A mandatory cost-preflight rule now blocks every future usage-based external call until its provider, endpoint, purpose, expected requests and resources, price, expected cost, conservative maximum, and enforcing hard guard are shown and explicitly approved. Local data must be reused before purchasing equivalent data, and provider tests start with approximately 20 to 50 Posts or the smallest sufficient window.
+- Task 004D.2.1 is actually present in pushed history as `2653679b704166e111b6ccc3d71be1856ec0cca6`; its earlier erroneous temporary-SHA roadmap reference was removed by Task 004D.2.2.
+- Task 004D.2.2 validation passed 43 targeted provider/recovery tests and the full suite with 210 passed and 5 external tests skipped; compileall and diff checks passed. All HTTP behavior was mocked locally, and no provider request, database write, migration, or `sync_state` code path was executed.
+- A mandatory cost-preflight rule now blocks every future usage-based external call until its provider, endpoint, exact input identity, expected requests and resources, price, expected cost, conservative estimate, response-size contract, and enforcing request guard are shown and explicitly approved. A technical hard dollar cap is claimed only with a documented response maximum. Local data must be reused before purchasing equivalent data, and provider tests start with approximately 20 to 50 Posts or the smallest sufficient window.
 - Task 005C.2 applied migration 004 without an X request. All 17 historical unavailable references now have relational reason `unknown`; available references have NULL. The two security-invoker review views expose 348 URL rows across 232 Posts, including 81 Ethplorer, 22 Binplorer, and 8 deterministic article URLs.
 - The known Rich List destination `https://ethplorer.io/posts/ethereum-rich-list-by-aggregated-usd-holdings-part-1` is visible in both first-party review views from stored entities only and resolves exactly to its reviewed static source ID.
 - Task 005D analysed all 378 first-party Posts as 170 originals, 132 replies, 26 quotes, and 50 reposts, with 187 available and 17 unavailable references. Exact article linkage covered 8 Posts and 5 reviewed source IDs.
@@ -302,6 +305,7 @@ These are validation estimates and observations, not a Developer Console billing
 - Task 004D did not produce a qualifying third-party provider. Its historical stored benchmark and incomplete trial runs limit provider-quality conclusions; Official X remains production.
 - Task 004D.2 corrects discovery methodology but supplies no new live provider-quality evidence. No paid provider test is approved.
 - Task 004D.2.1 does not treat SocialData's expected 20-result page as a documented maximum or hard dollar guarantee. No paid provider test is approved.
+- Task 004D.2.2 raises only the maximum representable provider preflight ceiling to $0.25. Defaults remain lower, and neither the ceiling nor this task approves a live provider or direct-ID request.
 - The vocabulary is a derivative artifact only; no runtime matching, scoring, status mutation, style model, or LLM analysis exists.
 - The dynamic analytics adapter is not implemented; `ethereum-top-addresses-pipeline` remains separate and no snapshot is copied into this repository.
 - Signals and Opportunities have schema placeholders but no runtime creation pipeline.
