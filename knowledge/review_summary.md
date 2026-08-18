@@ -47,7 +47,7 @@ The complete local PostgreSQL corpus was analysed without an X or web request:
 
 Originals, replies, and quote commentary contributed authored language. Reposts were inspected only for topic interest and were excluded from authored-style counts. Available reply, quote, and repost references contributed separate audience or context language. The 17 unavailable contexts remain unknown and were not interpreted as irrelevant.
 
-## Unified vocabulary
+## Task 005D vocabulary baseline
 
 - Total triggers: 76
 - By category: 27 capability, 12 analytics concept, 7 network, 5 contextual, 4 user problem, 4 user intent, 4 project entity, 4 BizDev integration, 4 exclusion context, 3 infrastructure, 2 product
@@ -62,10 +62,29 @@ The counts above indicate whether a vocabulary row has each provenance class. Th
 
 Exact article linkage joins a stored resolved URL to normalized source metadata. It is provenance for public wording, while the reviewed static source remains capability authority. No per-Post mapping is committed.
 
+## Task 005D.1 precision correction
+
+The precision review reduced broad standalone routing evidence while preserving all 11 reviewed capabilities:
+
+- Current triggers: 91
+- By category: 27 capability, 21 exclusion context, 12 analytics concept, 7 network, 4 contextual, 4 user problem, 4 user intent, 4 project entity, 3 BizDev integration, 3 infrastructure, 2 product
+- By role: 53 positive trigger, 17 context only, 21 negative context
+- By review status: 47 reviewed, 44 candidate, 0 deprecated
+- With reviewed static basis: 64
+- Informed by non-repost first-party authored text: 38
+- Informed by available referenced or audience context: 27
+- With exact linked-article basis: 9
+
+The standalone rows `on-chain` and `exchange integration` were removed. `tags and notes`, `private tags`, `trade volume`, `market cap`, and `candlestick chart` were demoted to weak context-only evidence. `moving average` became normal negative context while remaining reviewed historical product evidence. The precise reviewed phrase `address tags` was added as a positive capability trigger.
+
+Sixteen compact candidate negative-context rows were added for Solana and trader analysis, signal, execution, derivatives, and education language. Negative context is neither authoritative nor a hard reject, and it cannot override a strong positive capability or integration need. One or many context-only terms are insufficient for a future PASS. Task 005D.1 implements no runtime combination logic.
+
+The read-only local precision check found one first-party occurrence of `address tags`. The other suggested tags, stablecoin, whale, and on-chain compounds had no exact occurrence in either inspected Post table, so they were not added mechanically. `candlestick chart` appeared in first-party wording but was still demoted because it is too trading-oriented to route a Post alone. No Post body or database export is included here.
+
 ## Deliberate exclusions and unresolved gaps
 
 Generic high-frequency words such as `crypto`, `market`, `today`, `new`, `big`, `data`, `price`, `token`, and bare `API` were excluded because they would create excessive false positives. Historical numbers such as `$342B`, `$426B`, `$189B`, `$116.5B`, `58%`, `66%`, historical ranks, and historical PPI values were not made triggers.
 
-Potentially useful but broad terms such as `BSC`, `EVM`, `DeFi`, `on-chain`, `total supply`, and `whale` remain candidate or context-only language. Negative-context terms do not override positive product, capability, integration, or user-problem evidence.
+Potentially useful but broad terms such as `BSC`, `EVM`, `DeFi`, `total supply`, and `whale` remain candidate or context-only language. Generic standalone `on-chain` is omitted. Negative-context terms do not override positive product, capability, integration, or user-problem evidence.
 
 The largest unresolved gap is reviewed static Binplorer evidence. Binplorer first-party language supports candidate BNB Chain terminology and product wording, but it does not support a reviewed Binplorer capability row. Current Aggregated Rich List and PPI measurements are also unresolved until Task 005E reads dated structured upstream evidence.

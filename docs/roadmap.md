@@ -9,10 +9,10 @@ Status: Canonical implementation sequence and progress record
 - Stage 2 - X API Access Spike - Completed
 - Stage 3 - X Collection Pipeline - Completed
 - Stage 4 - Minimum Knowledge Base - In Progress
-- Current task - Task 005D - Reviewed Knowledge + Unified Prefilter Vocabulary - Completed
+- Current task - Task 005D.1 - Vocabulary Precision Review - Completed
 - Next task - Task 005E - Dynamic Analytics Adapter - Planned
-- Last completed corrective task - Task 004D.2.1 - Provider Runner Audit Fixes
-- Last completed MVP product task - Task 005C.2 - First-Party X Reference Reasons + URL Review Views
+- Last completed corrective task - Task 005D.1 - Vocabulary Precision Review
+- Last completed MVP product task - Task 005D - Reviewed Knowledge + Unified Prefilter Vocabulary
 - Local PostgreSQL implementation is ready
 - Real Supabase migration and database validation are complete
 - Task 003 documentation review, diagnostic probe, live OAuth, endpoint, pagination, refresh, and checkpoint validation are complete
@@ -68,7 +68,7 @@ Post-MVP work may cover:
 | 1 | Durable Storage Foundation | Completed | Task 002 | Yes |
 | 2 | X API Access Spike | Completed | Task 003 | Yes |
 | 3 | X Collection Pipeline | Completed | Tasks 004A through 004D.2 complete; bounded shadow corrections do not reopen the stage | Yes |
-| 4 | Minimum Knowledge Base | In Progress | Tasks 005A and 005C through 005D complete; Task 005E next | Yes |
+| 4 | Minimum Knowledge Base | In Progress | Tasks 005A and 005C through 005D.1 complete; Task 005E next | Yes |
 | 5 | Relevance Filtering and Signal Clustering | Planned | Task 006 | Yes |
 | 6 | Opportunity Gate and Context Enrichment | Planned | Task 007 | Yes |
 | 7 | Drafts, Human Review and Pilot | Planned | Task 008 | Yes |
@@ -417,6 +417,7 @@ Create the minimum reviewed knowledge required for credible Opportunity decision
 - Task 005C.1 - First-Party X Corpus Corrections - Completed
 - Task 005C.2 - First-Party X Reference Reasons + URL Review Views - Completed
 - Task 005D - Reviewed Knowledge + Unified Prefilter Vocabulary - Completed
+- Task 005D.1 - Vocabulary Precision Review - Completed
 - Task 005E - Dynamic Analytics Adapter - Planned and next
 
 ### Task 005A Validation Record
@@ -511,11 +512,25 @@ Create the minimum reviewed knowledge required for credible Opportunity decision
 - Final implementation commit: `a01f09d0d05de5a7bb85a6d1786619b84baa98df`
 - Stage boundary: Stage 4 remains In Progress; Task 005E is next and Task 006 has not started
 
+### Task 005D.1 Validation Record
+
+- Completion date: 2026-08-18
+- Precision result: vocabulary changed from 76 to 91 rows; 2 broad rows were removed, 6 positive rows were demoted, and 17 specific or compact negative-context rows were added
+- Current roles: 53 positive trigger, 17 context only, and 21 negative context; negative context increased from 4 to 21
+- Current review statuses: 47 reviewed and 44 candidate rows
+- Authority boundary: all 11 reviewed capabilities and their static evidence remain unchanged; routing usefulness remains separate from source truth
+- Future semantics: one or many context-only terms cannot create PASS; negative context is non-authoritative, never a hard reject, and cannot automatically override strong positive evidence
+- Local read-only review: 378 distinct first-party and 1,040 distinct incoming Posts were inspected only through aggregate counts; no Post text or export was committed and no database row or checkpoint was changed
+- Validation: offline knowledge validation passed for 17 sources, 11 assets, 12 routes, and 91 triggers; 50 focused tests passed; the full default suite passed with 198 tests and 5 external tests skipped
+- Scope boundary: no runtime matcher, PASS or rejection implementation, migration, LLM call, external request, Task 005E adapter, Task 006 processing, Signal, or Opportunity was added
+- Final implementation commit: pending final validated commit
+- Stage boundary: Stage 4 remains In Progress; Task 005E is next and Task 006 has not started
+
 ### Completion Record
 
 - Completion date:
 - Final commit:
-- Validation summary: Tasks 005A and 005C through 005D complete; Task 005E and Stage 4 completion remain pending.
+- Validation summary: Tasks 005A and 005C through 005D.1 complete; Task 005E and Stage 4 completion remain pending.
 - Remaining limitations: Dynamic analytical evidence is not integrated, and reviewed static Binplorer capability evidence is still missing.
 
 ## Stage 5 - Relevance Filtering and Signal Clustering

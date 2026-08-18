@@ -67,7 +67,7 @@ knowledge/
   README.md
 ```
 
-Current Git static-knowledge inventory: two terminology documents, 17 reviewed Ethplorer Markdown articles under `sources/posts/`, 11 deduplicated local article images directly under `sources/posts/assets/`, 11 reviewed capability rows, 12 canonical Ethplorer article routes carried by source metadata, one 76-row reviewed derivative vocabulary, and zero dynamic analytical records. The separate PostgreSQL editorial corpus contains 378 operational first-party rows and remains outside the static Git inventory.
+Current Git static-knowledge inventory: two terminology documents, 17 reviewed Ethplorer Markdown articles under `sources/posts/`, 11 deduplicated local article images directly under `sources/posts/assets/`, 11 reviewed capability rows, 12 canonical Ethplorer article routes carried by source metadata, one 91-row precision-reviewed derivative vocabulary, and zero dynamic analytical records. The separate PostgreSQL editorial corpus contains 378 operational first-party rows and remains outside the static Git inventory.
 
 ## Source Document Contract
 

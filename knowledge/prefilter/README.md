@@ -29,10 +29,24 @@ Counts are a reviewed snapshot of the 378-row local PostgreSQL corpus analysed o
 - `strong` is highly specific product, capability, or entity evidence.
 - `normal` is useful routing language that needs surrounding context.
 - `weak` is a clue that must not pass by itself.
-- A `negative_context` term never overrides positive product, capability, integration, or user-problem evidence.
+- A `context_only` trigger can never create a future PASS by itself.
+- Multiple `context_only` triggers together are also insufficient. `Ethereum + USDT + stablecoin + whale` contains useful context but no positive routing reason.
+- A future PASS requires at least one meaningful `positive_trigger`, such as a product, capability, user problem, user intent, analytics concept, infrastructure need, BizDev or integration need, or explicit Ethplorer or Binplorer relevance.
+- A `negative_context` term lowers confidence when meaningful positive evidence is absent. It is not authoritative and is never an automatic or hard rejection.
+- Strong positive evidence takes precedence over negative context. `Solana + Ethereum + address monitoring API` remains eligible for downstream analysis because it contains a specific supported need.
+- Negative-only language such as `Solana technical analysis RSI price prediction` has no meaningful project trigger and is an obvious future reject candidate.
+- Generic stablecoin, token-entity, DeFi, network, or market context cannot become sufficient merely by appearing in combination.
 - An unsupported network term alone is not a hard rejection.
 
-Task 005D does not implement matching, scoring, PASS or REJECT actions, database mutation, or LLM processing. Runtime behavior belongs to Task 006.
+Task 005D.1 documents these semantics but does not implement matching, scoring, PASS, REJECT, or UNCERTAIN actions, database mutation, or LLM processing. Runtime behavior belongs to Task 006.
+
+## Precision boundary
+
+Reviewed knowledge records what a source says. Vocabulary records only what is useful for routing incoming Posts. A documented capability phrase may therefore be contextual or negative routing evidence without changing the reviewed source or capability catalog.
+
+Task 005D.1 demotes broad annotation, market, and chart language that would create obvious false positives. `address tags` remains a positive specific capability phrase, while broad `tags and notes`, `private tags`, `trade volume`, `market cap`, and `candlestick chart` are context only. `moving average` is retained as reviewed historical evidence but acts as trader-oriented negative context. Generic standalone `on-chain` and `exchange integration` are omitted.
+
+The compact initial negative vocabulary covers Solana context and common trader analysis, signal, execution, derivatives, and education language. These terms help identify likely trader-only Posts only when positive project evidence is absent. It is not a complete unsupported-network or trading blacklist.
 
 ## Dynamic analytics boundary
 

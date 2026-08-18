@@ -1,12 +1,12 @@
 # Ethplorer X Signal Finder - Handoff
 
-Last updated: 2026-08-17
+Last updated: 2026-08-18
 
-Repository HEAD at Task 004D.2.1 implementation validation: `0ed283cc6962948fe9db027fa3220cfe43866eef`
+Repository HEAD before the Task 005D.1 implementation commit: `2653679b704166e111b6ccc3d71be1856ec0cca6`
 
-Validated commit: `0ed283cc6962948fe9db027fa3220cfe43866eef`
+Validated commit: pending Task 005D.1 implementation commit
 
-Validated implementation commit: `0ed283cc6962948fe9db027fa3220cfe43866eef`
+Validated implementation commit: pending Task 005D.1 implementation commit
 
 This file is a short current-state snapshot. It is not a canonical product, technical, architecture, or roadmap source.
 
@@ -27,8 +27,8 @@ The project is building an AI-assisted X intelligence pipeline for Ethplorer. It
 ## 2. Current Status
 
 - Current stage: Stage 4 - Minimum Knowledge Base - In Progress.
-- Current task: Task 005D - Reviewed Knowledge + Unified Prefilter Vocabulary - Completed.
-- Last completed corrective task: Task 004D.2.1 - Provider Runner Audit Fixes.
+- Current task: Task 005D.1 - Vocabulary Precision Review - Completed.
+- Last completed corrective task: Task 005D.1 - Vocabulary Precision Review.
 - Last completed MVP product task: Task 005D - Reviewed Knowledge + Unified Prefilter Vocabulary.
 - Completed bounded exception: Task 004D accepted no third-party provider and made no production change.
 - Next implementation action: Task 005E - Dynamic Analytics Adapter, only after its explicit task specification is available.
@@ -72,7 +72,8 @@ The following capabilities have been implemented and validated:
 - 17 canonical Ethplorer Markdown articles fully reviewed with stable IDs, explicit claims and limitations, and 11 inspected managed images;
 - 11 compact reviewed capabilities linked only to reviewed static evidence;
 - 12 canonical Ethplorer article routes carried by source metadata and normalized offline;
-- 76 manually reviewed derivative vocabulary triggers with static, authored, referenced-context, and exact-link provenance;
+- 91 derivative vocabulary triggers with static, authored, referenced-context, and exact-link provenance;
+- precision-first vocabulary semantics where context-only combinations cannot create a future PASS and negative context is never a hard reject;
 - exact stored first-party article URL linkage to 5 static source IDs across 8 Posts without fuzzy matching or committed per-Post data;
 - complete historical Ethplorer and Binplorer first-party X import within the retrievable API window;
 - one shared historical/future first-party corpus lifecycle with independent incremental checkpoints;
@@ -115,7 +116,7 @@ Ethplorer/Binplorer User Posts
 
 The X API, collector, and PostgreSQL portion exists. Runtime relevance filtering, Signals, Opportunity Gate evaluation, Opportunity creation, draft generation, and the human review workflow are not implemented. Publication remains outside the application and must be performed manually.
 
-The reviewed Git knowledge layer now includes 17 reviewed sources, 11 capabilities, canonical article identity, and a 76-trigger derivative vocabulary. First-party X informed wording and audience context but did not establish capabilities. Future dynamic analytics must be queried from their upstream source with temporal scope and provenance. No runtime prefilter or dynamic analytics adapter exists yet.
+The reviewed Git knowledge layer now includes 17 reviewed sources, 11 capabilities, canonical article identity, and a 91-trigger derivative vocabulary. First-party X informed wording and audience context but did not establish capabilities. Task 005D.1 removed or demoted obvious broad routing noise and added compact non-authoritative negative context without changing the capability catalog. Future dynamic analytics must be queried from their upstream source with temporal scope and provenance. No runtime prefilter or dynamic analytics adapter exists yet.
 
 ## 5. Architecture Snapshot
 
@@ -151,7 +152,7 @@ The reviewed Git knowledge layer now includes 17 reviewed sources, 11 capabiliti
 - [`knowledge/sources/posts/`](knowledge/sources/posts/) - canonical location for the 17 Ethplorer Markdown articles; shared local images use the flat `assets/` child directory.
 - [`knowledge/assets_catalog.csv`](knowledge/assets_catalog.csv) - compact evidence-linked asset and capability catalog.
 - [`knowledge/prefilter/`](knowledge/prefilter/) - derivative vocabulary contract and reviewed trigger catalog; no runtime matcher.
-- [`knowledge/review_summary.md`](knowledge/review_summary.md) - public-safe Task 005D aggregate review record.
+- [`knowledge/review_summary.md`](knowledge/review_summary.md) - public-safe Task 005D review and Task 005D.1 precision-correction record.
 - [`src/x_signal_finder/knowledge.py`](src/x_signal_finder/knowledge.py) - offline knowledge validator.
 - [`src/x_signal_finder/collector.py`](src/x_signal_finder/collector.py) - X Post mapping, bounded fetching, refresh behavior, and persistence orchestration.
 - [`src/x_signal_finder/first_party_x.py`](src/x_signal_finder/first_party_x.py) - first-party corpus mapping, pagination, reference completion, usage, and checkpoint behavior.
@@ -283,6 +284,7 @@ These commands read required values from local environment configuration. Never 
 - The known Rich List destination `https://ethplorer.io/posts/ethereum-rich-list-by-aggregated-usd-holdings-part-1` is visible in both first-party review views from stored entities only and resolves exactly to its reviewed static source ID.
 - Task 005D analysed all 378 first-party Posts as 170 originals, 132 replies, 26 quotes, and 50 reposts, with 187 available and 17 unavailable references. Exact article linkage covered 8 Posts and 5 reviewed source IDs.
 - Task 005D preserved 378 distinct first-party Posts, 1,040 distinct incoming Posts, 4 migrations, 4 `sync_state` rows, and checkpoint fingerprint `410535ed27aa2a464bc63953df0aa318`. PostgreSQL 17.6 is healthy, migrations are current, RLS is intact, 184 default tests passed with 5 external tests skipped, 3 PostgreSQL integration tests passed, and offline knowledge validation passed for 17 sources, 11 assets, 12 routes, and 76 triggers.
+- Task 005D.1 changed the derivative vocabulary from 76 to 91 rows while preserving all 11 capabilities. It removed 2 broad rows, demoted 6 positive rows, added 17 precise or compact negative-context rows, and left 53 positive, 17 context-only, and 21 negative-context rows. Offline validation passed for 17 sources, 11 assets, 12 routes, and 91 triggers; 50 focused tests and 198 default tests passed with 5 external tests skipped. The local PostgreSQL review was read-only and made no external call.
 
 These are validation estimates and observations, not a Developer Console billing statement. No raw Post text or raw X response belongs in this file.
 

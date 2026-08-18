@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import csv
 from pathlib import Path
 from textwrap import dedent
 
@@ -178,9 +179,13 @@ def _add_vocabulary(
     )
     path = root / "prefilter/vocabulary.csv"
     with path.open("a", encoding="utf-8", newline="") as handle:
-        import csv
-
         csv.writer(handle).writerow(row)
+
+
+def _repository_vocabulary_by_term() -> dict[str, dict[str, str]]:
+    path = Path(__file__).parents[1] / "knowledge/prefilter/vocabulary.csv"
+    with path.open(encoding="utf-8", newline="") as handle:
+        return {row["term"].casefold(): row for row in csv.DictReader(handle)}
 
 
 def test_repository_knowledge_structure_is_valid() -> None:
@@ -190,7 +195,58 @@ def test_repository_knowledge_structure_is_valid() -> None:
     assert result.source_count == 17
     assert result.asset_count == 11
     assert result.route_count == 12
-    assert result.vocabulary_count == 76
+    assert result.vocabulary_count == 91
+
+
+def test_repository_vocabulary_precision_contract() -> None:
+    rows = _repository_vocabulary_by_term()
+
+    for term in (
+        "tags and notes",
+        "private tags",
+        "trade volume",
+        "market cap",
+        "stablecoin",
+        "USDT",
+        "USDC",
+        "whale",
+        "DeFi",
+        "candlestick chart",
+    ):
+        assert rows[term.casefold()]["role"] == "context_only"
+        assert rows[term.casefold()]["strength"] == "weak"
+
+    assert rows["address tags"]["role"] == "positive_trigger"
+    assert rows["moving average"]["category"] == "exclusion_context"
+    assert rows["moving average"]["role"] == "negative_context"
+    assert rows["moving average"]["strength"] == "normal"
+
+    assert "on-chain" not in rows
+    assert "exchange integration" not in rows
+
+    assert rows["solana"]["role"] == "negative_context"
+    assert rows["solana"]["strength"] == "weak"
+
+    for term in (
+        "technical analysis",
+        "trading signal",
+        "buy signal",
+        "sell signal",
+        "price prediction",
+        "RSI",
+        "MACD",
+        "day trading",
+        "swing trading",
+        "scalping",
+        "leverage",
+        "futures",
+        "take profit",
+        "stop loss",
+        "trading course",
+        "learn trading",
+    ):
+        assert rows[term.casefold()]["category"] == "exclusion_context"
+        assert rows[term.casefold()]["role"] == "negative_context"
 
 
 def test_valid_pending_source_and_asset_pass(tmp_path: Path) -> None:

@@ -327,3 +327,13 @@ TwitterAPI.io observes `minimum_interval_seconds` through local pacing only. No 
 Raw quality acceptance requires at least 90% overall recall with 95% as the target, permits 5-10% non-systematic loss, requires complete content for every found Post, and blocks systematic reply, quote, or long-Post loss. Exact text representation is a separate metric: harmless appended provider URLs do not equal truncation, and one missed long Post alone is not systematic. These thresholds are explicit code configuration.
 
 This audit changes no production collector, provider choice, database schema, `sync_state`, scheduler, fallback, or direct-ID live behavior. No Official X, TwitterAPI.io, or SocialData call is authorized by this decision.
+
+## 2026-08-18 - Precision-first derivative vocabulary semantics
+
+Status: Accepted
+
+Task 005D.1 prioritizes high-probability routing value over maximum keyword coverage without changing reviewed knowledge authority. A documented product fact or capability does not automatically deserve a standalone positive trigger. The 11 reviewed capability records remain unchanged while broad annotation, chart, market, network, and integration phrases may be demoted or omitted from the derivative vocabulary.
+
+A `context_only` term can never create a future PASS by itself, and multiple context-only terms remain insufficient together. Future PASS behavior requires at least one meaningful positive product, capability, user-problem, user-intent, analytics, infrastructure, BizDev, integration, or explicit product signal. `negative_context` is a confidence-lowering clue only when meaningful positive evidence is absent. It is not authoritative, never creates a hard reject, and cannot automatically override strong positive evidence.
+
+The current precision correction removes generic standalone `on-chain` and `exchange integration`, demotes noisy tags, chart, volume, and market-cap phrases, and retains one evidence-backed specific `address tags` trigger. It adds only a compact initial Solana and trader-oriented negative-context set. Runtime matching, PASS or rejection logic, Task 005E dynamic analytics, Task 006 relevance processing, database changes, and external calls remain unimplemented.
