@@ -523,7 +523,7 @@ Create the minimum reviewed knowledge required for credible Opportunity decision
 - Local read-only review: 378 distinct first-party and 1,040 distinct incoming Posts were inspected only through aggregate counts; no Post text or export was committed and no database row or checkpoint was changed
 - Validation: offline knowledge validation passed for 17 sources, 11 assets, 12 routes, and 91 triggers; 50 focused tests passed; the full default suite passed with 198 tests and 5 external tests skipped
 - Scope boundary: no runtime matcher, PASS or rejection implementation, migration, LLM call, external request, Task 005E adapter, Task 006 processing, Signal, or Opportunity was added
-- Final implementation commit: pending final validated commit
+- Final implementation commit: `5be7476604927835f1d1efe73a2c41bb99b3ab6f`
 - Stage boundary: Stage 4 remains In Progress; Task 005E is next and Task 006 has not started
 
 ### Completion Record
