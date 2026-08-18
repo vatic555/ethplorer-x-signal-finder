@@ -313,3 +313,17 @@ Every future provider discovery execution is bound to a zero-cost plan generated
 A future direct-ID mode may select up to 50 known benchmark IDs from PostgreSQL or ignored raw artifacts with deterministic coverage of long Posts, replies, quotes, referenced context, and media. Task 004D.2 implements local selection, cost planning, and offline fixture comparison only. Provider lookup endpoints and pricing must be revalidated in a separate task before implementation or any paid call.
 
 This decision changes no production collector, database schema, `sync_state`, provider selection, scheduler, fallback, or production data. Official X remains production and no new provider test is authorized.
+
+## 2026-08-17 - Provider runner audit contracts
+
+Status: Accepted
+
+Task 004D.2.1 corrects the remaining provider-runner audit defects without an external call. SocialData ID bounds are Search query operators; only its cursor is an HTTP parameter. Discovery approval is bound to the exact benchmark Post-ID digest, every canonical planned SearchTask, and strategy parameters. Direct-ID approval is bound to the exact selected IDs and their selection digest.
+
+A provider response-size assumption is no longer silently promoted into a hard dollar guarantee. TwitterAPI.io Advanced Search retains a documented 20-result maximum and therefore supports a technical page reserve. SocialData's expected 20-result page is explicitly conservative and unbounded by contract in this implementation. Its plan uses a separately approved request cap, accounts actual returned resources after each response, and stops further calls when the approved budget is reached. Direct-ID endpoints remain unimplemented and their planning figures are not technical hard dollar caps.
+
+TwitterAPI.io observes `minimum_interval_seconds` through local pacing only. No automatic paid retry exists; HTTP 429 is an explicit incomplete outcome. Runtime artifact identities combine window, benchmark digest, plan digest, and a unique execution identity so repeated use of one stored benchmark cannot collide.
+
+Raw quality acceptance requires at least 90% overall recall with 95% as the target, permits 5-10% non-systematic loss, requires complete content for every found Post, and blocks systematic reply, quote, or long-Post loss. Exact text representation is a separate metric: harmless appended provider URLs do not equal truncation, and one missed long Post alone is not systematic. These thresholds are explicit code configuration.
+
+This audit changes no production collector, provider choice, database schema, `sync_state`, scheduler, fallback, or direct-ID live behavior. No Official X, TwitterAPI.io, or SocialData call is authorized by this decision.

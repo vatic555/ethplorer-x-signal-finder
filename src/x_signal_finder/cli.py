@@ -262,7 +262,10 @@ def build_parser() -> argparse.ArgumentParser:
         "--max-provider-spend-usd",
         type=Decimal,
         default=Decimal("0.10"),
-        help="Hard ceiling per third-party provider; cannot exceed $0.10.",
+        help=(
+            "Approved budget per provider; a technical dollar ceiling exists only "
+            "when the endpoint has a documented maximum response size."
+        ),
     )
     shadow_run.add_argument(
         "--approved-provider-plan-sha256",

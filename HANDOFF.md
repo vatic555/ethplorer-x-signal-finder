@@ -2,11 +2,11 @@
 
 Last updated: 2026-08-17
 
-Repository HEAD at Task 005D implementation validation: `a01f09d0d05de5a7bb85a6d1786619b84baa98df`
+Repository HEAD at Task 004D.2.1 implementation validation: `0ed283cc6962948fe9db027fa3220cfe43866eef`
 
-Validated commit: `a01f09d0d05de5a7bb85a6d1786619b84baa98df`
+Validated commit: `0ed283cc6962948fe9db027fa3220cfe43866eef`
 
-Validated implementation commit: `a01f09d0d05de5a7bb85a6d1786619b84baa98df`
+Validated implementation commit: `0ed283cc6962948fe9db027fa3220cfe43866eef`
 
 This file is a short current-state snapshot. It is not a canonical product, technical, architecture, or roadmap source.
 
@@ -28,7 +28,7 @@ The project is building an AI-assisted X intelligence pipeline for Ethplorer. It
 
 - Current stage: Stage 4 - Minimum Knowledge Base - In Progress.
 - Current task: Task 005D - Reviewed Knowledge + Unified Prefilter Vocabulary - Completed.
-- Last completed corrective task: Task 004D.2 - Fix Provider Discovery Runner.
+- Last completed corrective task: Task 004D.2.1 - Provider Runner Audit Fixes.
 - Last completed MVP product task: Task 005D - Reviewed Knowledge + Unified Prefilter Vocabulary.
 - Completed bounded exception: Task 004D accepted no third-party provider and made no production change.
 - Next implementation action: Task 005E - Dynamic Analytics Adapter, only after its explicit task specification is available.
@@ -89,6 +89,7 @@ The following capabilities have been implemented and validated:
 - provider-specific shadow discovery: recursive TwitterAPI.io time slicing and separate SocialData cursor plus `max_id` traversal, with repeated-progress protection and canonical Post-ID dedupe;
 - zero-cost discovery and direct-ID preflight reports bound to SHA-256 approval, with explicit request/resource/cost maxima and execution blocked before provider credentials when the plan is absent, mismatched, or over cap;
 - deterministic local selection and offline fixture comparison for a future approximately 50-ID provider lookup; provider direct-ID execution remains absent;
+- exact-plan provider approvals covering benchmark tasks or selected IDs, provider-specific response-size contracts, TwitterAPI.io pacing without retry, collision-resistant artifact identities, and explicit raw-recall/content-completeness acceptance thresholds;
 
 ## 4. Current Data Flow
 
@@ -275,6 +276,8 @@ These commands read required values from local environment configuration. Never 
 - Recovery usage records the historical 11 successful paid requests, 1,133 owner-reported Post Reads, and $5.665 reported cost. External requests during recovery were zero. All four `sync_state` rows and fingerprint `575476c6591871422c1249dc68f56f28507ff1d13792778f36b13a07ef6b5454` were identical immediately before and after apply.
 - Task 004D.2 made zero Official X, TwitterAPI.io, or SocialData calls. Its stored 24-hour discovery plan found 826 Posts from 132 authors; the initial 132 requests exceed the unchanged $0.10 cap for both providers, so execution is deterministically blocked. Estimated initial costs are $0.39600 for TwitterAPI.io and $0.5280 for SocialData.
 - The zero-cost 50-ID plan selected 39 long Posts, 23 replies, 25 quotes, 48 Posts with referenced context, and 38 with media. Under a $0.02 planning cap, TwitterAPI.io estimates $0.00750 with a $0.00900 conservative maximum and SocialData estimates $0.0100 with a $0.0120 conservative maximum. Provider direct-ID endpoints were not called and are not implemented.
+- Task 004D.2.1 recalculated the exact offline plans from the retained Official X artifacts. Discovery digest `c4e39d9ef46889b66c2e3d6de8bf383d035831fc9fa874bb395c72b5f81e9ede` is blocked because 132 initial author requests exceed both approved request caps. The exact 50-ID digest is `a31b0214801f8d17be2cefb7e79aaefcfd1d3f09ff873110c9abc0f5b3d38a32`; it remains planning-only and unapproved.
+- Task 004D.2.1 validation passed 31 targeted offline tests and the full suite with 197 passed and 5 external tests skipped; compileall and diff checks passed. No provider request, database write, migration, or `sync_state` code path was executed.
 - A mandatory cost-preflight rule now blocks every future usage-based external call until its provider, endpoint, purpose, expected requests and resources, price, expected cost, conservative maximum, and enforcing hard guard are shown and explicitly approved. Local data must be reused before purchasing equivalent data, and provider tests start with approximately 20 to 50 Posts or the smallest sufficient window.
 - Task 005C.2 applied migration 004 without an X request. All 17 historical unavailable references now have relational reason `unknown`; available references have NULL. The two security-invoker review views expose 348 URL rows across 232 Posts, including 81 Ethplorer, 22 Binplorer, and 8 deterministic article URLs.
 - The known Rich List destination `https://ethplorer.io/posts/ethereum-rich-list-by-aggregated-usd-holdings-part-1` is visible in both first-party review views from stored entities only and resolves exactly to its reviewed static source ID.
@@ -296,6 +299,7 @@ These are validation estimates and observations, not a Developer Console billing
 - Production provider-independent X ingestion is not implemented. Official X remains the production source. Task 004D implements only an isolated local shadow comparison and no provider switch, fallback, scheduler, monitor, webhook, or checkpoint integration.
 - Task 004D did not produce a qualifying third-party provider. Its historical stored benchmark and incomplete trial runs limit provider-quality conclusions; Official X remains production.
 - Task 004D.2 corrects discovery methodology but supplies no new live provider-quality evidence. No paid provider test is approved.
+- Task 004D.2.1 does not treat SocialData's expected 20-result page as a documented maximum or hard dollar guarantee. No paid provider test is approved.
 - The vocabulary is a derivative artifact only; no runtime matching, scoring, status mutation, style model, or LLM analysis exists.
 - The dynamic analytics adapter is not implemented; `ethereum-top-addresses-pipeline` remains separate and no snapshot is copied into this repository.
 - Signals and Opportunities have schema placeholders but no runtime creation pipeline.
@@ -330,7 +334,7 @@ Hard-coded dated analytics paths, copied dynamic datasets, private or licensed s
 - The repository is public. Treat every committed file as publicly visible.
 - Never commit secrets, credentials, `.env`, database URLs, raw operational X content, runtime databases, dumps, or private and licensed exports.
 - Never print access tokens, refresh tokens, authorization headers, or raw API response bodies.
-- Before any usage-based or potentially paid external call, perform a zero-cost preflight, show the exact conservative maximum and enforcing hard guard, and wait for explicit approval of that ceiling. A higher ceiling requires a new preflight and approval.
+- Before any usage-based or potentially paid external call, perform a zero-cost preflight, show the exact input identity, request cap, expected and conservative spend, documented response maximum when available, and enforcing guard. Never label an unbounded response estimate as a technical hard dollar cap. Wait for explicit approval of the exact plan digest.
 - Do not purchase data already available in PostgreSQL or approved local artifacts. Start external quality tests with approximately 20 to 50 Posts or the smallest sufficient window, and report actual usage and spend after every approved run.
 - Do not invent Ethplorer capabilities. Use only reviewed knowledge-base evidence.
 - Do not treat first-party editorial history or dynamic metrics as capability proof without reviewed supporting static evidence.

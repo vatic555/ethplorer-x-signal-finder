@@ -13,11 +13,14 @@ import json
 from math import ceil, log2
 import os
 from pathlib import Path
+import re
 from tempfile import NamedTemporaryFile
-from typing import Any, Literal, Protocol
+import time
+from typing import Any, Callable, Literal, Protocol
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
+from uuid import uuid4
 
 from dotenv import dotenv_values
 
@@ -39,7 +42,9 @@ OFFICIAL_X_USER_READ_COST_USD = Decimal("0.010")
 OFFICIAL_X_MEDIA_READ_COST_USD = Decimal("0.005")
 TRIAL_SPEND_LIMIT_USD = Decimal("0.10")
 TWITTERAPI_IO_CREDITS_PER_USD = Decimal("100000")
-MAX_PROVIDER_PAGE_RESULTS = 20
+TWITTERAPI_IO_DOCUMENTED_MAX_PAGE_RESULTS = 20
+SOCIALDATA_EXPECTED_PAGE_RESULTS = 20
+DIRECT_ID_EXPECTED_BATCH_SIZE = 20
 DEFAULT_TWITTERAPI_IO_MINIMUM_SLICE_SECONDS = 60
 SHADOW_EXPANSIONS = (
     "attachments.media_keys,author_id,in_reply_to_user_id,"
@@ -125,6 +130,7 @@ class ProviderPage:
     next_cursor: str | None = None
     continuation_max_id: str | None = None
     possible_incomplete: bool = False
+    billable_resources_returned: int | None = None
 
     def __repr__(self) -> str:
         return (
@@ -167,12 +173,17 @@ class ProviderCostPlan:
     expected_billable_resources: int
     expected_cost_usd: Decimal
     strategy_worst_case_requests: int
-    hard_cap_max_requests: int
+    approved_request_cap: int
+    documented_max_page_results: int | None
+    expected_page_results: int
+    page_size_bound: Literal["documented_maximum", "unknown_unbounded"]
+    technical_hard_dollar_cap: bool
     conservative_max_resources: int
     conservative_max_cost_usd: Decimal
-    hard_cap_usd: Decimal
+    approved_budget_usd: Decimal
     unit_cost_usd: Decimal
-    fits_hard_cap: bool
+    plan_fits_approved_limits: bool
+    approval_scope: Mapping[str, object]
     notes: tuple[str, ...]
 
     def _digest_payload(self) -> dict[str, object]:
@@ -190,14 +201,19 @@ class ProviderCostPlan:
             "expected_billable_resources": self.expected_billable_resources,
             "expected_cost_usd": format(self.expected_cost_usd, "f"),
             "strategy_worst_case_requests": self.strategy_worst_case_requests,
-            "hard_cap_max_requests": self.hard_cap_max_requests,
+            "approved_request_cap": self.approved_request_cap,
+            "documented_max_page_results": self.documented_max_page_results,
+            "expected_page_results": self.expected_page_results,
+            "page_size_bound": self.page_size_bound,
+            "technical_hard_dollar_cap": self.technical_hard_dollar_cap,
             "conservative_max_resources": self.conservative_max_resources,
             "conservative_max_cost_usd": format(
                 self.conservative_max_cost_usd, "f"
             ),
-            "hard_cap_usd": format(self.hard_cap_usd, "f"),
+            "approved_budget_usd": format(self.approved_budget_usd, "f"),
             "unit_cost_usd": format(self.unit_cost_usd, "f"),
-            "fits_hard_cap": self.fits_hard_cap,
+            "plan_fits_approved_limits": self.plan_fits_approved_limits,
+            "approval_scope": self.approval_scope,
             "notes": list(self.notes),
         }
 
@@ -209,25 +225,55 @@ class ProviderCostPlan:
         return sha256(encoded).hexdigest()
 
     def safe_summary(self) -> dict[str, object]:
+        hard_guard = (
+            "documented maximum page reserve plus approved request cap"
+            if self.technical_hard_dollar_cap
+            else (
+                "approved request cap plus conservative expected-page reserve; "
+                "page-size worst case is unknown"
+            )
+        )
         return {
             **self._digest_payload(),
             "plan_sha256": self.plan_sha256,
             "external_requests_during_plan": 0,
             "approval_required": True,
             "execution_authorized": False,
-            "hard_guard": (
-                "reserve one full provider page before every request and stop "
-                "before hard_cap_max_requests"
-            ),
+            "hard_guard": hard_guard,
         }
 
     def __repr__(self) -> str:
         return f"ProviderCostPlan({self.safe_summary()!r})"
 
 
+@dataclass(frozen=True)
+class QualityAcceptanceThresholds:
+    minimum_raw_recall_pct: float = 90.0
+    target_raw_recall_pct: float = 95.0
+    maximum_non_systematic_raw_loss_pct: float = 10.0
+    required_content_complete_pct: float = 100.0
+    systematic_group_minimum_posts: int = 3
+    systematic_group_minimum_missing: int = 2
+    systematic_recall_gap_pct: float = 10.0
+
+    def safe_summary(self) -> dict[str, object]:
+        return {
+            "minimum_raw_recall_pct": self.minimum_raw_recall_pct,
+            "target_raw_recall_pct": self.target_raw_recall_pct,
+            "maximum_non_systematic_raw_loss_pct": (
+                self.maximum_non_systematic_raw_loss_pct
+            ),
+            "required_content_complete_pct": self.required_content_complete_pct,
+            "systematic_group_minimum_posts": self.systematic_group_minimum_posts,
+            "systematic_group_minimum_missing": self.systematic_group_minimum_missing,
+            "systematic_recall_gap_pct": self.systematic_recall_gap_pct,
+        }
+
+
 class SearchProvider(Protocol):
     name: ProviderName
     unit_cost_usd: Decimal
+    minimum_interval_seconds: float
 
     def search(self, task: SearchTask) -> ProviderPage: ...
 
@@ -554,13 +600,19 @@ def _request_json(
     return status, payload
 
 
-def _query_for(task: SearchTask) -> str:
+def _query_for(task: SearchTask, *, include_id_bounds: bool = False) -> str:
     authors = " OR ".join(f"from:{author}" for author in task.authors)
     author_expression = authors if len(task.authors) == 1 else f"({authors})"
-    return (
-        f"{author_expression} since_time:{int(task.start.timestamp())} "
-        f"until_time:{int(task.end.timestamp())}"
-    )
+    operators = [
+        author_expression,
+        f"since_time:{int(task.start.timestamp())}",
+        f"until_time:{int(task.end.timestamp())}",
+    ]
+    if include_id_bounds and task.since_id:
+        operators.append(f"since_id:{task.since_id}")
+    if include_id_bounds and task.max_id:
+        operators.append(f"max_id:{task.max_id}")
+    return " ".join(operators)
 
 
 class TwitterApiIoProvider:
@@ -597,8 +649,9 @@ class TwitterApiIoProvider:
             has_more=payload.get("has_next_page") is True,
             possible_incomplete=(
                 payload.get("has_next_page") is True
-                or len(raw_posts) >= MAX_PROVIDER_PAGE_RESULTS
+                or len(raw_posts) >= TWITTERAPI_IO_DOCUMENTED_MAX_PAGE_RESULTS
             ),
+            billable_resources_returned=len(raw_posts),
         )
 
     def balance_usd(self) -> Decimal | None:
@@ -634,11 +687,9 @@ class SocialDataProvider:
 
     def search(self, task: SearchTask) -> ProviderPage:
         params: dict[str, object] = {
-            "query": _query_for(task),
+            "query": _query_for(task, include_id_bounds=True),
             "type": "Latest",
             "cursor": task.cursor,
-            "max_id": task.max_id,
-            "since_id": task.since_id,
         }
         _, payload = _request_json(
             provider=self.name,
@@ -667,7 +718,7 @@ class SocialDataProvider:
         possible_incomplete = (
             bool(next_cursor)
             or explicit_has_more
-            or len(raw_posts) >= MAX_PROVIDER_PAGE_RESULTS
+            or len(raw_posts) >= SOCIALDATA_EXPECTED_PAGE_RESULTS
         )
         return ProviderPage(
             posts=posts,
@@ -676,6 +727,7 @@ class SocialDataProvider:
             next_cursor=next_cursor,
             continuation_max_id=continuation_max_id,
             possible_incomplete=possible_incomplete,
+            billable_resources_returned=len(raw_posts),
         )
 
     def balance_usd(self) -> Decimal | None:
@@ -738,13 +790,39 @@ def _provider_unit_cost(provider: ProviderName) -> Decimal:
     raise ValueError("Cost planning supports only third-party shadow providers.")
 
 
-def _hard_cap_max_requests(hard_cap_usd: Decimal, unit_cost_usd: Decimal) -> int:
-    if hard_cap_usd <= 0:
-        raise ValueError("Provider hard cap must be positive.")
-    if hard_cap_usd > TRIAL_SPEND_LIMIT_USD:
-        raise ValueError("Provider hard cap cannot exceed $0.10.")
-    worst_case_request = unit_cost_usd * MAX_PROVIDER_PAGE_RESULTS
-    return int(hard_cap_usd // worst_case_request)
+def _approved_request_cap(
+    approved_budget_usd: Decimal,
+    unit_cost_usd: Decimal,
+    reserve_page_results: int,
+) -> int:
+    if approved_budget_usd <= 0:
+        raise ValueError("Provider approved budget must be positive.")
+    if approved_budget_usd > TRIAL_SPEND_LIMIT_USD:
+        raise ValueError("Provider approved budget cannot exceed $0.10.")
+    if reserve_page_results < 1:
+        raise ValueError("Provider page reserve must be positive.")
+    reserve_cost = unit_cost_usd * reserve_page_results
+    return int(approved_budget_usd // reserve_cost)
+
+
+def _canonical_search_tasks(tasks: Sequence[SearchTask]) -> list[dict[str, object]]:
+    return [
+        {
+            "authors": list(task.authors),
+            "start": task.start.astimezone(timezone.utc).isoformat(),
+            "end": task.end.astimezone(timezone.utc).isoformat(),
+            "since_id": task.since_id,
+            "max_id": task.max_id,
+            "cursor": task.cursor,
+            "depth": task.depth,
+        }
+        for task in tasks
+    ]
+
+
+def _post_id_digest(posts: Sequence[NormalizedPost]) -> str:
+    post_ids = sorted({post.post_id for post in posts})
+    return sha256("\n".join(post_ids).encode("utf-8")).hexdigest()
 
 
 def build_discovery_cost_plan(
@@ -764,11 +842,14 @@ def build_discovery_cost_plan(
     tasks = plan_search_tasks(benchmark, start=start, end=end)
     author_count = len(tasks)
     unit_cost = _provider_unit_cost(provider)
-    max_requests = _hard_cap_max_requests(hard_cap_usd, unit_cost)
     estimated_requests = author_count
-    expected_resources = estimated_requests * MAX_PROVIDER_PAGE_RESULTS
-    expected_cost = unit_cost * expected_resources
     if provider == "twitterapi_io":
+        documented_max_page_results = TWITTERAPI_IO_DOCUMENTED_MAX_PAGE_RESULTS
+        expected_page_results = TWITTERAPI_IO_DOCUMENTED_MAX_PAGE_RESULTS
+        page_size_bound: Literal["documented_maximum", "unknown_unbounded"] = (
+            "documented_maximum"
+        )
+        technical_hard_dollar_cap = True
         seconds = max(1, int((end - start).total_seconds()))
         ratio = max(1, ceil(seconds / minimum_twitter_slice_seconds))
         depth = ceil(log2(ratio)) if ratio > 1 else 0
@@ -782,9 +863,13 @@ def build_discovery_cost_plan(
             f"minimum_time_slice_seconds={minimum_twitter_slice_seconds}",
             "overflow at minimum slice produces explicit incomplete status",
             "canonical post_id dedupe across parent and child windows",
+            "documented Advanced Search maximum is 20 returned Posts per request",
         )
     else:
-        strategy_worst_case_requests = max_requests
+        documented_max_page_results = None
+        expected_page_results = SOCIALDATA_EXPECTED_PAGE_RESULTS
+        page_size_bound = "unknown_unbounded"
+        technical_hard_dollar_cap = False
         strategy = (
             "SocialData cursor traversal; max_id continuation fallback with repeated "
             "cursor and ID protection"
@@ -793,9 +878,30 @@ def build_discovery_cost_plan(
             "SocialData does not inherit TwitterAPI.io time slicing",
             "coverage is incomplete when cursor or max_id progress cannot be proven",
             "canonical post_id dedupe across pages",
+            "page-size worst case is not documented; dollar maximum is not technical",
         )
-    conservative_resources = max_requests * MAX_PROVIDER_PAGE_RESULTS
+    request_cap = _approved_request_cap(
+        hard_cap_usd,
+        unit_cost,
+        expected_page_results,
+    )
+    if provider == "socialdata":
+        strategy_worst_case_requests = request_cap
+    expected_resources = estimated_requests * expected_page_results
+    expected_cost = unit_cost * expected_resources
+    conservative_resources = request_cap * expected_page_results
     conservative_cost = conservative_resources * unit_cost
+    approval_scope = {
+        "benchmark_post_ids_sha256": _post_id_digest(benchmark),
+        "planned_search_tasks": _canonical_search_tasks(tasks),
+        "strategy_parameters": {
+            "minimum_twitter_slice_seconds": minimum_twitter_slice_seconds,
+            "documented_max_page_results": documented_max_page_results,
+            "expected_page_results": expected_page_results,
+            "page_size_bound": page_size_bound,
+            "approved_request_cap": request_cap,
+        },
+    }
     return ProviderCostPlan(
         provider=provider,
         mode="discovery",
@@ -808,12 +914,17 @@ def build_discovery_cost_plan(
         expected_billable_resources=expected_resources,
         expected_cost_usd=expected_cost,
         strategy_worst_case_requests=strategy_worst_case_requests,
-        hard_cap_max_requests=max_requests,
+        approved_request_cap=request_cap,
+        documented_max_page_results=documented_max_page_results,
+        expected_page_results=expected_page_results,
+        page_size_bound=page_size_bound,
+        technical_hard_dollar_cap=technical_hard_dollar_cap,
         conservative_max_resources=conservative_resources,
         conservative_max_cost_usd=conservative_cost,
-        hard_cap_usd=hard_cap_usd,
+        approved_budget_usd=hard_cap_usd,
         unit_cost_usd=unit_cost,
-        fits_hard_cap=estimated_requests <= max_requests,
+        plan_fits_approved_limits=estimated_requests <= request_cap,
+        approval_scope=approval_scope,
         notes=notes,
     )
 
@@ -825,11 +936,20 @@ def build_direct_id_cost_plan(
     hard_cap_usd: Decimal,
 ) -> ProviderCostPlan:
     """Plan a future direct-ID lookup without implementing or calling an endpoint."""
-    unique_count = len({post.post_id for post in benchmark})
+    selected_ids = sorted({post.post_id for post in benchmark})
+    unique_count = len(selected_ids)
     unit_cost = _provider_unit_cost(provider)
-    expected_requests = ceil(unique_count / MAX_PROVIDER_PAGE_RESULTS) if unique_count else 0
-    max_requests = _hard_cap_max_requests(hard_cap_usd, unit_cost)
-    conservative_resources = expected_requests * MAX_PROVIDER_PAGE_RESULTS
+    expected_requests = (
+        ceil(unique_count / DIRECT_ID_EXPECTED_BATCH_SIZE) if unique_count else 0
+    )
+    affordable_request_cap = _approved_request_cap(
+        hard_cap_usd,
+        unit_cost,
+        DIRECT_ID_EXPECTED_BATCH_SIZE,
+    )
+    request_cap = min(expected_requests, affordable_request_cap)
+    conservative_resources = request_cap * DIRECT_ID_EXPECTED_BATCH_SIZE
+    selection_digest = sha256("\n".join(selected_ids).encode("utf-8")).hexdigest()
     return ProviderCostPlan(
         provider=provider,
         mode="direct_id",
@@ -847,16 +967,29 @@ def build_direct_id_cost_plan(
         expected_billable_resources=unique_count,
         expected_cost_usd=unit_cost * unique_count,
         strategy_worst_case_requests=expected_requests,
-        hard_cap_max_requests=max_requests,
+        approved_request_cap=request_cap,
+        documented_max_page_results=None,
+        expected_page_results=DIRECT_ID_EXPECTED_BATCH_SIZE,
+        page_size_bound="unknown_unbounded",
+        technical_hard_dollar_cap=False,
         conservative_max_resources=conservative_resources,
         conservative_max_cost_usd=unit_cost * conservative_resources,
-        hard_cap_usd=hard_cap_usd,
+        approved_budget_usd=hard_cap_usd,
         unit_cost_usd=unit_cost,
-        fits_hard_cap=(
+        plan_fits_approved_limits=(
             unique_count > 0
-            and expected_requests <= max_requests
+            and expected_requests <= request_cap
             and unit_cost * conservative_resources <= hard_cap_usd
         ),
+        approval_scope={
+            "selected_post_ids": selected_ids,
+            "selection_sha256": selection_digest,
+            "strategy_parameters": {
+                "expected_batch_size": DIRECT_ID_EXPECTED_BATCH_SIZE,
+                "endpoint_contract_verified": False,
+                "approved_request_cap": request_cap,
+            },
+        },
         notes=(
             "planning and offline comparison only; direct-ID API execution is absent",
             "Official X benchmark data comes only from PostgreSQL or ignored artifacts",
@@ -866,7 +999,10 @@ def build_direct_id_cost_plan(
 
 
 def combined_plan_sha256(plans: Sequence[ProviderCostPlan]) -> str:
-    payload = [plan.safe_summary() for plan in plans]
+    payload = [
+        {"provider": plan.provider, "plan_sha256": plan.plan_sha256}
+        for plan in plans
+    ]
     encoded = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode(
         "utf-8"
     )
@@ -877,12 +1013,32 @@ def build_preflight_report(plans: Sequence[ProviderCostPlan]) -> dict[str, objec
     return {
         "plans": [plan.safe_summary() for plan in plans],
         "combined_plan_sha256": combined_plan_sha256(plans),
-        "all_plans_fit_hard_caps": all(plan.fits_hard_cap for plan in plans),
+        "all_plans_fit_approved_limits": all(
+            plan.plan_fits_approved_limits for plan in plans
+        ),
         "external_requests": 0,
         "approval_required": True,
         "execution_authorized": False,
         "cost_limits_auto_increased": False,
     }
+
+
+def build_shadow_run_id(
+    *,
+    window_end: datetime,
+    benchmark: Sequence[NormalizedPost],
+    combined_plan_digest: str,
+    execution_identity: str | None = None,
+) -> str:
+    """Build a collision-resistant local artifact identity for one execution."""
+    identity = execution_identity or uuid4().hex
+    if not re.fullmatch(r"[A-Za-z0-9_-]{4,64}", identity):
+        raise ValueError("execution_identity must be 4-64 safe filename characters.")
+    window_identity = window_end.astimezone(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    return (
+        f"{window_identity}-{_post_id_digest(benchmark)[:10]}-"
+        f"{combined_plan_digest[:10]}-{identity}"
+    )
 
 
 def _write_json(path: Path, value: object) -> None:
@@ -977,6 +1133,8 @@ def run_search_provider(
     artifact_dir: Path,
     approved_plan_sha256: str | None = None,
     minimum_twitter_slice_seconds: int = DEFAULT_TWITTERAPI_IO_MINIMUM_SLICE_SECONDS,
+    monotonic_clock: Callable[[], float] | None = None,
+    sleep: Callable[[float], None] | None = None,
 ) -> ProviderRun:
     if provider.name not in {"twitterapi_io", "socialdata"}:
         raise ValueError("Unsupported discovery provider.")
@@ -998,6 +1156,8 @@ def run_search_provider(
             artifact_dir=artifact_dir,
             plan=plan,
             minimum_slice_seconds=minimum_twitter_slice_seconds,
+            monotonic_clock=monotonic_clock or time.monotonic,
+            sleep=sleep or time.sleep,
         )
     return _run_socialdata_discovery(
         provider,
@@ -1021,10 +1181,10 @@ def _require_approved_plan(
         raise ShadowSpikeError(
             "External provider execution blocked: approved preflight digest mismatch."
         )
-    if not plan.fits_hard_cap:
+    if not plan.plan_fits_approved_limits:
         raise ShadowSpikeError(
             "External provider execution blocked: planned initial coverage exceeds the "
-            "unchanged hard cap."
+            "approved request and spend limits."
         )
 
 
@@ -1062,6 +1222,53 @@ def _dedupe_posts(
     return duplicates
 
 
+def _returned_billable_resources(page: ProviderPage) -> int:
+    resources = page.billable_resources_returned
+    if resources is None:
+        return len(page.posts)
+    if resources < 0:
+        raise ShadowSpikeError("Provider returned a negative billable-resource count.")
+    return resources
+
+
+def _pace_request(
+    provider: SearchProvider,
+    *,
+    last_request_started_at: float | None,
+    monotonic_clock: Callable[[], float],
+    sleep: Callable[[float], None],
+) -> float:
+    interval = max(0.0, float(getattr(provider, "minimum_interval_seconds", 0.0)))
+    now = monotonic_clock()
+    if last_request_started_at is not None:
+        remaining = last_request_started_at + interval - now
+        if remaining > 0:
+            sleep(remaining)
+            now = monotonic_clock()
+    return now
+
+
+def _request_reserve_cost(plan: ProviderCostPlan) -> Decimal:
+    reserve_results = (
+        plan.documented_max_page_results
+        if plan.documented_max_page_results is not None
+        else plan.expected_page_results
+    )
+    return plan.unit_cost_usd * reserve_results
+
+
+def _can_start_next_request(
+    *,
+    plan: ProviderCostPlan,
+    requests: int,
+    returned_billable_resources: int,
+) -> bool:
+    if requests >= plan.approved_request_cap:
+        return False
+    accounted_cost = plan.unit_cost_usd * returned_billable_resources
+    return accounted_cost + _request_reserve_cost(plan) <= plan.approved_budget_usd
+
+
 def _run_twitterapi_io_discovery(
     provider: SearchProvider,
     *,
@@ -1071,6 +1278,8 @@ def _run_twitterapi_io_discovery(
     artifact_dir: Path,
     plan: ProviderCostPlan,
     minimum_slice_seconds: int,
+    monotonic_clock: Callable[[], float],
+    sleep: Callable[[float], None],
 ) -> ProviderRun:
     queue = deque(plan_search_tasks(benchmark, start=start, end=end))
     seen_windows: set[tuple[tuple[str, ...], int, int]] = set()
@@ -1081,8 +1290,13 @@ def _run_twitterapi_io_discovery(
     duplicate_rows = 0
     warnings: set[str] = set()
     status = "complete"
+    last_request_started_at: float | None = None
     while queue:
-        if requests >= plan.hard_cap_max_requests:
+        if not _can_start_next_request(
+            plan=plan,
+            requests=requests,
+            returned_billable_resources=raw_resources,
+        ):
             status = "incomplete_due_to_budget"
             warnings.add("provider_hard_request_and_spend_guard_reached")
             unresolved_windows += len(queue)
@@ -1099,6 +1313,13 @@ def _run_twitterapi_io_discovery(
             unresolved_windows += 1
             continue
         seen_windows.add(key)
+        last_request_started_at = _pace_request(
+            provider,
+            last_request_started_at=last_request_started_at,
+            monotonic_clock=monotonic_clock,
+            sleep=sleep,
+        )
+        requests += 1
         try:
             page = provider.search(task)
         except ProviderRequestError as error:
@@ -1106,17 +1327,21 @@ def _run_twitterapi_io_discovery(
             warnings.add(warning)
             unresolved_windows += len(queue) + 1
             break
-        requests += 1
         _write_json(
             artifact_dir / provider.name / f"response-{requests:04d}.json",
             page.raw_payload,
         )
-        raw_resources += max(1, len(page.posts))
+        raw_resources += _returned_billable_resources(page)
         duplicate_rows += _dedupe_posts(posts_by_id, page.posts)
+        if provider.unit_cost_usd * raw_resources >= plan.approved_budget_usd:
+            status = "incomplete_due_to_budget"
+            warnings.add("approved_budget_reached_after_response")
+            unresolved_windows += len(queue)
+            break
         overflow = (
             page.has_more
             or page.possible_incomplete
-            or len(page.posts) >= MAX_PROVIDER_PAGE_RESULTS
+            or len(page.posts) >= TWITTERAPI_IO_DOCUMENTED_MAX_PAGE_RESULTS
         )
         if not overflow:
             continue
@@ -1186,9 +1411,13 @@ def _run_socialdata_discovery(
     status = "complete"
     warnings: set[str] = set()
     while queue:
-        if requests >= plan.hard_cap_max_requests:
+        if not _can_start_next_request(
+            plan=plan,
+            requests=requests,
+            returned_billable_resources=raw_resources,
+        ):
             status = "incomplete_due_to_budget"
-            warnings.add("provider_hard_request_and_spend_guard_reached")
+            warnings.add("provider_request_cap_or_conservative_reserve_reached")
             unresolved_pages += len(queue)
             break
         task = queue.popleft()
@@ -1206,6 +1435,7 @@ def _run_socialdata_discovery(
             unresolved_pages += 1
             continue
         seen_states.add(state)
+        requests += 1
         try:
             page = provider.search(task)
         except ProviderRequestError as error:
@@ -1213,13 +1443,17 @@ def _run_socialdata_discovery(
             warnings.add(warning)
             unresolved_pages += len(queue) + 1
             break
-        requests += 1
         _write_json(
             artifact_dir / provider.name / f"response-{requests:04d}.json",
             page.raw_payload,
         )
-        raw_resources += max(1, len(page.posts))
+        raw_resources += _returned_billable_resources(page)
         duplicate_rows += _dedupe_posts(posts_by_id, page.posts)
+        if provider.unit_cost_usd * raw_resources >= plan.approved_budget_usd:
+            status = "incomplete_due_to_budget"
+            warnings.add("approved_budget_reached_after_response")
+            unresolved_pages += len(queue)
+            break
         if page.next_cursor:
             cursor_key = (author_key, page.next_cursor)
             if page.next_cursor == task.cursor or cursor_key in seen_cursors:
@@ -1236,7 +1470,7 @@ def _run_socialdata_discovery(
         overflow = (
             page.has_more
             or page.possible_incomplete
-            or len(page.posts) >= MAX_PROVIDER_PAGE_RESULTS
+            or len(page.posts) >= SOCIALDATA_EXPECTED_PAGE_RESULTS
         )
         if not overflow:
             continue
@@ -1622,10 +1856,72 @@ def _percentage(numerator: int, denominator: int) -> float | None:
     return round(numerator * 100.0 / denominator, 2)
 
 
+_ONLY_URLS_RE = re.compile(r"https?://\S+(?:\s+https?://\S+)*", re.IGNORECASE)
+
+
+def _normalized_text(value: str) -> str:
+    return " ".join(value.split())
+
+
+def _content_status(expected: str, actual: str) -> tuple[bool, bool, bool]:
+    """Return exact match, complete content, and proven truncation flags."""
+    if expected == actual:
+        return True, True, False
+    expected_normalized = _normalized_text(expected)
+    actual_normalized = _normalized_text(actual)
+    if expected_normalized == actual_normalized:
+        return False, True, False
+    if actual_normalized.startswith(expected_normalized):
+        suffix = actual_normalized[len(expected_normalized) :].strip()
+        if suffix and _ONLY_URLS_RE.fullmatch(suffix):
+            return False, True, False
+    truncated = bool(
+        actual_normalized
+        and expected_normalized.startswith(actual_normalized)
+        and len(actual_normalized) < len(expected_normalized)
+    )
+    return False, False, truncated
+
+
+def _systematic_group_loss(
+    *,
+    group: str,
+    total: int,
+    missing: int,
+    group_recall_pct: float | None,
+    overall_recall_pct: float | None,
+    thresholds: QualityAcceptanceThresholds,
+) -> str | None:
+    if (
+        total < thresholds.systematic_group_minimum_posts
+        or missing < thresholds.systematic_group_minimum_missing
+        or group_recall_pct is None
+    ):
+        return None
+    loss_pct = 100.0 - group_recall_pct
+    materially_concentrated = (
+        overall_recall_pct is not None
+        and group_recall_pct + thresholds.systematic_recall_gap_pct
+        < overall_recall_pct
+    )
+    if (
+        loss_pct > thresholds.maximum_non_systematic_raw_loss_pct
+        and (
+            group_recall_pct < thresholds.minimum_raw_recall_pct
+            or materially_concentrated
+        )
+    ):
+        return f"systematic_{group}_recall_loss"
+    return None
+
+
 def compare_provider(
     benchmark: Sequence[NormalizedPost],
     run: ProviderRun,
+    *,
+    thresholds: QualityAcceptanceThresholds | None = None,
 ) -> dict[str, Any]:
+    thresholds = thresholds or QualityAcceptanceThresholds()
     benchmark_by_id = {post.post_id: post for post in benchmark}
     provider_by_id: dict[str, NormalizedPost] = {}
     duplicate_count = run.duplicates_removed
@@ -1643,7 +1939,13 @@ def compare_provider(
         (benchmark_by_id[post_id], provider_by_id[post_id])
         for post_id in matched_ids
     ]
-    exact_text = sum(expected.text == actual.text for expected, actual in matched_pairs)
+    text_statuses = [
+        _content_status(expected.text, actual.text)
+        for expected, actual in matched_pairs
+    ]
+    exact_text = sum(exact for exact, _, _ in text_statuses)
+    complete_text = sum(complete for _, complete, _ in text_statuses)
+    truncated_text = sum(truncated for _, _, truncated in text_statuses)
     missing_text = sum(not actual.text for _, actual in matched_pairs)
     long_ids = {
         post_id for post_id, post in benchmark_by_id.items() if len(post.text) > 280
@@ -1653,6 +1955,15 @@ def compare_provider(
         benchmark_by_id[post_id].text == provider_by_id[post_id].text
         for post_id in matched_long_ids
     )
+    long_content_statuses = [
+        _content_status(
+            benchmark_by_id[post_id].text,
+            provider_by_id[post_id].text,
+        )
+        for post_id in matched_long_ids
+    ]
+    complete_long_text = sum(complete for _, complete, _ in long_content_statuses)
+    truncated_long_text = sum(truncated for _, _, truncated in long_content_statuses)
     type_correct = sum(
         expected.post_type == actual.post_type for expected, actual in matched_pairs
     )
@@ -1700,17 +2011,48 @@ def compare_provider(
         for post_type in benchmark_by_type
     }
     recall = _percentage(len(matched_ids), len(benchmark_ids))
-    systematic: list[str] = []
-    if long_ids and _percentage(len(matched_long_ids), len(long_ids)) is not None:
-        if len(matched_long_ids) < len(long_ids):
-            systematic.append("long_post_recall_below_100")
-    for post_type in ("reply", "quote", "repost"):
-        typed_recall = recall_by_type[post_type]
-        if benchmark_by_type[post_type] and typed_recall is not None and recall is not None:
-            if typed_recall + 10 < recall:
-                systematic.append(f"{post_type}_recall_materially_below_overall")
-    if exact_text < len(matched_ids):
-        systematic.append("matched_post_text_not_100_percent_exact")
+    long_recall = _percentage(len(matched_long_ids), len(long_ids))
+    systematic = [
+        flag
+        for flag in (
+            _systematic_group_loss(
+                group="long_post",
+                total=len(long_ids),
+                missing=len(long_ids - matched_ids),
+                group_recall_pct=long_recall,
+                overall_recall_pct=recall,
+                thresholds=thresholds,
+            ),
+            *(
+                _systematic_group_loss(
+                    group=post_type,
+                    total=benchmark_by_type[post_type],
+                    missing=missing_by_type[post_type],
+                    group_recall_pct=recall_by_type[post_type],
+                    overall_recall_pct=recall,
+                    thresholds=thresholds,
+                )
+                for post_type in ("reply", "quote")
+            ),
+        )
+        if flag is not None
+    ]
+    content_complete_pct = _percentage(complete_text, len(matched_ids))
+    raw_recall_passed = bool(
+        recall is not None and recall >= thresholds.minimum_raw_recall_pct
+    )
+    content_complete_passed = bool(
+        content_complete_pct is not None
+        and content_complete_pct >= thresholds.required_content_complete_pct
+    )
+    if not content_complete_passed and matched_ids:
+        systematic.append("matched_content_incomplete")
+    accepted = bool(
+        run.status == "complete"
+        and raw_recall_passed
+        and content_complete_passed
+        and not systematic
+    )
     return {
         "provider": run.provider,
         "status": run.status,
@@ -1721,19 +2063,39 @@ def compare_provider(
         "missing_benchmark_ids": len(missing_ids),
         "extra_ids": len(extra_ids),
         "recall_pct": recall,
-        "full_text": {
-            "exact_matches": exact_text,
+        "exact_text_match": {
+            "matches": exact_text,
             "matched_posts": len(matched_ids),
-            "exact_pct": _percentage(exact_text, len(matched_ids)),
+            "pct": _percentage(exact_text, len(matched_ids)),
+        },
+        "content_completeness": {
+            "complete": complete_text,
+            "matched_posts": len(matched_ids),
+            "complete_pct": content_complete_pct,
+            "proven_truncations": truncated_text,
+            "complete_representation_differences": complete_text - exact_text,
+            "incomplete_non_truncating_differences": (
+                len(matched_ids) - complete_text - truncated_text
+            ),
             "missing_text": missing_text,
         },
         "long_posts": {
             "benchmark": len(long_ids),
             "matched": len(matched_long_ids),
-            "recall_pct": _percentage(len(matched_long_ids), len(long_ids)),
+            "recall_pct": long_recall,
             "exact_text": exact_long_text,
             "exact_text_pct": _percentage(exact_long_text, len(matched_long_ids)),
-            "truncated_or_mismatched": len(matched_long_ids) - exact_long_text,
+            "content_complete": complete_long_text,
+            "content_complete_pct": _percentage(
+                complete_long_text, len(matched_long_ids)
+            ),
+            "proven_truncations": truncated_long_text,
+            "complete_representation_differences": (
+                complete_long_text - exact_long_text
+            ),
+            "incomplete_non_truncating_differences": (
+                len(matched_long_ids) - complete_long_text - truncated_long_text
+            ),
         },
         "post_type": {
             "correct": type_correct,
@@ -1785,6 +2147,22 @@ def compare_provider(
             else None
         ),
         "systematic_loss_flags": systematic,
+        "acceptance": {
+            "accepted": accepted,
+            "raw_recall_passed": raw_recall_passed,
+            "content_complete_passed": content_complete_passed,
+            "systematic_loss_blockers": systematic,
+            "raw_recall_band": (
+                "target_95_plus"
+                if recall is not None and recall >= thresholds.target_raw_recall_pct
+                else (
+                    "acceptable_90_to_95"
+                    if raw_recall_passed
+                    else "below_minimum_90"
+                )
+            ),
+            "thresholds": thresholds.safe_summary(),
+        },
         "warnings": list(run.warnings),
     }
 
@@ -1878,18 +2256,8 @@ def compare_direct_id_lookup(
 def _recommendation(reports: Sequence[Mapping[str, Any]]) -> dict[str, str]:
     accepted: list[Mapping[str, Any]] = []
     for report in reports:
-        if report.get("status") != "complete":
-            continue
-        recall = report.get("recall_pct")
-        full_text = report.get("full_text")
-        systematic = report.get("systematic_loss_flags")
-        if (
-            isinstance(recall, (int, float))
-            and recall >= 90
-            and isinstance(full_text, Mapping)
-            and full_text.get("exact_pct") == 100.0
-            and not systematic
-        ):
+        acceptance = report.get("acceptance")
+        if isinstance(acceptance, Mapping) and acceptance.get("accepted") is True:
             accepted.append(report)
     if not accepted:
         return {
@@ -2058,10 +2426,10 @@ def run_shadow_spike(
             "Provider discovery execution blocked: approved combined plan digest "
             "does not match the current zero-cost plan."
         )
-    if not all(plan.fits_hard_cap for plan in plans):
+    if not all(plan.plan_fits_approved_limits for plan in plans):
         raise ShadowSpikeError(
             "Provider discovery execution blocked: the plan cannot cover every "
-            "benchmark author within the unchanged hard cap."
+            "benchmark author within the approved request and spend limits."
         )
     keys = load_provider_keys()
     missing = [
@@ -2076,12 +2444,23 @@ def run_shadow_spike(
         raise ShadowSpikeError(
             "Missing required local provider credentials: " + ", ".join(missing)
         )
-    run_id = end.strftime("%Y%m%dT%H%M%SZ")
+    run_id = build_shadow_run_id(
+        window_end=end,
+        benchmark=unique_benchmark,
+        combined_plan_digest=expected_combined_digest,
+    )
     artifact_dir = Path(output_root) / run_id
     artifact_dir.mkdir(parents=True, exist_ok=False)
     _write_json(
         artifact_dir / "window.json",
-        {"start": start.isoformat(), "end": end.isoformat(), "hours": hours},
+        {
+            "start": start.isoformat(),
+            "end": end.isoformat(),
+            "hours": hours,
+            "benchmark_post_ids_sha256": _post_id_digest(unique_benchmark),
+            "combined_plan_sha256": expected_combined_digest,
+            "execution_identity": run_id.rsplit("-", 1)[-1],
+        },
     )
     if not unique_benchmark:
         raise ShadowSpikeError("Official X benchmark returned no Posts for the window.")

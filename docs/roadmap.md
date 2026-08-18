@@ -11,7 +11,7 @@ Status: Canonical implementation sequence and progress record
 - Stage 4 - Minimum Knowledge Base - In Progress
 - Current task - Task 005D - Reviewed Knowledge + Unified Prefilter Vocabulary - Completed
 - Next task - Task 005E - Dynamic Analytics Adapter - Planned
-- Last completed corrective task - Task 004D.2 - Fix Provider Discovery Runner
+- Last completed corrective task - Task 004D.2.1 - Provider Runner Audit Fixes
 - Last completed MVP product task - Task 005C.2 - First-Party X Reference Reasons + URL Review Views
 - Local PostgreSQL implementation is ready
 - Real Supabase migration and database validation are complete
@@ -222,6 +222,7 @@ Current state:
 - Task 004C.1 - Explicit Baseline Acceptance - Completed
 - Task 004D - X Provider Shadow Quality Spike - Completed, non-production exception
 - Task 004D.2 - Fix Provider Discovery Runner - Completed, zero-cost correction
+- Task 004D.2.1 - Provider Runner Audit Fixes - Completed, zero-cost audit correction
 
 ### Task 004A Validation Record
 
@@ -367,12 +368,28 @@ Status: Completed as a zero-cost non-production correction
 - Problem corrected: the old shared algorithm issued one author-window request, ignored provider continuation after the first page, and could not prove discovery coverage
 - TwitterAPI.io: overflowing or full Advanced Search windows are recursively split into two exact time halves until complete or the configured minimum slice; repeated windows and minimum-slice overflow are explicit incomplete states; canonical `post_id` dedupe spans parent and child windows
 - SocialData: a separate traversal follows advancing cursors and then decreasing `max_id` continuation when needed; repeated cursor, repeated ID, repeated page state, or missing progress produces explicit incomplete status
-- Cost control: zero-cost plans disclose benchmark, authors, window, strategy, requests, billable resources, expected cost, conservative maximum, and unchanged hard cap; execution requires the separately approved combined plan SHA-256 and is blocked before provider credentials or requests when it is absent, mismatched, or cannot cover the initial authors
-- Request discipline: one full 20-result page is reserved before every request; no automatic retry, balance request, cost-limit increase, or fresh Official X discovery benchmark is allowed
+- Cost control: zero-cost plans disclose exact benchmark identity, tasks, strategy, requests, billable resources, expected cost, conservative estimate, documented maximum when available, approved request cap, and budget; execution requires the exact separately approved plan SHA-256
+- Request discipline: TwitterAPI.io reserves its documented 20-result maximum; SocialData uses an explicit request cap and conservative expected-page reserve without claiming a hard dollar maximum; no automatic retry, balance request, limit increase, or fresh Official X discovery benchmark is allowed
 - Direct-ID groundwork: deterministic local selection, cost planning, and fixture comparison exist for up to 50 known IDs; provider direct-ID lookup endpoints are not implemented or called
 - Current zero-cost discovery example: 826 stored Posts from 132 authors would require at least 132 requests per provider, estimated at $0.39600 for TwitterAPI.io and $0.5280 for SocialData, so both are blocked by the unchanged $0.10 cap
 - Current zero-cost 50-ID example under a $0.02 cap: three planned batches; TwitterAPI.io expected $0.00750 and conservative $0.00900; SocialData expected $0.0100 and conservative $0.0120; API execution remains absent and unapproved
 - Scope boundary: no Official X, TwitterAPI.io, SocialData, LLM, or other external API call; no production collector, database write, migration, `sync_state`, provider switch, fallback, scheduler, or monitoring change
+
+#### Task 004D.2.1 - Provider Runner Audit Fixes
+
+Status: Completed as a zero-cost non-production correction
+
+- SocialData query: `since_id` and `max_id` are query operators; cursor alone remains an HTTP parameter
+- Approval identity: discovery digests include exact benchmark identity, canonical SearchTasks, and strategy parameters; direct-ID digests include exact selected IDs and selection digest
+- Spend semantics: TwitterAPI.io retains a documented 20-result technical reserve; SocialData exposes an unknown page-size maximum, uses an approved request cap plus conservative estimate, and accounts actual returned resources after each response before another call
+- Request behavior: TwitterAPI.io observes local pacing and never retries a paid 429; rate limit is explicitly incomplete
+- Artifact identity: window, benchmark digest, short plan digest, and unique execution identity prevent repeated-benchmark directory collisions
+- Acceptance: minimum raw recall is 90%, target is 95%, complete content is required for found Posts, exact representation is separate, and systematic reply, quote, or long-Post loss uses explicit minimum sample and missing thresholds
+- Direct-ID boundary: selection and comparison remain offline; no live lookup endpoint exists
+- Scope boundary: zero external API calls, database writes, migrations, or `sync_state` changes; production collector and provider choice remain unchanged
+- Validation: 31 targeted provider/recovery tests passed; the full suite passed with 197 tests and 5 external tests skipped; compileall and diff checks passed without a provider request or database-writing path
+- Offline plans: discovery combined SHA-256 `c4e39d9ef46889b66c2e3d6de8bf383d035831fc9fa874bb395c72b5f81e9ede` remains non-executable; the exact 50-ID combined SHA-256 is `a31b0214801f8d17be2cefb7e79aaefcfd1d3f09ff873110c9abc0f5b3d38a32`
+- Final implementation commit: `0ed283cc6962948fe9db027fa3220cfe43866eef`
 
 ## Stage 4 - Minimum Knowledge Base
 

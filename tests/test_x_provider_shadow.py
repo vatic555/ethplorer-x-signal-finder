@@ -11,10 +11,14 @@ from x_signal_finder.x_provider_shadow import (
     NormalizedPost,
     NormalizedReference,
     ProviderPage,
+    ProviderRequestError,
     ProviderRun,
+    QualityAcceptanceThresholds,
     SearchTask,
     ShadowSpikeError,
+    SocialDataProvider,
     TwitterApiIoProvider,
+    build_shadow_run_id,
     build_direct_id_cost_plan,
     build_discovery_cost_plan,
     compare_direct_id_lookup,
@@ -158,6 +162,37 @@ def test_plan_search_tasks_groups_only_active_benchmark_authors() -> None:
     assert len(tasks) == 2
 
 
+def test_socialdata_provider_puts_id_bounds_in_search_query(monkeypatch) -> None:
+    captured = {}
+
+    def request_json(**kwargs):
+        captured.update(kwargs)
+        return 200, {"tweets": []}
+
+    monkeypatch.setattr(
+        "x_signal_finder.x_provider_shadow._request_json", request_json
+    )
+    task = SearchTask(
+        authors=("alice",),
+        start=NOW - timedelta(hours=1),
+        end=NOW,
+        cursor="cursor-1",
+        since_id="100",
+        max_id="200",
+    )
+
+    SocialDataProvider("key").search(task)
+
+    params = captured["params"]
+    assert params["cursor"] == "cursor-1"
+    assert "since_id" not in params
+    assert "max_id" not in params
+    assert params["query"] == (
+        f"from:alice since_time:{int(task.start.timestamp())} "
+        f"until_time:{int(task.end.timestamp())} since_id:100 max_id:200"
+    )
+
+
 class _FakeProvider:
     name = "twitterapi_io"
     unit_cost_usd = Decimal("0.00015")
@@ -188,6 +223,86 @@ def test_provider_run_requires_approved_preflight_before_request(tmp_path) -> No
         )
 
     assert provider.calls == 0
+
+
+def test_provider_run_blocks_approved_plan_over_limits_before_request(tmp_path) -> None:
+    provider = _FakeProvider()
+    benchmark = tuple(_post(str(index), author=f"author{index}") for index in range(34))
+    start = NOW - timedelta(hours=24)
+    plan = build_discovery_cost_plan(
+        provider="twitterapi_io",
+        benchmark=benchmark,
+        start=start,
+        end=NOW,
+        hard_cap_usd=Decimal("0.10"),
+    )
+
+    assert plan.plan_fits_approved_limits is False
+    with pytest.raises(ShadowSpikeError, match="approved request and spend limits"):
+        run_search_provider(
+            provider,
+            benchmark=benchmark,
+            start=start,
+            end=NOW,
+            spend_limit_usd=Decimal("0.10"),
+            artifact_dir=tmp_path,
+            approved_plan_sha256=plan.plan_sha256,
+        )
+
+    assert provider.calls == 0
+
+
+def test_discovery_approval_digest_changes_with_benchmark_identity() -> None:
+    start = NOW - timedelta(hours=1)
+    benchmark_a = (_post("100"), _post("200"))
+    benchmark_b = (_post("100"), _post("300"))
+
+    plan_a = build_discovery_cost_plan(
+        provider="twitterapi_io",
+        benchmark=benchmark_a,
+        start=start,
+        end=NOW,
+        hard_cap_usd=Decimal("0.10"),
+    )
+    plan_b = build_discovery_cost_plan(
+        provider="twitterapi_io",
+        benchmark=benchmark_b,
+        start=start,
+        end=NOW,
+        hard_cap_usd=Decimal("0.10"),
+    )
+    plan_different_strategy = build_discovery_cost_plan(
+        provider="twitterapi_io",
+        benchmark=benchmark_a,
+        start=start,
+        end=NOW,
+        hard_cap_usd=Decimal("0.10"),
+        minimum_twitter_slice_seconds=30,
+    )
+
+    assert plan_a.approval_scope["planned_search_tasks"] == plan_b.approval_scope[
+        "planned_search_tasks"
+    ]
+    assert plan_a.benchmark_size == plan_b.benchmark_size
+    assert plan_a.plan_sha256 != plan_b.plan_sha256
+    assert plan_a.plan_sha256 != plan_different_strategy.plan_sha256
+
+
+def test_direct_id_approval_digest_contains_exact_selected_ids() -> None:
+    plan_a = build_direct_id_cost_plan(
+        provider="socialdata",
+        benchmark=(_post("100"), _post("200")),
+        hard_cap_usd=Decimal("0.02"),
+    )
+    plan_b = build_direct_id_cost_plan(
+        provider="socialdata",
+        benchmark=(_post("100"), _post("300")),
+        hard_cap_usd=Decimal("0.02"),
+    )
+
+    assert plan_a.approval_scope["selected_post_ids"] == ["100", "200"]
+    assert plan_a.approval_scope["selection_sha256"]
+    assert plan_a.plan_sha256 != plan_b.plan_sha256
 
 
 def test_twitterapi_balance_includes_trial_bonus_credits(monkeypatch) -> None:
@@ -294,6 +409,107 @@ def test_twitterapi_overflow_at_minimum_slice_stops_without_loop(tmp_path) -> No
     assert result.status == "incomplete_due_to_minimum_time_slice"
     assert result.requests == 1
     assert provider.calls == 1
+
+
+def test_twitterapi_pacing_waits_without_extra_provider_calls(tmp_path) -> None:
+    class Provider:
+        name = "twitterapi_io"
+        unit_cost_usd = Decimal("0.00015")
+        minimum_interval_seconds = 5.0
+
+        def __init__(self):
+            self.calls = 0
+
+        def search(self, task):
+            self.calls += 1
+            return ProviderPage(
+                posts=(_post(str(self.calls), provider=self.name),),
+                raw_payload={"call": self.calls},
+                has_more=False,
+            )
+
+    class Clock:
+        def __init__(self):
+            self.now = 0.0
+            self.sleeps = []
+
+        def monotonic(self):
+            return self.now
+
+        def sleep(self, seconds):
+            self.sleeps.append(seconds)
+            self.now += seconds
+
+    provider = Provider()
+    clock = Clock()
+    benchmark = (_post("1", author="alice"), _post("2", author="bob"))
+    start = NOW - timedelta(hours=1)
+    plan = build_discovery_cost_plan(
+        provider="twitterapi_io",
+        benchmark=benchmark,
+        start=start,
+        end=NOW,
+        hard_cap_usd=Decimal("0.10"),
+    )
+
+    result = run_search_provider(
+        provider,
+        benchmark=benchmark,
+        start=start,
+        end=NOW,
+        spend_limit_usd=Decimal("0.10"),
+        artifact_dir=tmp_path,
+        approved_plan_sha256=plan.plan_sha256,
+        monotonic_clock=clock.monotonic,
+        sleep=clock.sleep,
+    )
+
+    assert result.status == "complete"
+    assert result.requests == 2
+    assert provider.calls == 2
+    assert clock.sleeps == [5.0]
+
+
+def test_twitterapi_429_is_incomplete_without_retry(tmp_path) -> None:
+    class Provider:
+        name = "twitterapi_io"
+        unit_cost_usd = Decimal("0.00015")
+        minimum_interval_seconds = 5.0
+
+        def __init__(self):
+            self.calls = 0
+
+        def search(self, task):
+            self.calls += 1
+            raise ProviderRequestError(self.name, 429, "rate_limited")
+
+    provider = Provider()
+    benchmark = (_post("1"),)
+    start = NOW - timedelta(hours=1)
+    plan = build_discovery_cost_plan(
+        provider="twitterapi_io",
+        benchmark=benchmark,
+        start=start,
+        end=NOW,
+        hard_cap_usd=Decimal("0.10"),
+    )
+
+    result = run_search_provider(
+        provider,
+        benchmark=benchmark,
+        start=start,
+        end=NOW,
+        spend_limit_usd=Decimal("0.10"),
+        artifact_dir=tmp_path,
+        approved_plan_sha256=plan.plan_sha256,
+        monotonic_clock=lambda: 0.0,
+        sleep=lambda seconds: None,
+    )
+
+    assert result.status == "incomplete_due_to_rate_limit"
+    assert result.requests == 1
+    assert provider.calls == 1
+    assert "provider_rate_limit_reached" in result.warnings
 
 
 def test_socialdata_traverses_cursor_and_blocks_repeated_cursor(tmp_path) -> None:
@@ -445,6 +661,139 @@ def test_socialdata_blocks_repeated_max_id_without_loop(tmp_path) -> None:
     assert provider.calls == 2
 
 
+def test_socialdata_plan_does_not_claim_a_hard_page_or_dollar_maximum() -> None:
+    plan = build_discovery_cost_plan(
+        provider="socialdata",
+        benchmark=(_post("1"),),
+        start=NOW - timedelta(hours=1),
+        end=NOW,
+        hard_cap_usd=Decimal("0.10"),
+    )
+
+    assert plan.documented_max_page_results is None
+    assert plan.expected_page_results == 20
+    assert plan.page_size_bound == "unknown_unbounded"
+    assert plan.technical_hard_dollar_cap is False
+    assert "worst case is unknown" in plan.safe_summary()["hard_guard"]
+
+
+def test_socialdata_stops_after_response_reaches_approved_budget(tmp_path) -> None:
+    class Provider:
+        name = "socialdata"
+        unit_cost_usd = Decimal("0.0002")
+        minimum_interval_seconds = 0.0
+
+        def __init__(self):
+            self.calls = 0
+
+        def search(self, task):
+            self.calls += 1
+            posts = tuple(
+                _post(str(index), provider=self.name) for index in range(500)
+            )
+            return ProviderPage(
+                posts=posts,
+                raw_payload={"returned": len(posts)},
+                has_more=True,
+                next_cursor="another-page",
+                possible_incomplete=True,
+            )
+
+    provider = Provider()
+    benchmark = (_post("1"),)
+    start = NOW - timedelta(hours=1)
+    plan = build_discovery_cost_plan(
+        provider="socialdata",
+        benchmark=benchmark,
+        start=start,
+        end=NOW,
+        hard_cap_usd=Decimal("0.10"),
+    )
+
+    result = run_search_provider(
+        provider,
+        benchmark=benchmark,
+        start=start,
+        end=NOW,
+        spend_limit_usd=Decimal("0.10"),
+        artifact_dir=tmp_path,
+        approved_plan_sha256=plan.plan_sha256,
+    )
+
+    assert result.status == "incomplete_due_to_budget"
+    assert result.requests == 1
+    assert provider.calls == 1
+    assert result.estimated_spend_usd == Decimal("0.1000")
+    assert "approved_budget_reached_after_response" in result.warnings
+
+
+def test_provider_accounts_returned_billable_resources_not_normalized_rows(
+    tmp_path,
+) -> None:
+    class Provider:
+        name = "socialdata"
+        unit_cost_usd = Decimal("0.0002")
+        minimum_interval_seconds = 0.0
+
+        def __init__(self):
+            self.calls = 0
+
+        def search(self, task):
+            self.calls += 1
+            return ProviderPage(
+                posts=(_post("1", provider=self.name),),
+                raw_payload={"returned": 7},
+                has_more=False,
+                billable_resources_returned=7,
+            )
+
+    provider = Provider()
+    benchmark = (_post("1"),)
+    start = NOW - timedelta(hours=1)
+    plan = build_discovery_cost_plan(
+        provider="socialdata",
+        benchmark=benchmark,
+        start=start,
+        end=NOW,
+        hard_cap_usd=Decimal("0.10"),
+    )
+
+    result = run_search_provider(
+        provider,
+        benchmark=benchmark,
+        start=start,
+        end=NOW,
+        spend_limit_usd=Decimal("0.10"),
+        artifact_dir=tmp_path,
+        approved_plan_sha256=plan.plan_sha256,
+    )
+
+    assert result.status == "complete"
+    assert result.requests == 1
+    assert provider.calls == 1
+    assert result.estimated_spend_usd == Decimal("0.0014")
+
+
+def test_shadow_run_identity_does_not_collide_for_same_benchmark() -> None:
+    benchmark = (_post("1"), _post("2"))
+    first = build_shadow_run_id(
+        window_end=NOW,
+        benchmark=benchmark,
+        combined_plan_digest="a" * 64,
+        execution_identity="run_one",
+    )
+    second = build_shadow_run_id(
+        window_end=NOW,
+        benchmark=benchmark,
+        combined_plan_digest="a" * 64,
+        execution_identity="run_two",
+    )
+
+    assert first != second
+    assert first.startswith("20260814T120000Z-")
+    assert "aaaaaaaaaa" in first
+
+
 def test_direct_id_selection_and_fixture_comparison_are_offline() -> None:
     fixture = json.loads(
         Path("tests/fixtures/provider_direct_id.json").read_text(encoding="utf-8")
@@ -502,10 +851,11 @@ def test_direct_id_selection_and_fixture_comparison_are_offline() -> None:
     assert selection["with_media"] == 2
     assert plan.estimated_requests == 1
     assert plan.expected_billable_resources == 4
-    assert plan.fits_hard_cap is True
+    assert plan.plan_fits_approved_limits is True
+    assert plan.approval_scope["selected_post_ids"]
     assert report["available_ids"] == 3
     assert report["unavailable_ids"] == 1
-    assert report["comparison"]["full_text"]["exact_matches"] == 2
+    assert report["comparison"]["exact_text_match"]["matches"] == 2
     assert report["comparison"]["long_posts"]["exact_text"] == 1
     assert report["comparison"]["post_type"]["accuracy_pct"] == 100.0
     assert report["comparison"]["referenced_context"]["coverage_pct"] == 50.0
@@ -656,10 +1006,111 @@ def test_compare_provider_reports_recall_text_type_context_and_media() -> None:
     assert report["missing_benchmark_ids"] == 1
     assert report["extra_ids"] == 1
     assert report["recall_pct"] == 66.67
-    assert report["full_text"]["exact_pct"] == 50.0
-    assert report["long_posts"]["truncated_or_mismatched"] == 1
+    assert report["exact_text_match"]["pct"] == 50.0
+    assert report["content_completeness"]["proven_truncations"] == 1
+    assert report["long_posts"]["proven_truncations"] == 1
     assert report["post_type"]["accuracy_pct"] == 50.0
     assert report["duplicates"] == 1
+
+
+def test_appended_quote_url_is_complete_but_not_exact() -> None:
+    expected = _post("1", text="Complete quoted commentary https://example.com/source")
+    actual = _post(
+        "1",
+        provider="twitterapi_io",
+        text=(
+            "Complete quoted commentary https://example.com/source "
+            "https://t.co/example"
+        ),
+    )
+    report = compare_provider(
+        (expected,),
+        ProviderRun(
+            provider="twitterapi_io",
+            status="complete",
+            posts=(actual,),
+            requests=1,
+            pagination_gaps=0,
+            estimated_spend_usd=Decimal("0.00015"),
+            actual_spend_usd=None,
+            warnings=(),
+        ),
+    )
+
+    assert report["exact_text_match"]["pct"] == 0.0
+    assert report["content_completeness"]["complete_pct"] == 100.0
+    assert report["content_completeness"]["proven_truncations"] == 0
+    assert report["acceptance"]["accepted"] is True
+
+
+def test_single_missed_long_post_is_not_systematic_loss() -> None:
+    benchmark = tuple(
+        _post(str(index), text=(f"long-{index}-" + "x" * 300))
+        for index in range(10)
+    )
+    provider_posts = tuple(
+        _post(
+            str(index),
+            provider="socialdata",
+            text=(f"long-{index}-" + "x" * 300),
+        )
+        for index in range(9)
+    )
+    report = compare_provider(
+        benchmark,
+        ProviderRun(
+            provider="socialdata",
+            status="complete",
+            posts=provider_posts,
+            requests=1,
+            pagination_gaps=0,
+            estimated_spend_usd=Decimal("0.0018"),
+            actual_spend_usd=None,
+            warnings=(),
+        ),
+        thresholds=QualityAcceptanceThresholds(),
+    )
+
+    assert report["recall_pct"] == 90.0
+    assert "systematic_long_post_recall_loss" not in report["systematic_loss_flags"]
+    assert report["acceptance"]["raw_recall_band"] == "acceptable_90_to_95"
+    assert report["acceptance"]["accepted"] is True
+
+
+def test_systematic_reply_loss_blocks_otherwise_acceptable_recall() -> None:
+    benchmark = tuple(
+        _post(
+            str(index),
+            post_type="reply" if index < 3 else "original",
+        )
+        for index in range(20)
+    )
+    provider_posts = tuple(
+        _post(
+            str(index),
+            provider="socialdata",
+            post_type="reply" if index < 3 else "original",
+        )
+        for index in range(20)
+        if index not in {1, 2}
+    )
+    report = compare_provider(
+        benchmark,
+        ProviderRun(
+            provider="socialdata",
+            status="complete",
+            posts=provider_posts,
+            requests=1,
+            pagination_gaps=0,
+            estimated_spend_usd=Decimal("0.0036"),
+            actual_spend_usd=None,
+            warnings=(),
+        ),
+    )
+
+    assert report["recall_pct"] == 90.0
+    assert "systematic_reply_recall_loss" in report["systematic_loss_flags"]
+    assert report["acceptance"]["accepted"] is False
 
 
 def test_stored_official_benchmark_is_read_only(monkeypatch) -> None:
